@@ -46,51 +46,9 @@ class NotificationService {
       });
     }
 
-    // Set up notification category with interactive actions
-    try {
-      await Notifications.setNotificationCategoryAsync('tidbit_feedback', [
-        {
-          identifier: 'knew',
-          buttonTitle: '✅ I knew it',
-          options: {
-            opensAppToForeground: false, // Don't open app when action is pressed
-          },
-        },
-        {
-          identifier: 'didnt_know',
-          buttonTitle: '❓ I didn\'t',
-          options: {
-            opensAppToForeground: false,
-          },
-        },
-        {
-          identifier: 'save',
-          buttonTitle: '💾 Save',
-          options: {
-            opensAppToForeground: false,
-          },
-        },
-      ], {
-        previewPlaceholder: 'Tap to view tidbit',
-      });
-      console.log('[NOTIFICATION_CATEGORY] Category "tidbit_feedback" set up successfully');
-      
-      // Immediately verify it was registered
-      try {
-        const allCategories = await Notifications.getNotificationCategoriesAsync();
-        console.log('[NOTIFICATION_CATEGORY] All categories after init setup:', allCategories.map(c => c.identifier));
-        const ourCategory = allCategories.find(cat => cat.identifier === 'tidbit_feedback');
-        if (ourCategory) {
-          console.log('[NOTIFICATION_CATEGORY] Category verified in init:', JSON.stringify(ourCategory, null, 2));
-        } else {
-          console.error('[NOTIFICATION_CATEGORY] Category NOT found after init setup!');
-        }
-      } catch (error) {
-        console.error('[NOTIFICATION_CATEGORY] Error verifying category in init:', error);
-      }
-    } catch (error) {
-      console.error('[NOTIFICATION_CATEGORY] Error setting up category:', error);
-    }
+    // IMPORTANT: Set up notification category with interactive actions
+    // This must be done before any push notifications arrive
+    await this.ensureCategorySetup();
 
     // Register device for push notifications
     await this.registerDeviceToken();
@@ -212,6 +170,69 @@ class NotificationService {
     }
   }
 
+  /**
+   * Send a test push notification through the server
+   * This ensures action buttons work correctly
+   */
+  static async sendTestPushNotification(tidbit) {
+    if (!tidbit) {
+      // If no tidbit provided, get one (prioritize due tidbits)
+      tidbit = await ContentService.getSmartTidbit();
+      if (!tidbit) return null;
+    }
+
+    // Ensure category is set up on client
+    await this.ensureCategorySetup();
+
+    try {
+      // Get push token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+      const pushToken = tokenData.data;
+
+      // Send push notification through server
+      if (API_CONFIG && API_CONFIG.BASE_URL && API_CONFIG.BASE_URL !== 'https://your-production-server.com') {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/api/send-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token: pushToken,
+            title: '📚 Tidbit',
+            body: tidbit.text,
+            data: {
+              tidbit: JSON.stringify(tidbit),
+              tidbitId: tidbit.id || null,
+              category: tidbit.category,
+            },
+            categoryId: 'tidbit_feedback', // Important: include categoryId for action buttons
+          }),
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          console.log('[TEST_NOTIFICATION] Push notification sent successfully');
+          return true;
+        } else {
+          console.error('[TEST_NOTIFICATION] Failed to send:', result.error);
+          return false;
+        }
+      } else {
+        console.warn('[TEST_NOTIFICATION] No server URL configured');
+        return false;
+      }
+    } catch (error) {
+      console.error('[TEST_NOTIFICATION] Error sending push notification:', error);
+      return false;
+    }
+  }
+
+  /**
+   * DEPRECATED: Use sendTestPushNotification for push notifications with action buttons
+   * This method is kept for backward compatibility but uses local notifications
+   */
   static async sendNotification(tidbit) {
     if (!tidbit) {
       // If no tidbit provided, get one (prioritize due tidbits)

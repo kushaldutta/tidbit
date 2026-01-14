@@ -16,12 +16,22 @@ export default function HomeScreen({ navigation }) {
     dailyTidbits: 0,
   });
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [devModeEnabled, setDevModeEnabled] = useState(false);
 
   useEffect(() => {
     loadData();
-    const unsubscribe = navigation.addListener('focus', loadData);
+    loadDevMode();
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+      loadDevMode();
+    });
     return unsubscribe;
   }, [navigation]);
+
+  const loadDevMode = async () => {
+    const enabled = await StorageService.getDevModeEnabled();
+    setDevModeEnabled(enabled);
+  };
 
   const loadData = async () => {
     const tidbitsSeen = await StorageService.getTidbitsSeen();
@@ -106,12 +116,14 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.button, styles.testButton]}
-        onPress={handleTestTidbit}
-      >
-        <Text style={styles.testButtonText}>Test Tidbit (Dev)</Text>
-      </TouchableOpacity>
+      {devModeEnabled && (
+        <TouchableOpacity
+          style={[styles.button, styles.testButton]}
+          onPress={handleTestTidbit}
+        >
+          <Text style={styles.testButtonText}>Test Tidbit (Dev)</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }

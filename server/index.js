@@ -612,10 +612,11 @@ async function sendScheduledNotifications() {
           tidbitId: tidbitId,
           category: randomTidbit.category,
         },
-        categoryId: 'tidbit_feedback',
+        categoryId: 'tidbit_feedback', // Required for action buttons - must match client-side category
         priority: 'high',
       };
       
+      console.log('[SCHEDULER] Creating notification with categoryId:', message.categoryId);
       messages.push(message);
     }
     
@@ -629,6 +630,16 @@ async function sendScheduledNotifications() {
     let sentCount = 0;
     let errorCount = 0;
     
+    // Log first message to verify categoryId is included
+    if (messages.length > 0) {
+      console.log('[SCHEDULER] Sample message being sent:', JSON.stringify({
+        to: messages[0].to.substring(0, 20) + '...',
+        title: messages[0].title,
+        categoryId: messages[0].categoryId,
+        hasData: !!messages[0].data,
+      }, null, 2));
+    }
+    
     for (const chunk of chunks) {
       try {
         const tickets = await expo.sendPushNotificationsAsync(chunk);
@@ -637,6 +648,7 @@ async function sendScheduledNotifications() {
         for (const ticket of tickets) {
           if (ticket.status === 'ok') {
             sentCount++;
+            console.log('[SCHEDULER] Notification sent successfully, ticket:', ticket.id);
           } else {
             errorCount++;
             console.error('[SCHEDULER] Notification error:', ticket.message || ticket);

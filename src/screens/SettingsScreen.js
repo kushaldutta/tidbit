@@ -8,6 +8,7 @@ import {
   Switch,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
@@ -24,12 +25,14 @@ const INTERVAL_OPTIONS = [
 
 export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [notificationInterval, setNotificationInterval] = useState(30);
+  const [notificationInterval, setNotificationInterval] = useState(60);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
   const [quietHoursStart, setQuietHoursStart] = useState(23); // 11 PM
   const [quietHoursEnd, setQuietHoursEnd] = useState(9); // 9 AM
   const [showQuietHoursPicker, setShowQuietHoursPicker] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [devModeEnabled, setDevModeEnabled] = useState(false);
+  const [devModeTapCount, setDevModeTapCount] = useState(0);
   const [spacedRepStats, setSpacedRepStats] = useState({
     totalTidbits: 0,
     dueTidbits: 0,
@@ -41,6 +44,7 @@ export default function SettingsScreen({ navigation }) {
   useEffect(() => {
     loadSettings();
     loadSpacedRepStats();
+    loadDevMode();
     
     // Refresh stats when screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
@@ -49,6 +53,38 @@ export default function SettingsScreen({ navigation }) {
     
     return unsubscribe;
   }, [navigation]);
+
+  const loadDevMode = async () => {
+    const enabled = await StorageService.getDevModeEnabled();
+    setDevModeEnabled(enabled);
+  };
+
+  const handleDevModeToggle = async () => {
+    const newState = !devModeEnabled;
+    setDevModeEnabled(newState);
+    await StorageService.setDevModeEnabled(newState);
+    if (newState) {
+      Alert.alert('🔧 Dev Mode', 'Developer mode enabled. Debug tools are now visible.');
+    } else {
+      Alert.alert('🔧 Dev Mode', 'Developer mode disabled.');
+    }
+  };
+
+  const handleSecretTap = () => {
+    const newCount = devModeTapCount + 1;
+    setDevModeTapCount(newCount);
+    
+    // Reset after 3 seconds
+    setTimeout(() => {
+      setDevModeTapCount(0);
+    }, 3000);
+    
+    // Enable dev mode after 5 taps
+    if (newCount >= 5) {
+      handleDevModeToggle();
+      setDevModeTapCount(0);
+    }
+  };
 
   const loadSpacedRepStats = async () => {
     try {
@@ -158,18 +194,22 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const handleTestNotification = async () => {
-    // Send an immediate test notification
+    // Send an immediate test push notification (with action buttons)
     try {
       const tidbit = await ContentService.getRandomTidbit();
       if (tidbit) {
-        await NotificationService.sendNotification(tidbit);
-        Alert.alert('Success', 'Test notification sent! Check your notification center.');
+        const success = await NotificationService.sendTestPushNotification(tidbit);
+        if (success) {
+          Alert.alert('Success', 'Test push notification sent! Check your notification center. Action buttons should appear when you expand it.');
+        } else {
+          Alert.alert('Error', 'Failed to send push notification. Check server connection and console logs.');
+        }
       } else {
         Alert.alert('Error', 'Could not generate tidbit. Make sure you have categories selected.');
       }
     } catch (error) {
       console.error('Error sending test notification:', error);
-      Alert.alert('Error', 'Could not send notification. Check if permissions are granted.');
+      Alert.alert('Error', 'Could not send notification. Check if permissions are granted and server is running.');
     }
   };
 
@@ -451,13 +491,13 @@ export default function SettingsScreen({ navigation }) {
           style={styles.testButton}
           onPress={handleTestNotification}
         >
-          <Text style={styles.testButtonText}>Send Test Notification</Text>
+          <Text style={styles.testButtonText}>Send Test Push Notification</Text>
         </TouchableOpacity>
         <Text style={styles.testButtonDescription}>
-          Send an immediate notification
+          Send an immediate push notification with action buttons
         </Text>
         
-        {Platform.OS === 'ios' && (
+        {Platform.OS === 'ios' && devModeEnabled && (
           <>
             <TouchableOpacity
               style={[styles.testButton, styles.testButtonSecondary]}
@@ -472,8 +512,9 @@ export default function SettingsScreen({ navigation }) {
         )}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Spaced Repetition Debug</Text>
+      {devModeEnabled && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔧 Spaced Repetition Debug</Text>
         <View style={styles.debugStats}>
           <View style={styles.debugStatRow}>
             <Text style={styles.debugStatLabel}>Total Tidbits with State:</Text>
@@ -570,6 +611,7 @@ export default function SettingsScreen({ navigation }) {
           Use these tools to test spaced repetition features. Check console logs for detailed info.
         </Text>
       </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
@@ -583,9 +625,54 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.aboutText}>
             <Text style={styles.aboutLabel}>Description:</Text> Learn tiny things daily through bite-sized notifications and interactive learning.
           </Text>
-          <Text style={styles.aboutText}>
-            <Text style={styles.aboutLabel}>Contact:</Text> support@tidbit.app
-          </Text>
+          <TouchableOpacity
+            onPress={() => Linking.openURL('mailto:kushald@berkeley.edu?subject=Tidbit App Support')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.aboutText}>
+              <Text style={styles.aboutLabel}>Contact:</Text>{' '}
+              <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
+                support@tidbit.app
+              </Text>
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              // Update this URL to your GitHub Pages URL once deployed
+              // Example: https://yourusername.github.io/tidbit/privacy
+              const privacyUrl = 'https://kushaldutta.github.io/tidbit/privacy'; // TODO: Update with your GitHub Pages URL
+              Linking.canOpenURL(privacyUrl).then(supported => {
+                if (supported) {
+                  Linking.openURL(privacyUrl);
+                } else {
+                  Alert.alert('Error', 'Could not open privacy policy link.');
+                }
+              }).catch(() => {
+                Alert.alert('Error', 'Could not open privacy policy link.');
+              });
+            }}
+            activeOpacity={0.7}
+            style={{ marginTop: 8 }}
+          >
+            <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
+              Privacy Policy
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        <View style={[styles.settingRow, { marginTop: 16 }]}>
+          <View style={styles.settingInfo}>
+            <Text style={styles.settingLabel}>🔧 Developer Mode</Text>
+            <Text style={styles.settingDescription}>
+              {devModeEnabled ? 'Debug tools are visible' : 'Enable to show debug tools'}
+            </Text>
+          </View>
+          <Switch
+            value={devModeEnabled}
+            onValueChange={handleDevModeToggle}
+            trackColor={{ false: '#e5e7eb', true: '#6366f1' }}
+            thumbColor="#ffffff"
+          />
         </View>
       </View>
     </ScrollView>

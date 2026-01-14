@@ -13,6 +13,7 @@ const KEYS = {
   QUIET_HOURS_ENABLED: 'quiet_hours_enabled', // Quiet hours toggle
   QUIET_HOURS_START: 'quiet_hours_start', // Quiet hours start hour (0-23)
   QUIET_HOURS_END: 'quiet_hours_end', // Quiet hours end hour (0-23)
+  DEV_MODE_ENABLED: 'dev_mode_enabled', // Developer mode toggle
 };
 
 class StorageService {
@@ -142,10 +143,10 @@ class StorageService {
   static async getNotificationInterval() {
     try {
       const interval = await AsyncStorage.getItem(KEYS.NOTIFICATION_INTERVAL);
-      return interval ? parseInt(interval, 10) : 30; // Default 30 minutes
+      return interval ? parseInt(interval, 10) : 60; // Default 60 minutes (1 hour)
     } catch (error) {
       console.error('Error getting notification interval:', error);
-      return 30;
+      return 60;
     }
   }
 
@@ -264,6 +265,25 @@ class StorageService {
       await AsyncStorage.setItem(key, value);
     } catch (error) {
       console.error(`Error setting item ${key}:`, error);
+    }
+  }
+
+  // Dev mode methods
+  static async getDevModeEnabled() {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.DEV_MODE_ENABLED);
+      return value === 'true';
+    } catch (error) {
+      console.error('Error getting dev mode:', error);
+      return false;
+    }
+  }
+
+  static async setDevModeEnabled(enabled) {
+    try {
+      await AsyncStorage.setItem(KEYS.DEV_MODE_ENABLED, String(enabled));
+    } catch (error) {
+      console.error('Error setting dev mode:', error);
     }
   }
 }

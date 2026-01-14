@@ -281,6 +281,12 @@ export default function App() {
           // App came to foreground - check if we should show a tidbit
           handleUnlock();
           
+          // Re-register notification category to ensure action buttons work
+          // This is important for push notifications that arrive when app is in background
+          NotificationService.ensureCategorySetup().catch(err => {
+            console.error('[APP] Error re-registering category on foreground:', err);
+          });
+          
           // Push notifications are handled by server - no local rescheduling needed
         }
         return nextAppState;
