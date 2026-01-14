@@ -42,6 +42,56 @@ class SpacedRepetitionService {
   }
 
   /**
+   * Mark a tidbit as shown (when displayed to user)
+   * If it was due and no action is taken, this will be used to clear the due status
+   * @param {string} tidbitId - The tidbit ID
+   */
+  static async markTidbitAsShown(tidbitId) {
+    if (!tidbitId) return;
+    
+    try {
+      const state = await this.getTidbitState(tidbitId);
+      if (state && state.nextDue) {
+        // Check if this tidbit was due (nextDue is in the past)
+        const nextDueDate = new Date(state.nextDue);
+        const now = new Date();
+        
+        if (nextDueDate <= now) {
+          // This was a due tidbit - mark it as shown
+          state.wasShownAsDue = true;
+          state.shownAsDueAt = now.toISOString();
+          await this.saveTidbitState(tidbitId, state);
+        }
+      }
+    } catch (error) {
+      console.error(`Error marking tidbit as shown: ${tidbitId}`, error);
+    }
+  }
+
+  /**
+   * Clear the due status for a tidbit (when shown but no action taken)
+   * This makes it a normal random tidbit again
+   * @param {string} tidbitId - The tidbit ID
+   */
+  static async clearDueStatus(tidbitId) {
+    if (!tidbitId) return;
+    
+    try {
+      const state = await this.getTidbitState(tidbitId);
+      if (state) {
+        // Clear nextDue so it's no longer prioritized
+        state.nextDue = null;
+        state.wasShownAsDue = false;
+        state.shownAsDueAt = null;
+        await this.saveTidbitState(tidbitId, state);
+        console.log(`[SPACED_REP] Cleared due status for tidbit ${tidbitId} (no action taken)`);
+      }
+    } catch (error) {
+      console.error(`Error clearing due status for ${tidbitId}:`, error);
+    }
+  }
+
+  /**
    * Record user feedback for a tidbit
    * @param {string} tidbitId - The tidbit ID
    * @param {string} action - 'knew', 'didnt_know', or 'save'
@@ -57,6 +107,9 @@ class SpacedRepetitionService {
     
     // Get existing state or create new
     let state = await this.getTidbitState(tidbitId);
+    
+    // Check if this was a due tidbit being reset
+    const wasDueTidbit = state?.wasShownAsDue === true;
     
     if (!state) {
       // First time user interacts with this tidbit
@@ -75,16 +128,25 @@ class SpacedRepetitionService {
     // Update lastSeen and totalViews
     state.lastSeen = nowISO;
     state.totalViews = (state.totalViews || 0) + 1;
+    
+    // Clear the "shown as due" flag since user took action
+    state.wasShownAsDue = false;
+    state.shownAsDueAt = null;
 
     // Handle different actions
     if (action === 'didnt_know') {
       // "I didn't know" → Repeat in 3-6 hours
+      // If this was a due tidbit, reset to initial schedule (as if first time)
       const hoursFromNow = 3 + Math.random() * 3; // Random between 3-6 hours
       const nextDueDate = new Date(now.getTime() + hoursFromNow * 60 * 60 * 1000);
       state.nextDue = nextDueDate.toISOString();
       state.correctStreak = 0; // Reset streak
       state.masteryLevel = 'learning';
       // Don't clear saved status - user explicitly saved it
+      
+      if (wasDueTidbit) {
+        console.log(`[SPACED_REP] Due tidbit ${tidbitId} reset to initial "didn't know" schedule`);
+      }
       
     } else if (action === 'knew') {
       // "I knew it" → Repeat tomorrow (first time) or 2-3 days (subsequent)

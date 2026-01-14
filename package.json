@@ -7,6 +7,7 @@
     "content:add": "node scripts/add-tidbit.js",
     "server": "node server/index.js",
     "server:dev": "nodemon server/index.js",
+    "server:seed": "node server/scripts/seed-from-json.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

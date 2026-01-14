@@ -124,6 +124,12 @@ export default function App() {
     if (shouldShow) {
       const tidbit = await ContentService.getSmartTidbit();
       if (tidbit) {
+        // Mark tidbit as shown (will mark as "shown as due" if it was due)
+        const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
+        if (tidbitWithId.id) {
+          await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
+        }
+        
         setCurrentTidbit(tidbit);
         setShowTidbit(true);
         await UnlockService.recordUnlock();
@@ -318,6 +324,12 @@ export default function App() {
     try {
       const tidbit = await ContentService.getSmartTidbit();
       if (tidbit) {
+        // Mark tidbit as shown (will mark as "shown as due" if it was due)
+        const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
+        if (tidbitWithId.id) {
+          await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
+        }
+        
         setCurrentTidbit(tidbit);
         setShowTidbit(true);
         // Count this as a tidbit seen, but don't affect unlock-based limits

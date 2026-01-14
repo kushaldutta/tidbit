@@ -51,13 +51,20 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
       setIsFlipped(false);
       flipAnim.setValue(0);
       
-      // Check tidbit learning state
+      // Check tidbit learning state and mark as shown if it was due
       const loadLearningState = async () => {
         const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
         if (tidbitWithId.id) {
           const state = await SpacedRepetitionService.getTidbitState(tidbitWithId.id);
           setIsSaved(state?.saved === true);
           setLearningState(state);
+          
+          // Mark tidbit as shown (will mark as "shown as due" if it was due)
+          await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
+          
+          // Reload state to get updated "wasShownAsDue" flag
+          const updatedState = await SpacedRepetitionService.getTidbitState(tidbitWithId.id);
+          setLearningState(updatedState);
         } else {
           setIsSaved(false);
           setLearningState(null);
@@ -70,8 +77,17 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
     }
   }, [tidbit?.text, tidbit?.category]); // Only trigger on actual content change
 
-  const handleDismiss = () => {
+  const handleDismiss = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // If this was a due tidbit and user dismissed without action, clear the due status
+    if (tidbit) {
+      const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
+      if (tidbitWithId.id && learningState?.wasShownAsDue) {
+        await SpacedRepetitionService.clearDueStatus(tidbitWithId.id);
+      }
+    }
+    
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
