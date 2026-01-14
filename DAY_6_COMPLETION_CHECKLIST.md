@@ -29,19 +29,18 @@
 
 ## 🎯 Critical Before Testing (Must Do)
 
-### 1. App Icon + Splash Screen ⚠️
+### 1. App Icon + Splash Screen ✅
 
 **Current Status:**
-- You have icon files in `assets/`:
-  - `icon.png` (1024x1024px recommended)
-  - `splash.png`
-  - `adaptive-icon.png` (Android)
+- ✅ Using `assets/tidbit.png` (1024x1024px) as app icon
+- ✅ Icon configured in `app.json` for iOS and Android
+- ✅ Splash screen configured to use `assets/splash.png`
+- ✅ Adaptive icon configured for Android 8+
 
 **What to Check:**
-- [ ] Is `icon.png` at least 1024x1024px?
-- [ ] Does the icon look good? (simple, recognizable, works at small sizes)
-- [ ] Does `splash.png` match your app's design?
-- [ ] Test on device - does icon appear correctly?
+- [x] Icon file is 1024x1024px (`tidbit.png`)
+- [ ] Test on device - does icon appear correctly in app switcher/home screen?
+- [ ] Does splash screen look good on launch?
 
 **Options if icon needs work:**
 - Use an AI icon generator (DALL-E, Midjourney, etc.)
@@ -87,7 +86,7 @@ npx expo prebuild
 - ✅ Permission handling graceful
 
 **Only Remaining:**
-- ⚠️ App icon verification (you have files, just need to check they look good)
+- ⚠️ App icon testing (configured, just need to verify it appears correctly on device)
 
 ---
 
@@ -139,7 +138,7 @@ If you need a quick icon:
 - [x] Contact info works
 - [x] Default settings good
 - [x] Debug UI hidden
-- [ ] Icon looks professional (quick check needed)
+- [x] Icon configured (test on device to verify it looks good)
 
 **You're 95% ready!** Just verify the icon and you're good to go! 🚀
 

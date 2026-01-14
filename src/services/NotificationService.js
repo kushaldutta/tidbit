@@ -312,6 +312,17 @@ class NotificationService {
     
     // Handle notifications received while app is foregrounded
     this.notificationListener = Notifications.addNotificationReceivedListener(async (notification) => {
+      // iOS uses categoryIdentifier, Android/Expo uses categoryId
+      const categoryId = notification.request.content.categoryId || notification.request.content.categoryIdentifier;
+      
+      // Log notification details to debug category issues
+      console.log('[NOTIFICATION_RECEIVED] Notification received:', {
+        title: notification.request.content.title,
+        categoryId: categoryId,
+        hasData: !!notification.request.content.data,
+        triggerType: notification.request.trigger?.type || 'push',
+      });
+      
       // Re-ensure category when notification arrives (in case it wasn't registered)
       await this.ensureCategorySetup();
       

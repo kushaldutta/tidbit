@@ -115,6 +115,7 @@ export default function App() {
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(null); // null = checking, true/false = determined
   const [isLoading, setIsLoading] = useState(true); // Show loading screen initially
   const isInitializedRef = useRef(false);
+  const navigationRef = useRef(null);
 
   const handleUnlock = useCallback(async () => {
     // Only show tidbits after initialization
@@ -145,7 +146,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Show loading screen for 1.5 seconds, then check onboarding status
+    // Show loading screen for 1 second, then check onboarding status
     const loadingTimer = setTimeout(async () => {
       await checkOnboardingStatus();
       setIsLoading(false);
@@ -184,10 +185,13 @@ export default function App() {
       NotificationService.setupNotificationListeners(
         // Notification received (app in foreground)
         (notification) => {
+          // iOS uses categoryIdentifier, Android/Expo uses categoryId
+          const categoryId = notification.request.content.categoryId || notification.request.content.categoryIdentifier;
+          
           console.log('[NOTIFICATION_RECEIVED] Notification received in foreground:', {
             title: notification.request.content.title,
             body: notification.request.content.body?.substring(0, 50),
-            categoryId: notification.request.content.categoryId,
+            categoryId: categoryId,
             hasData: !!notification.request.content.data,
           });
           
@@ -201,19 +205,27 @@ export default function App() {
           const { notification, actionIdentifier } = response;
           const data = notification.request.content.data;
           
+          // iOS uses categoryIdentifier (capital I), Android/Expo uses categoryId (lowercase)
+          // Check both to handle platform differences
+          const categoryId = notification.request.content.categoryId || notification.request.content.categoryIdentifier;
+          
           console.log('[NOTIFICATION_RESPONSE] Received response:', {
             actionIdentifier,
             defaultActionId: Notifications.DEFAULT_ACTION_IDENTIFIER,
             hasData: !!data,
             tidbitId: data?.tidbitId,
-            categoryId: notification.request.content.categoryId,
+            categoryId: categoryId,
+            categoryIdField: notification.request.content.categoryId,
+            categoryIdentifierField: notification.request.content.categoryIdentifier,
             notificationSource: notification.request.trigger?.type || 'push',
           });
           
-          // Log if categoryId is missing
-          if (!notification.request.content.categoryId) {
-            console.error('[NOTIFICATION_RESPONSE] ⚠️ WARNING: categoryId is missing from notification!');
+          // Log if category is missing (check both field names)
+          if (!categoryId) {
+            console.error('[NOTIFICATION_RESPONSE] ⚠️ WARNING: categoryId/categoryIdentifier is missing from notification!');
             console.error('[NOTIFICATION_RESPONSE] Full notification:', JSON.stringify(notification.request.content, null, 2));
+          } else {
+            console.log('[NOTIFICATION_RESPONSE] ✅ category present:', categoryId);
           }
           
           // Check if this is an action button press
@@ -345,6 +357,25 @@ export default function App() {
     }
   }, []);
 
+  // Listen for navigation to Tidbit route and show modal
+  // This must be before any early returns to follow Rules of Hooks
+  useEffect(() => {
+    if (!isOnboardingComplete || !navigationRef.current) return;
+    
+    const unsubscribe = navigationRef.current.addListener('state', (e) => {
+      const route = e.data?.state?.routes?.[e.data?.state?.index];
+      if (route?.name === 'Tidbit' && route?.params?.tidbit && !showTidbit) {
+        setCurrentTidbit(route.params.tidbit);
+        setShowTidbit(true);
+        // Navigate back to Main after showing modal
+        setTimeout(() => {
+          navigationRef.current?.navigate('Main');
+        }, 100);
+      }
+    });
+    return unsubscribe;
+  }, [showTidbit, isOnboardingComplete]);
+
   // Show loading screen initially
   if (isLoading || isOnboardingComplete === null) {
     return (
@@ -357,10 +388,16 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         {isOnboardingComplete ? (
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen 
+              name="Tidbit" 
+              options={{ presentation: 'transparentModal', headerShown: false }}
+            >
+              {() => null}
+            </Stack.Screen>
           </Stack.Navigator>
         ) : (
           <OnboardingStack />

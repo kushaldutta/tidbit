@@ -357,15 +357,24 @@ app.post('/api/register-token', async (req, res) => {
     };
     
     // Add user preferences if provided
-    if (notificationInterval !== undefined) updateData.notification_interval = notificationInterval;
-    if (notificationsEnabled !== undefined) updateData.notifications_enabled = notificationsEnabled;
+    if (notificationInterval !== undefined) {
+      updateData.notification_interval = notificationInterval;
+      console.log(`[SERVER] Updating notification_interval to: ${notificationInterval} minutes`);
+    }
+    if (notificationsEnabled !== undefined) {
+      updateData.notifications_enabled = notificationsEnabled;
+      console.log(`[SERVER] Updating notifications_enabled to: ${notificationsEnabled}`);
+    }
     if (quietHoursEnabled !== undefined) updateData.quiet_hours_enabled = quietHoursEnabled;
     if (quietHoursStart !== undefined) updateData.quiet_hours_start = quietHoursStart;
     if (quietHoursEnd !== undefined) updateData.quiet_hours_end = quietHoursEnd;
-    if (selectedCategories !== undefined) updateData.selected_categories = selectedCategories;
+    if (selectedCategories !== undefined) {
+      updateData.selected_categories = selectedCategories;
+      console.log(`[SERVER] Updating selected_categories to: ${JSON.stringify(selectedCategories)}`);
+    }
     
     // Upsert device token (update if exists, insert if new)
-    // Add timeout wrapper for Supabase call
+    // IMPORTANT: Include all updateData fields so preferences are saved
     const upsertPromise = supabase
       .from('device_tokens')
       .upsert({
@@ -373,6 +382,7 @@ app.post('/api/register-token', async (req, res) => {
         platform,
         app_version: appVersion || null,
         last_active: new Date().toISOString(),
+        ...updateData, // Include all user preferences (interval, categories, quiet hours, etc.)
       }, {
         onConflict: 'token',
       })
@@ -386,6 +396,14 @@ app.post('/api/register-token', async (req, res) => {
     
     let data, error;
     try {
+      console.log(`[SERVER] 📝 Attempting to upsert device token with data:`, JSON.stringify({
+        token: updateData.token.substring(0, 20) + '...',
+        platform: updateData.platform,
+        notification_interval: updateData.notification_interval,
+        notifications_enabled: updateData.notifications_enabled,
+        selected_categories: updateData.selected_categories,
+      }, null, 2));
+      
       const result = await Promise.race([upsertPromise, timeoutPromise]);
       data = result.data;
       error = result.error;
@@ -419,7 +437,14 @@ app.post('/api/register-token', async (req, res) => {
       });
     }
     
-    console.log(`[SERVER] Device token registered: ${platform} (${token.substring(0, 20)}...)`);
+    console.log(`[SERVER] ✅ Device token registered: ${platform} (${token.substring(0, 20)}...)`);
+    if (data) {
+      console.log(`[SERVER] ✅ Database now has notification_interval: ${data.notification_interval || 'NOT SET'}`);
+      console.log(`[SERVER] ✅ Database now has notifications_enabled: ${data.notifications_enabled ?? 'NOT SET'}`);
+      console.log(`[SERVER] ✅ Database now has selected_categories: ${JSON.stringify(data.selected_categories || [])}`);
+    } else {
+      console.warn(`[SERVER] ⚠️ No data returned from upsert - preferences may not have been saved!`);
+    }
     
     res.json({
       success: true,
@@ -465,11 +490,22 @@ app.post('/api/send-notification', async (req, res) => {
       priority: 'high',
     };
     
+    // Log the exact message format for test notifications
+    console.log('[TEST_NOTIFICATION] Message being sent:', JSON.stringify({
+      to: message.to.substring(0, 30) + '...',
+      title: message.title,
+      body: message.body?.substring(0, 50) + '...',
+      categoryId: message.categoryId,
+      hasData: !!message.data,
+      priority: message.priority,
+    }, null, 2));
+    
     const chunks = expo.chunkPushNotifications([message]);
     const tickets = [];
     
     for (const chunk of chunks) {
       try {
+        console.log('[TEST_NOTIFICATION] Sending chunk, categoryId:', chunk[0].categoryId);
         const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
       } catch (error) {
@@ -524,7 +560,9 @@ async function sendScheduledNotifications() {
       return;
     }
     
-    console.log(`[SCHEDULER] Checking ${devices.length} devices for notifications...`);
+    console.log(`[SCHEDULER] ========================================`);
+    console.log(`[SCHEDULER] Starting notification check at ${currentHour}:${currentMinute}`);
+    console.log(`[SCHEDULER] Found ${devices.length} active device(s)`);
     
     // Get tidbits from Supabase
     const tidbitsData = await fetchTidbitsFromSupabase();
@@ -613,6 +651,8 @@ async function sendScheduledNotifications() {
       const tidbitId = generateTidbitId(randomTidbit.text, randomTidbit.category);
       
       // Create notification message
+      // IMPORTANT: Must match the exact format of test notifications
+      // For iOS action buttons, categoryId must be at the top level
       const message = {
         to: device.token,
         sound: 'default',
@@ -627,11 +667,27 @@ async function sendScheduledNotifications() {
           tidbitId: tidbitId,
           category: randomTidbit.category,
         },
-        categoryId: 'tidbit_feedback', // Required for action buttons - must match client-side category
+        categoryId: 'tidbit_feedback', // Required for iOS action buttons - Expo converts this to aps.category
         priority: 'high',
+        // Also try adding it to the iOS-specific payload (Expo should handle this, but being explicit)
+        _displayInForeground: true,
       };
       
+      // Verify categoryId is included before adding to messages
+      if (!message.categoryId) {
+        console.error('[SCHEDULER] ERROR: categoryId is missing from message!');
+      }
+      
       console.log('[SCHEDULER] Creating notification with categoryId:', message.categoryId);
+      console.log('[SCHEDULER] Full message structure:', JSON.stringify({
+        hasTo: !!message.to,
+        hasTitle: !!message.title,
+        hasBody: !!message.body,
+        hasData: !!message.data,
+        categoryId: message.categoryId,
+        priority: message.priority,
+      }, null, 2));
+      
       messages.push(message);
     }
     
@@ -668,17 +724,29 @@ async function sendScheduledNotifications() {
           dataKeys: chunk[0].data ? Object.keys(chunk[0].data) : [],
         }, null, 2));
         
+        // Log the EXACT payload being sent to Expo
+        console.log('[SCHEDULER] About to send to Expo, chunk[0] categoryId:', chunk[0].categoryId);
+        console.log('[SCHEDULER] Full chunk[0] keys:', Object.keys(chunk[0]));
+        
         const tickets = await expo.sendPushNotificationsAsync(chunk);
+        
+        // Log the response from Expo
+        console.log('[SCHEDULER] Expo response tickets:', tickets.map(t => ({
+          status: t.status,
+          id: t.id,
+          message: t.message,
+        })));
         
         // Check for errors in tickets
         for (let i = 0; i < tickets.length; i++) {
           const ticket = tickets[i];
           if (ticket.status === 'ok') {
             sentCount++;
-            console.log(`[SCHEDULER] Notification ${i+1} sent successfully, ticket ID: ${ticket.id}`);
+            console.log(`[SCHEDULER] ✅ Notification ${i+1} sent successfully, ticket ID: ${ticket.id}`);
+            console.log(`[SCHEDULER] ✅ This notification SHOULD have categoryId: ${chunk[i].categoryId}`);
           } else {
             errorCount++;
-            console.error(`[SCHEDULER] Notification ${i+1} error:`, ticket.message || ticket);
+            console.error(`[SCHEDULER] ❌ Notification ${i+1} error:`, ticket.message || ticket);
             if (ticket.details) {
               console.error('[SCHEDULER] Error details:', ticket.details);
             }
@@ -720,21 +788,42 @@ function setupNotificationScheduler() {
       }
       
       const now = new Date();
+      const currentMinute = now.getMinutes();
+      const currentHour = now.getHours();
+      const minutesSinceMidnight = currentHour * 60 + currentMinute;
       
+      console.log(`[CRON] Running at ${currentHour}:${currentMinute.toString().padStart(2, '0')} (minute ${minutesSinceMidnight} since midnight)`);
+      
+      let shouldSend = false;
       for (const device of devices) {
-        if (!device.notification_interval) continue;
+        if (!device.notification_interval) {
+          console.log(`[CRON] Device ${device.token.substring(0, 20)}... has no interval, skipping`);
+          continue;
+        }
         
         // Check if it's time to send (based on interval)
-        // For simplicity, send if current minute is divisible by interval
-        // This is a basic implementation - can be improved
-        const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+        // For 15 min: sends at :00, :15, :30, :45
+        // For 30 min: sends at :00, :30
+        // For 60 min: sends at :00 every hour
+        // For 120 min: sends at :00 every 2 hours (12:00 AM, 2:00 AM, 4:00 AM, etc.)
+        // For 240 min: sends at :00 every 4 hours (12:00 AM, 4:00 AM, 8:00 AM, 12:00 PM, 4:00 PM, 8:00 PM)
+        const remainder = minutesSinceMidnight % device.notification_interval;
+        const isTimeToSend = remainder === 0;
         
-        if (minutesSinceMidnight % device.notification_interval === 0) {
-          // It's time to send for this device
-          // We'll send to all eligible devices in one batch
-          await sendScheduledNotifications();
-          break; // Only send once per minute
+        console.log(`[CRON] Device interval: ${device.notification_interval} min, remainder: ${remainder}, should send: ${isTimeToSend}`);
+        
+        if (isTimeToSend) {
+          shouldSend = true;
+          console.log(`[CRON] ✅ It's time to send notifications (interval: ${device.notification_interval} min)`);
+          break; // Found a device that needs notification
         }
+      }
+      
+      if (shouldSend) {
+        console.log(`[CRON] Calling sendScheduledNotifications()...`);
+        await sendScheduledNotifications();
+      } else {
+        console.log(`[CRON] Not time to send yet (will check again next minute)`);
       }
     } catch (error) {
       console.error('[SCHEDULER] Error in cron job:', error);

@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
+import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 
 export default function HomeScreen({ navigation }) {
   const [stats, setStats] = useState({
@@ -53,12 +54,26 @@ export default function HomeScreen({ navigation }) {
     setSelectedCategories(validCategories);
   };
 
-  const handleTestTidbit = async () => {
-    const tidbit = await ContentService.getRandomTidbit();
-    if (tidbit) {
-      // Navigate to a test modal or show it
-      // For now, we'll just show an alert or you can trigger the modal from App.js
-      console.log('Test tidbit:', tidbit);
+  const handleGetTidbitNow = async () => {
+    try {
+      // Get a smart tidbit (prioritizes due tidbits for spaced repetition)
+      const tidbit = await ContentService.getSmartTidbit();
+      if (tidbit) {
+        // Mark tidbit as shown (will mark as "shown as due" if it was due)
+        const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
+        if (tidbitWithId.id) {
+          await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
+        }
+        
+        // Trigger the tidbit modal by navigating with tidbit data
+        // App.js will listen for this and show the modal
+        navigation.navigate('Tidbit', { tidbit: tidbitWithId });
+        
+        // Count this as a tidbit seen
+        await StorageService.incrementTidbitsSeen();
+      }
+    } catch (error) {
+      console.error('Error getting tidbit:', error);
     }
   };
 
@@ -116,14 +131,12 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {devModeEnabled && (
-        <TouchableOpacity
-          style={[styles.button, styles.testButton]}
-          onPress={handleTestTidbit}
-        >
-          <Text style={styles.testButtonText}>Test Tidbit (Dev)</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={[styles.button, styles.getTidbitButton]}
+        onPress={handleGetTidbitNow}
+      >
+        <Text style={styles.buttonText}>Get Tidbit Now</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -254,13 +267,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  testButton: {
-    backgroundColor: '#f3f4f6',
-    marginTop: 8,
-  },
-  testButtonText: {
-    color: '#6b7280',
-    fontSize: 14,
+  getTidbitButton: {
+    marginTop: 16,
+    marginBottom: 8,
   },
 });
 

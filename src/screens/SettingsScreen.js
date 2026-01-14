@@ -21,6 +21,7 @@ const INTERVAL_OPTIONS = [
   { label: '30 minutes', value: 30 },
   { label: '1 hour', value: 60 },
   { label: '2 hours', value: 120 },
+  { label: '4 hours', value: 240 },
 ];
 
 export default function SettingsScreen({ navigation }) {
@@ -485,17 +486,18 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Testing</Text>
-        <TouchableOpacity
-          style={styles.testButton}
-          onPress={handleTestNotification}
-        >
-          <Text style={styles.testButtonText}>Send Test Push Notification</Text>
-        </TouchableOpacity>
-        <Text style={styles.testButtonDescription}>
-          Send an immediate push notification with action buttons
-        </Text>
+      {devModeEnabled && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Testing</Text>
+          <TouchableOpacity
+            style={styles.testButton}
+            onPress={handleTestNotification}
+          >
+            <Text style={styles.testButtonText}>Send Test Push Notification</Text>
+          </TouchableOpacity>
+          <Text style={styles.testButtonDescription}>
+            Send an immediate push notification with action buttons
+          </Text>
         
         {Platform.OS === 'ios' && devModeEnabled && (
           <>
@@ -508,9 +510,31 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.testButtonDescription}>
               See how many notifications are scheduled (check console for debug logs)
             </Text>
+            <TouchableOpacity
+              style={[styles.testButton, { backgroundColor: '#f59e0b', marginTop: 8 }]}
+              onPress={async () => {
+                try {
+                  await NotificationService.cancelAllNotifications();
+                  const scheduled = await NotificationService.getAllScheduledNotifications();
+                  Alert.alert(
+                    'Success',
+                    `Cleared all local notifications.\n\nRemaining scheduled: ${scheduled.length}\n\nNote: Push notifications from the server are not affected.`
+                  );
+                } catch (error) {
+                  console.error('Error clearing notifications:', error);
+                  Alert.alert('Error', 'Could not clear notifications.');
+                }
+              }}
+            >
+              <Text style={styles.testButtonText}>Clear Old Local Notifications</Text>
+            </TouchableOpacity>
+            <Text style={styles.testButtonDescription}>
+              Clears any old local notifications that might still be scheduled. Push notifications from the server are not affected.
+            </Text>
           </>
         )}
-      </View>
+        </View>
+      )}
 
       {devModeEnabled && (
         <View style={styles.section}>
