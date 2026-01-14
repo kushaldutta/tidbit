@@ -248,6 +248,24 @@ class StorageService {
       console.error('Error setting quiet hours end:', error);
     }
   }
+
+  // Generic storage methods
+  static async getItem(key) {
+    try {
+      return await AsyncStorage.getItem(key);
+    } catch (error) {
+      console.error(`Error getting item ${key}:`, error);
+      return null;
+    }
+  }
+
+  static async setItem(key, value) {
+    try {
+      await AsyncStorage.setItem(key, value);
+    } catch (error) {
+      console.error(`Error setting item ${key}:`, error);
+    }
+  }
 }
 
 export { StorageService };

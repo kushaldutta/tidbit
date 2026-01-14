@@ -39,13 +39,40 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Triggers to auto-update updated_at
+-- Drop existing triggers if they exist (for re-running the script)
+DROP TRIGGER IF EXISTS update_categories_updated_at ON categories;
 CREATE TRIGGER update_categories_updated_at
   BEFORE UPDATE ON categories
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_tidbits_updated_at ON tidbits;
 CREATE TRIGGER update_tidbits_updated_at
   BEFORE UPDATE ON tidbits
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Device tokens table for push notifications
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id SERIAL PRIMARY KEY,
+  token TEXT UNIQUE NOT NULL,
+  user_id TEXT, -- Optional: for multi-user support later
+  platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
+  app_version TEXT,
+  last_active TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_device_tokens_token ON device_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_platform ON device_tokens(platform);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_last_active ON device_tokens(last_active);
+
+-- Trigger to update updated_at for device_tokens
+DROP TRIGGER IF EXISTS update_device_tokens_updated_at ON device_tokens;
+CREATE TRIGGER update_device_tokens_updated_at
+  BEFORE UPDATE ON device_tokens
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 

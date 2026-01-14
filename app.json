@@ -29,10 +29,19 @@
       [
         "expo-notifications",
         {
-          "color": "#ffffff"
+          "color": "#ffffff",
+          "sounds": [],
+          "mode": "production"
         }
       ]
     ],
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#ffffff",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new tidbits"
+    },
     "extra": {
       "eas": {
         "projectId": "4337afcf-a02c-4ea8-b202-e3b836db1771"

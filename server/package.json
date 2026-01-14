@@ -12,7 +12,9 @@
     "@supabase/supabase-js": "^2.90.1",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
-    "express": "^4.22.1"
+    "expo-server-sdk": "^3.15.0",
+    "express": "^4.22.1",
+    "node-cron": "^3.0.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

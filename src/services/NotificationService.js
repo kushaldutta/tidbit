@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 import { StorageService } from './StorageService';
 import { ContentService } from './ContentService';
 import { UnlockService } from './UnlockService';
+import API_CONFIG from '../config/api';
+import Constants from 'expo-constants';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -90,7 +92,59 @@ class NotificationService {
       console.error('[NOTIFICATION_CATEGORY] Error setting up category:', error);
     }
 
+    // Register device for push notifications
+    await this.registerDeviceToken();
+
     return true;
+  }
+
+  /**
+   * Register device push token with server
+   */
+  static async registerDeviceToken() {
+    try {
+      // Get Expo push token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+      
+      const pushToken = tokenData.data;
+      console.log('[PUSH_NOTIFICATIONS] Expo push token:', pushToken.substring(0, 20) + '...');
+      
+      // Register token with server
+      if (API_CONFIG && API_CONFIG.BASE_URL && API_CONFIG.BASE_URL !== 'https://your-production-server.com') {
+        try {
+          const response = await fetch(`${API_CONFIG.BASE_URL}/api/register-token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              token: pushToken,
+              platform: Platform.OS,
+              appVersion: Constants.expoConfig?.version || '1.0.0',
+            }),
+          });
+          
+          const result = await response.json();
+          if (result.success) {
+            console.log('[PUSH_NOTIFICATIONS] Device token registered successfully');
+            // Store token locally for reference
+            await StorageService.setItem('push_token', pushToken);
+          } else {
+            console.error('[PUSH_NOTIFICATIONS] Failed to register token:', result.error);
+          }
+        } catch (error) {
+          console.error('[PUSH_NOTIFICATIONS] Error registering token with server:', error);
+          // Don't fail init if server is unavailable - app can still work
+        }
+      } else {
+        console.warn('[PUSH_NOTIFICATIONS] No server URL configured, skipping token registration');
+      }
+    } catch (error) {
+      console.error('[PUSH_NOTIFICATIONS] Error getting Expo push token:', error);
+      // Don't fail init if push token fails - app can still work with local notifications
+    }
   }
 
   /**
