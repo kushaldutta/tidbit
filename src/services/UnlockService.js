@@ -1,6 +1,6 @@
 import { StorageService } from './StorageService';
 
-const DAILY_TIDBIT_LIMIT = 20; // Maximum tidbits per day
+const DAILY_TIDBIT_LIMIT = 100; // Maximum tidbits per day
 const MIN_UNLOCK_INTERVAL = 30000; // 30 seconds minimum between tidbits
 
 class UnlockService {

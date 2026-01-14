@@ -12,6 +12,8 @@ import {
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
 import { ContentService } from '../services/ContentService';
+import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
+import * as Notifications from 'expo-notifications';
 
 const INTERVAL_OPTIONS = [
   { label: '15 minutes', value: 15 },
@@ -20,21 +22,92 @@ const INTERVAL_OPTIONS = [
   { label: '2 hours', value: 120 },
 ];
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [notificationInterval, setNotificationInterval] = useState(30);
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
+  const [quietHoursStart, setQuietHoursStart] = useState(23); // 11 PM
+  const [quietHoursEnd, setQuietHoursEnd] = useState(9); // 9 AM
+  const [showQuietHoursPicker, setShowQuietHoursPicker] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [spacedRepStats, setSpacedRepStats] = useState({
+    totalTidbits: 0,
+    dueTidbits: 0,
+    scheduledTidbits: 0,
+    savedTidbits: 0,
+    masteredTidbits: 0,
+  });
 
   useEffect(() => {
     loadSettings();
-  }, []);
+    loadSpacedRepStats();
+    
+    // Refresh stats when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadSpacedRepStats();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadSpacedRepStats = async () => {
+    try {
+      const dueTidbits = await SpacedRepetitionService.getDueTidbits();
+      const scheduledTidbits = await SpacedRepetitionService.getScheduledTidbits();
+      const savedTidbits = await SpacedRepetitionService.getSavedTidbits();
+      
+      // Get all tidbit states to count total and mastered
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const allKeys = await AsyncStorage.getAllKeys();
+      const spacedRepKeys = allKeys.filter(key => key.startsWith('spaced_repetition_'));
+      
+      let masteredCount = 0;
+      for (const key of spacedRepKeys) {
+        try {
+          const data = await AsyncStorage.getItem(key);
+          if (data) {
+            const state = JSON.parse(data);
+            if (state.masteryLevel === 'mastered') {
+              masteredCount++;
+            }
+          }
+        } catch (error) {
+          // Ignore parse errors
+        }
+      }
+      
+      console.log('[DEBUG] Spaced Rep Stats:', {
+        total: spacedRepKeys.length,
+        due: dueTidbits.length,
+        scheduled: scheduledTidbits.length,
+        saved: savedTidbits.length,
+        mastered: masteredCount,
+      });
+      
+      setSpacedRepStats({
+        totalTidbits: spacedRepKeys.length,
+        dueTidbits: dueTidbits.length,
+        scheduledTidbits: scheduledTidbits.length,
+        savedTidbits: savedTidbits.length,
+        masteredTidbits: masteredCount,
+      });
+    } catch (error) {
+      console.error('Error loading spaced rep stats:', error);
+    }
+  };
 
   const loadSettings = async () => {
     const enabled = await StorageService.getNotificationsEnabled();
     const interval = await StorageService.getNotificationInterval();
+    const quietHours = await StorageService.getQuietHoursEnabled();
+    const quietStart = await StorageService.getQuietHoursStart();
+    const quietEnd = await StorageService.getQuietHoursEnd();
     
     setNotificationsEnabled(enabled);
     setNotificationInterval(interval);
+    setQuietHoursEnabled(quietHours);
+    setQuietHoursStart(quietStart);
+    setQuietHoursEnd(quietEnd);
     setLoading(false);
   };
 
@@ -61,6 +134,40 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleToggleQuietHours = async (enabled) => {
+    setQuietHoursEnabled(enabled);
+    await StorageService.setQuietHoursEnabled(enabled);
+    
+    if (notificationsEnabled && Platform.OS === 'ios') {
+      // Reschedule notifications to respect quiet hours
+      await NotificationService.scheduleRecurringNotifications(notificationInterval);
+    }
+  };
+
+  const handleQuietHoursStartChange = async (hour) => {
+    setQuietHoursStart(hour);
+    await StorageService.setQuietHoursStart(hour);
+    
+    if (quietHoursEnabled && notificationsEnabled && Platform.OS === 'ios') {
+      await NotificationService.scheduleRecurringNotifications(notificationInterval);
+    }
+  };
+
+  const handleQuietHoursEndChange = async (hour) => {
+    setQuietHoursEnd(hour);
+    await StorageService.setQuietHoursEnd(hour);
+    
+    if (quietHoursEnabled && notificationsEnabled && Platform.OS === 'ios') {
+      await NotificationService.scheduleRecurringNotifications(notificationInterval);
+    }
+  };
+
+  const formatHour = (hour) => {
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:00 ${period}`;
+  };
+
   const handleTestNotification = async () => {
     // Send an immediate test notification
     try {
@@ -74,6 +181,82 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error('Error sending test notification:', error);
       Alert.alert('Error', 'Could not send notification. Check if permissions are granted.');
+    }
+  };
+
+  const handleTestScheduledNotification = async () => {
+    // Schedule a test notification in 1 minute
+    try {
+      const tidbit = await ContentService.getRandomTidbit();
+      if (tidbit) {
+        const triggerDate = new Date();
+        triggerDate.setMinutes(triggerDate.getMinutes() + 1); // 1 minute from now
+        
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '📚 Tidbit (Test)',
+            body: tidbit.text.length > 80 ? tidbit.text.substring(0, 77) + '...' : tidbit.text,
+            data: {
+              tidbit: JSON.stringify(tidbit),
+              category: tidbit.category,
+            },
+            sound: true,
+          },
+          trigger: {
+            date: triggerDate,
+          },
+        });
+        Alert.alert('Success', 'Test scheduled notification set for 1 minute from now!');
+      } else {
+        Alert.alert('Error', 'Could not generate tidbit. Make sure you have categories selected.');
+      }
+    } catch (error) {
+      console.error('Error scheduling test notification:', error);
+      Alert.alert('Error', 'Could not schedule notification.');
+    }
+  };
+
+  const handleCheckScheduledNotifications = async () => {
+    // Check how many notifications are scheduled
+    try {
+      const scheduled = await NotificationService.getAllScheduledNotifications();
+      console.log('[DEBUG] Scheduled notifications:', JSON.stringify(scheduled, null, 2));
+      
+      let firstNotificationTime = 'None';
+      if (scheduled.length > 0) {
+        const first = scheduled[0];
+        console.log('[DEBUG] First notification trigger:', JSON.stringify(first.trigger, null, 2));
+        
+        // iOS converts date triggers to timeInterval triggers
+        // Calculate the date from seconds (time until notification) or use hour/minute from data
+        if (first.trigger && first.trigger.type === 'timeInterval' && first.trigger.seconds) {
+          // Calculate date from seconds (time until notification)
+          const now = new Date();
+          const triggerDate = new Date(now.getTime() + first.trigger.seconds * 1000);
+          firstNotificationTime = triggerDate.toLocaleString();
+        } else if (first.content && first.content.data && first.content.data.hour !== undefined && first.content.data.minute !== undefined) {
+          // Use hour/minute from notification data to construct time
+          const now = new Date();
+          const triggerDate = new Date();
+          triggerDate.setHours(first.content.data.hour, first.content.data.minute, 0, 0);
+          if (triggerDate < now) {
+            triggerDate.setDate(triggerDate.getDate() + 1);
+          }
+          firstNotificationTime = triggerDate.toLocaleString();
+        } else if (first.trigger && first.trigger.date) {
+          firstNotificationTime = new Date(first.trigger.date).toLocaleString();
+        } else {
+          firstNotificationTime = 'Unable to parse date from: ' + JSON.stringify(first.trigger);
+        }
+      }
+      
+      Alert.alert(
+        'Scheduled Notifications',
+        `You have ${scheduled.length} notification(s) scheduled.\n\nFirst notification: ${firstNotificationTime}`
+      );
+    } catch (error) {
+      console.error('Error checking scheduled notifications:', error);
+      Alert.alert('Error', 'Could not check scheduled notifications.');
     }
   };
 
@@ -110,36 +293,132 @@ export default function SettingsScreen() {
       </View>
 
       {Platform.OS === 'ios' && notificationsEnabled && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Interval</Text>
-          <Text style={styles.sectionDescription}>
-            How often you'd like to receive tidbit notifications
-          </Text>
-          <View style={styles.intervalOptions}>
-            {INTERVAL_OPTIONS.map((option) => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.intervalOption,
-                  notificationInterval === option.value && styles.intervalOptionSelected,
-                ]}
-                onPress={() => handleIntervalChange(option.value)}
-              >
-                <Text
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notification Interval</Text>
+            <Text style={styles.sectionDescription}>
+              How often you'd like to receive tidbit notifications
+            </Text>
+            <View style={styles.intervalOptions}>
+              {INTERVAL_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
                   style={[
-                    styles.intervalOptionText,
-                    notificationInterval === option.value && styles.intervalOptionTextSelected,
+                    styles.intervalOption,
+                    notificationInterval === option.value && styles.intervalOptionSelected,
                   ]}
+                  onPress={() => handleIntervalChange(option.value)}
                 >
-                  {option.label}
-                </Text>
-                {notificationInterval === option.value && (
-                  <Text style={styles.checkmark}>✓</Text>
-                )}
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.intervalOptionText,
+                      notificationInterval === option.value && styles.intervalOptionTextSelected,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {notificationInterval === option.value && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+
+          <View style={styles.section}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>Quiet Hours</Text>
+                {quietHoursEnabled ? (
+                  <Text style={styles.settingDescription}>
+                    No notifications from {formatHour(quietHoursStart)} to {formatHour(quietHoursEnd)}
+                  </Text>
+                ) : (
+                  <Text style={styles.settingDescription}>
+                    No notifications during selected hours
+                  </Text>
+                )}
+              </View>
+              <Switch
+                value={quietHoursEnabled}
+                onValueChange={handleToggleQuietHours}
+                trackColor={{ false: '#e5e7eb', true: '#6366f1' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+            
+            {quietHoursEnabled && (
+              <View style={styles.quietHoursExpanded}>
+                <TouchableOpacity
+                  style={styles.expandButton}
+                  onPress={() => setShowQuietHoursPicker(!showQuietHoursPicker)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.expandButtonText}>
+                    {showQuietHoursPicker ? 'Hide' : 'Choose'} Quiet Hours
+                  </Text>
+                  <Text style={styles.expandButtonIcon}>
+                    {showQuietHoursPicker ? '▲' : '▼'}
+                  </Text>
+                </TouchableOpacity>
+                
+                {showQuietHoursPicker && (
+                  <View style={styles.quietHoursPicker}>
+                    <View style={styles.timePickerRow}>
+                      <Text style={styles.timePickerLabel}>Start:</Text>
+                      <View style={styles.hourSelector}>
+                        {[22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((hour) => (
+                          <TouchableOpacity
+                            key={hour}
+                            style={[
+                              styles.hourButton,
+                              quietHoursStart === hour && styles.hourButtonSelected,
+                            ]}
+                            onPress={() => handleQuietHoursStartChange(hour)}
+                          >
+                            <Text
+                              style={[
+                                styles.hourButtonText,
+                                quietHoursStart === hour && styles.hourButtonTextSelected,
+                              ]}
+                            >
+                              {formatHour(hour)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                    
+                    <View style={styles.timePickerRow}>
+                      <Text style={styles.timePickerLabel}>End:</Text>
+                      <View style={styles.hourSelector}>
+                        {[22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hour) => (
+                          <TouchableOpacity
+                            key={hour}
+                            style={[
+                              styles.hourButton,
+                              quietHoursEnd === hour && styles.hourButtonSelected,
+                            ]}
+                            onPress={() => handleQuietHoursEndChange(hour)}
+                          >
+                            <Text
+                              style={[
+                                styles.hourButtonText,
+                                quietHoursEnd === hour && styles.hourButtonTextSelected,
+                              ]}
+                            >
+                              {formatHour(hour)}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </>
       )}
 
       {Platform.OS === 'android' && notificationsEnabled && (
@@ -153,17 +432,32 @@ export default function SettingsScreen() {
       )}
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Categories</Text>
+        <Text style={styles.sectionDescription}>
+          Choose what topics you want to learn about
+        </Text>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('Categories')}
+        >
+          <Text style={styles.actionButtonText}>Manage Categories</Text>
+          <Text style={styles.chevron}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>About Notifications</Text>
           <Text style={styles.infoText}>
             {Platform.OS === 'ios' 
-              ? 'Notifications are scheduled throughout the day based on your interval setting. You\'ll receive up to 20 tidbits per day.'
-              : 'Notifications are sent when you unlock your phone, up to 20 tidbits per day.'}
+              ? 'Notifications are scheduled throughout the day based on your interval setting. You\'ll receive up to 100 tidbits per day.'
+              : 'Notifications are sent when you unlock your phone, up to 100 tidbits per day.'}
           </Text>
         </View>
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Testing</Text>
         <TouchableOpacity
           style={styles.testButton}
           onPress={handleTestNotification}
@@ -171,8 +465,139 @@ export default function SettingsScreen() {
           <Text style={styles.testButtonText}>Send Test Notification</Text>
         </TouchableOpacity>
         <Text style={styles.testButtonDescription}>
-          Send an immediate notification to test if notifications are working in Expo Go
+          Send an immediate notification
         </Text>
+        
+        {Platform.OS === 'ios' && (
+          <>
+            <TouchableOpacity
+              style={[styles.testButton, styles.testButtonSecondary]}
+              onPress={handleCheckScheduledNotifications}
+            >
+              <Text style={styles.testButtonText}>Check Scheduled Notifications</Text>
+            </TouchableOpacity>
+            <Text style={styles.testButtonDescription}>
+              See how many notifications are scheduled (check console for debug logs)
+            </Text>
+          </>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Spaced Repetition Debug</Text>
+        <View style={styles.debugStats}>
+          <View style={styles.debugStatRow}>
+            <Text style={styles.debugStatLabel}>Total Tidbits with State:</Text>
+            <Text style={styles.debugStatValue}>{spacedRepStats.totalTidbits}</Text>
+          </View>
+          <View style={styles.debugStatRow}>
+            <Text style={styles.debugStatLabel}>Due for Review (Past Due):</Text>
+            <Text style={styles.debugStatValue}>{spacedRepStats.dueTidbits}</Text>
+          </View>
+          <View style={styles.debugStatRow}>
+            <Text style={styles.debugStatLabel}>Scheduled (Has nextDue):</Text>
+            <Text style={styles.debugStatValue}>{spacedRepStats.scheduledTidbits}</Text>
+          </View>
+          <View style={styles.debugStatRow}>
+            <Text style={styles.debugStatLabel}>Saved Tidbits:</Text>
+            <Text style={styles.debugStatValue}>{spacedRepStats.savedTidbits}</Text>
+          </View>
+          <View style={styles.debugStatRow}>
+            <Text style={styles.debugStatLabel}>Mastered:</Text>
+            <Text style={styles.debugStatValue}>{spacedRepStats.masteredTidbits}</Text>
+          </View>
+        </View>
+        
+        <TouchableOpacity
+          style={[styles.testButton, styles.testButtonSecondary]}
+          onPress={async () => {
+            const dueTidbits = await SpacedRepetitionService.getDueTidbits();
+            console.log('[DEBUG] Due tidbits (past due):', dueTidbits);
+            Alert.alert(
+              'Due Tidbits',
+              `Found ${dueTidbits.length} tidbits past their due date.\n\nCheck console for IDs.`
+            );
+            loadSpacedRepStats();
+          }}
+        >
+          <Text style={styles.testButtonText}>View Due Tidbits (Past Due)</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.testButton, styles.testButtonSecondary]}
+          onPress={async () => {
+            const scheduledTidbits = await SpacedRepetitionService.getScheduledTidbits();
+            console.log('[DEBUG] Scheduled tidbits (has nextDue):', scheduledTidbits);
+            Alert.alert(
+              'Scheduled Tidbits',
+              `Found ${scheduledTidbits.length} tidbits with a scheduled review time.\n\nCheck console for IDs.`
+            );
+            loadSpacedRepStats();
+          }}
+        >
+          <Text style={styles.testButtonText}>View Scheduled Tidbits</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.testButton, styles.testButtonSecondary]}
+          onPress={async () => {
+            const savedTidbits = await SpacedRepetitionService.getSavedTidbits();
+            console.log('[DEBUG] Saved tidbits:', savedTidbits);
+            Alert.alert(
+              'Saved Tidbits',
+              `Found ${savedTidbits.length} saved tidbits.\n\nCheck console for IDs.`
+            );
+            loadSpacedRepStats();
+          }}
+        >
+          <Text style={styles.testButtonText}>View Saved Tidbits</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.testButton, { backgroundColor: '#ef4444' }]}
+          onPress={() => {
+            Alert.alert(
+              'Clear All Learning State',
+              'This will delete all spaced repetition data. This action cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Clear All',
+                  style: 'destructive',
+                  onPress: async () => {
+                    await SpacedRepetitionService.clearAllState();
+                    Alert.alert('Success', 'All learning state cleared.');
+                    loadSpacedRepStats();
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          <Text style={[styles.testButtonText, { color: '#ffffff' }]}>Clear All Learning State</Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.testButtonDescription}>
+          Use these tools to test spaced repetition features. Check console logs for detailed info.
+        </Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>About</Text>
+        <View style={styles.aboutContent}>
+          <Text style={styles.aboutText}>
+            <Text style={styles.aboutLabel}>App Name:</Text> Tidbit
+          </Text>
+          <Text style={styles.aboutText}>
+            <Text style={styles.aboutLabel}>Version:</Text> 1.0.0
+          </Text>
+          <Text style={styles.aboutText}>
+            <Text style={styles.aboutLabel}>Description:</Text> Learn tiny things daily through bite-sized notifications and interactive learning.
+          </Text>
+          <Text style={styles.aboutText}>
+            <Text style={styles.aboutLabel}>Contact:</Text> support@tidbit.app
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -315,6 +740,137 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 18,
+    marginBottom: 12,
+  },
+  testButtonSecondary: {
+    backgroundColor: '#8b5cf6',
+    marginTop: 8,
+  },
+  debugStats: {
+    marginBottom: 16,
+  },
+  debugStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  debugStatLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+  debugStatValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  chevron: {
+    fontSize: 24,
+    color: '#9ca3af',
+  },
+  aboutContent: {
+    marginTop: 8,
+  },
+  aboutText: {
+    fontSize: 14,
+    lineHeight: 24,
+    color: '#4b5563',
+    marginBottom: 8,
+  },
+  aboutLabel: {
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  quietHoursExpanded: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  expandButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+  },
+  expandButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366f1',
+  },
+  expandButtonIcon: {
+    fontSize: 12,
+    color: '#6366f1',
+  },
+  quietHoursPicker: {
+    marginTop: 16,
+  },
+  timePickerRow: {
+    marginBottom: 16,
+  },
+  timePickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
+  },
+  hourSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  hourButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  hourButtonSelected: {
+    backgroundColor: '#ede9fe',
+    borderColor: '#6366f1',
+  },
+  hourButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#1f2937',
+  },
+  hourButtonTextSelected: {
+    color: '#6366f1',
+    fontWeight: '600',
+  },
+  quietHoursInfo: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+  },
+  quietHoursInfoText: {
+    fontSize: 13,
+    color: '#1e40af',
+    textAlign: 'center',
   },
 });
 

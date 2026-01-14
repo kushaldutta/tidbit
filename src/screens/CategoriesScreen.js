@@ -22,7 +22,16 @@ export default function CategoriesScreen() {
     const selected = await StorageService.getSelectedCategories();
     const available = ContentService.getAvailableCategories();
     
-    setSelectedCategories(selected);
+    // Filter out invalid categories (categories that no longer exist)
+    const availableIds = available.map(cat => cat.id);
+    const validSelected = selected.filter(catId => availableIds.includes(catId));
+    
+    // If any invalid categories were removed, update storage
+    if (validSelected.length !== selected.length) {
+      await StorageService.setSelectedCategories(validSelected);
+    }
+    
+    setSelectedCategories(validSelected);
     setAvailableCategories(available);
   };
 

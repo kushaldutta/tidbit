@@ -4,12 +4,8 @@
     "slug": "tidbit",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "_comment": "Note: Placeholder assets created. Replace with actual images before production.",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
@@ -17,27 +13,30 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tidbit.app"
+      "bundleIdentifier": "com.cinnamiddles.tidbit",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.tidbit.app"
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
+    "web": {},
     "plugins": [
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
           "color": "#ffffff"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "4337afcf-a02c-4ea8-b202-e3b836db1771"
+      }
+    }
   }
 }
-

@@ -27,10 +27,20 @@ export default function HomeScreen({ navigation }) {
     const tidbitsSeen = await StorageService.getTidbitsSeen();
     const dailyUnlocks = await StorageService.getDailyUnlocks();
     const dailyTidbits = await StorageService.getDailyTidbitCount();
-    const categories = await StorageService.getSelectedCategories();
+    const selected = await StorageService.getSelectedCategories();
+    const available = ContentService.getAvailableCategories();
+    
+    // Filter out invalid categories (categories that no longer exist)
+    const availableIds = available.map(cat => cat.id);
+    const validCategories = selected.filter(catId => availableIds.includes(catId));
+    
+    // If any invalid categories were removed, update storage
+    if (validCategories.length !== selected.length) {
+      await StorageService.setSelectedCategories(validCategories);
+    }
     
     setStats({ tidbitsSeen, dailyUnlocks, dailyTidbits });
-    setSelectedCategories(categories);
+    setSelectedCategories(validCategories);
   };
 
   const handleTestTidbit = async () => {

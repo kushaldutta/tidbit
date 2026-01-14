@@ -9,6 +9,10 @@ const KEYS = {
   LAST_TIDBIT_DATE: 'last_tidbit_date',
   NOTIFICATION_INTERVAL: 'notification_interval', // iOS: interval in minutes
   NOTIFICATIONS_ENABLED: 'notifications_enabled', // Both: enable/disable notifications
+  ONBOARDING_COMPLETED: 'onboarding_completed', // Onboarding completion flag
+  QUIET_HOURS_ENABLED: 'quiet_hours_enabled', // Quiet hours toggle
+  QUIET_HOURS_START: 'quiet_hours_start', // Quiet hours start hour (0-23)
+  QUIET_HOURS_END: 'quiet_hours_end', // Quiet hours end hour (0-23)
 };
 
 class StorageService {
@@ -17,7 +21,7 @@ class StorageService {
     const categories = await this.getSelectedCategories();
     if (categories.length === 0) {
       // Default categories
-      await this.setSelectedCategories(['tech', 'psychology', 'fun-facts']);
+      await this.setSelectedCategories(['miscellaneous']);
     }
   }
 
@@ -168,6 +172,80 @@ class StorageService {
       await AsyncStorage.setItem(KEYS.NOTIFICATIONS_ENABLED, String(enabled));
     } catch (error) {
       console.error('Error setting notifications enabled:', error);
+    }
+  }
+
+  // Onboarding
+  static async getOnboardingCompleted() {
+    try {
+      const completed = await AsyncStorage.getItem(KEYS.ONBOARDING_COMPLETED);
+      return completed === 'true';
+    } catch (error) {
+      console.error('Error getting onboarding completed:', error);
+      return false;
+    }
+  }
+
+  static async setOnboardingCompleted(completed) {
+    try {
+      await AsyncStorage.setItem(KEYS.ONBOARDING_COMPLETED, String(completed));
+    } catch (error) {
+      console.error('Error setting onboarding completed:', error);
+    }
+  }
+
+  // Quiet Hours
+  static async getQuietHoursEnabled() {
+    try {
+      const enabled = await AsyncStorage.getItem(KEYS.QUIET_HOURS_ENABLED);
+      return enabled === 'true'; // Default to false
+    } catch (error) {
+      console.error('Error getting quiet hours enabled:', error);
+      return false;
+    }
+  }
+
+  static async setQuietHoursEnabled(enabled) {
+    try {
+      await AsyncStorage.setItem(KEYS.QUIET_HOURS_ENABLED, String(enabled));
+    } catch (error) {
+      console.error('Error setting quiet hours enabled:', error);
+    }
+  }
+
+  static async getQuietHoursStart() {
+    try {
+      const start = await AsyncStorage.getItem(KEYS.QUIET_HOURS_START);
+      return start ? parseInt(start, 10) : 23; // Default to 11 PM
+    } catch (error) {
+      console.error('Error getting quiet hours start:', error);
+      return 23;
+    }
+  }
+
+  static async setQuietHoursStart(hour) {
+    try {
+      await AsyncStorage.setItem(KEYS.QUIET_HOURS_START, String(hour));
+    } catch (error) {
+      console.error('Error setting quiet hours start:', error);
+    }
+  }
+
+  static async getQuietHoursEnd() {
+    try {
+      const end = await AsyncStorage.getItem(KEYS.QUIET_HOURS_END);
+      return end ? parseInt(end, 10) : 9; // Default to 9 AM
+    } catch (error) {
+      console.error('Error getting quiet hours end:', error);
+      return 9;
+    }
+  }
+
+  static async setQuietHoursEnd(hour) {
+    try {
+      await AsyncStorage.setItem(KEYS.QUIET_HOURS_END, String(hour));
+    } catch (error) {
+      console.error('Error setting quiet hours end:', error);
     }
   }
 }
