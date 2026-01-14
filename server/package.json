@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "seed": "node scripts/seed-from-json.js"
+    "seed": "node scripts/seed-from-json.js",
+    "test-push": "node scripts/test-push-notification.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

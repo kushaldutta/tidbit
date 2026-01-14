@@ -59,6 +59,13 @@ CREATE TABLE IF NOT EXISTS device_tokens (
   user_id TEXT, -- Optional: for multi-user support later
   platform TEXT NOT NULL CHECK (platform IN ('ios', 'android')),
   app_version TEXT,
+  -- User preferences (stored as JSON)
+  notification_interval INTEGER DEFAULT 60, -- minutes
+  notifications_enabled BOOLEAN DEFAULT true,
+  quiet_hours_enabled BOOLEAN DEFAULT false,
+  quiet_hours_start INTEGER DEFAULT 23, -- 0-23
+  quiet_hours_end INTEGER DEFAULT 9, -- 0-23
+  selected_categories JSONB DEFAULT '[]'::jsonb, -- array of category IDs
   last_active TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

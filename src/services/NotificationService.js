@@ -114,6 +114,14 @@ class NotificationService {
       // Register token with server
       if (API_CONFIG && API_CONFIG.BASE_URL && API_CONFIG.BASE_URL !== 'https://your-production-server.com') {
         try {
+          // Get user preferences to send with token registration
+          const notificationInterval = await StorageService.getNotificationInterval();
+          const notificationsEnabled = await StorageService.getNotificationsEnabled();
+          const quietHoursEnabled = await StorageService.getQuietHoursEnabled();
+          const quietHoursStart = await StorageService.getQuietHoursStart();
+          const quietHoursEnd = await StorageService.getQuietHoursEnd();
+          const selectedCategories = await StorageService.getSelectedCategories();
+          
           const response = await fetch(`${API_CONFIG.BASE_URL}/api/register-token`, {
             method: 'POST',
             headers: {
@@ -123,6 +131,12 @@ class NotificationService {
               token: pushToken,
               platform: Platform.OS,
               appVersion: Constants.expoConfig?.version || '1.0.0',
+              notificationInterval,
+              notificationsEnabled,
+              quietHoursEnabled,
+              quietHoursStart,
+              quietHoursEnd,
+              selectedCategories,
             }),
           });
           

@@ -17,6 +17,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Initialize Supabase client (use service role for admin access)
 let supabase = null;
 let supabaseConnected = false;
+let schedulerStarted = false;
 
 if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -40,13 +41,19 @@ if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
     },
   });
   
-  // Test connection
+  // Test connection and start scheduler when ready
   (async () => {
     try {
       const { data, error } = await supabase.from('categories').select('id').limit(1);
       if (error) throw error;
       supabaseConnected = true;
       console.log('[SERVER] Supabase connected and tested:', SUPABASE_URL);
+      
+      // Start scheduler now that Supabase is confirmed connected
+      if (!schedulerStarted) {
+        setupNotificationScheduler();
+        schedulerStarted = true;
+      }
     } catch (error) {
       console.error('[SERVER] Supabase connection test failed:', error.message);
       console.warn('[SERVER] Supabase will be unavailable. Token registration may fail.');
@@ -296,7 +303,18 @@ app.get('/health', (req, res) => {
 // POST /api/register-token - Register device push token
 app.post('/api/register-token', async (req, res) => {
   try {
-    const { token, platform, appVersion } = req.body;
+    const { 
+      token, 
+      platform, 
+      appVersion,
+      // User preferences (optional, will be updated if provided)
+      notificationInterval,
+      notificationsEnabled,
+      quietHoursEnabled,
+      quietHoursStart,
+      quietHoursEnd,
+      selectedCategories,
+    } = req.body;
     
     if (!token || !platform) {
       return res.status(400).json({
@@ -329,6 +347,22 @@ app.post('/api/register-token', async (req, res) => {
         warning: 'Database connection failed - token will be saved on next registration',
       });
     }
+    
+    // Prepare update data (only include fields that are provided)
+    const updateData = {
+      token,
+      platform,
+      app_version: appVersion || null,
+      last_active: new Date().toISOString(),
+    };
+    
+    // Add user preferences if provided
+    if (notificationInterval !== undefined) updateData.notification_interval = notificationInterval;
+    if (notificationsEnabled !== undefined) updateData.notifications_enabled = notificationsEnabled;
+    if (quietHoursEnabled !== undefined) updateData.quiet_hours_enabled = quietHoursEnabled;
+    if (quietHoursStart !== undefined) updateData.quiet_hours_start = quietHoursStart;
+    if (quietHoursEnd !== undefined) updateData.quiet_hours_end = quietHoursEnd;
+    if (selectedCategories !== undefined) updateData.selected_categories = selectedCategories;
     
     // Upsert device token (update if exists, insert if new)
     // Add timeout wrapper for Supabase call
@@ -458,6 +492,216 @@ app.post('/api/send-notification', async (req, res) => {
   }
 });
 
+/**
+ * Send push notifications to all eligible devices
+ * This function is called by the cron scheduler
+ */
+async function sendScheduledNotifications() {
+  if (!supabase || !supabaseConnected) {
+    console.warn('[SCHEDULER] Supabase not available, skipping notification send');
+    return;
+  }
+  
+  try {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Get all active device tokens with their preferences
+    const { data: devices, error } = await supabase
+      .from('device_tokens')
+      .select('*')
+      .eq('notifications_enabled', true)
+      .order('last_active', { ascending: false });
+    
+    if (error) {
+      console.error('[SCHEDULER] Error fetching devices:', error);
+      return;
+    }
+    
+    if (!devices || devices.length === 0) {
+      console.log('[SCHEDULER] No active devices to notify');
+      return;
+    }
+    
+    console.log(`[SCHEDULER] Checking ${devices.length} devices for notifications...`);
+    
+    // Get tidbits from Supabase
+    const tidbitsData = await fetchTidbitsFromSupabase();
+    if (!tidbitsData) {
+      console.error('[SCHEDULER] Could not fetch tidbits');
+      return;
+    }
+    
+    const messages = [];
+    
+    for (const device of devices) {
+      // Check quiet hours
+      if (device.quiet_hours_enabled) {
+        const quietStart = device.quiet_hours_start || 23;
+        const quietEnd = device.quiet_hours_end || 9;
+        
+        // Handle quiet hours that span midnight (e.g., 23 to 9)
+        let inQuietHours = false;
+        if (quietStart > quietEnd) {
+          // Quiet hours span midnight (e.g., 11 PM to 9 AM)
+          inQuietHours = currentHour >= quietStart || currentHour < quietEnd;
+        } else {
+          // Quiet hours within same day (e.g., 10 PM to 11 PM)
+          inQuietHours = currentHour >= quietStart && currentHour < quietEnd;
+        }
+        
+        if (inQuietHours) {
+          continue; // Skip this device during quiet hours
+        }
+      }
+      
+      // Get selected categories for this device
+      const selectedCategories = device.selected_categories || [];
+      if (selectedCategories.length === 0) {
+        continue; // No categories selected
+      }
+      
+      // Pick a random tidbit from selected categories
+      const availableTidbits = [];
+      for (const categoryId of selectedCategories) {
+        if (tidbitsData[categoryId] && tidbitsData[categoryId].length > 0) {
+          for (const tidbitText of tidbitsData[categoryId]) {
+            availableTidbits.push({
+              text: tidbitText,
+              category: categoryId,
+            });
+          }
+        }
+      }
+      
+      if (availableTidbits.length === 0) {
+        continue; // No tidbits available for selected categories
+      }
+      
+      // Pick random tidbit
+      const randomTidbit = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+      
+      // Generate tidbit ID (same as ContentService)
+      function generateTidbitId(text, category) {
+        const content = `${text}|${category}`;
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+          const char = content.charCodeAt(i);
+          hash = ((hash << 5) - hash) + char;
+          hash = hash & hash;
+        }
+        const hashStr = Math.abs(hash).toString(16);
+        return `tidbit_${hashStr}`;
+      }
+      
+      const tidbitId = generateTidbitId(randomTidbit.text, randomTidbit.category);
+      
+      // Create notification message
+      const message = {
+        to: device.token,
+        sound: 'default',
+        title: '📚 Tidbit',
+        body: randomTidbit.text,
+        data: {
+          tidbit: JSON.stringify({
+            text: randomTidbit.text,
+            category: randomTidbit.category,
+            id: tidbitId,
+          }),
+          tidbitId: tidbitId,
+          category: randomTidbit.category,
+        },
+        categoryId: 'tidbit_feedback',
+        priority: 'high',
+      };
+      
+      messages.push(message);
+    }
+    
+    if (messages.length === 0) {
+      console.log('[SCHEDULER] No notifications to send (all devices in quiet hours or no categories)');
+      return;
+    }
+    
+    // Send notifications in chunks (Expo limit)
+    const chunks = expo.chunkPushNotifications(messages);
+    let sentCount = 0;
+    let errorCount = 0;
+    
+    for (const chunk of chunks) {
+      try {
+        const tickets = await expo.sendPushNotificationsAsync(chunk);
+        
+        // Check for errors in tickets
+        for (const ticket of tickets) {
+          if (ticket.status === 'ok') {
+            sentCount++;
+          } else {
+            errorCount++;
+            console.error('[SCHEDULER] Notification error:', ticket.message || ticket);
+          }
+        }
+      } catch (error) {
+        console.error('[SCHEDULER] Error sending notification chunk:', error);
+        errorCount += chunk.length;
+      }
+    }
+    
+    console.log(`[SCHEDULER] Sent ${sentCount} notifications, ${errorCount} errors`);
+    
+  } catch (error) {
+    console.error('[SCHEDULER] Error in sendScheduledNotifications:', error);
+  }
+}
+
+/**
+ * Setup cron jobs for sending notifications
+ * Runs every minute and checks if it's time to send based on user intervals
+ */
+function setupNotificationScheduler() {
+  // Run every minute
+  cron.schedule('* * * * *', async () => {
+    if (!supabase || !supabaseConnected) {
+      return; // Skip if Supabase not available
+    }
+    
+    try {
+      // Get all devices and their intervals
+      const { data: devices } = await supabase
+        .from('device_tokens')
+        .select('token, notification_interval, last_active, notifications_enabled')
+        .eq('notifications_enabled', true);
+      
+      if (!devices || devices.length === 0) {
+        return;
+      }
+      
+      const now = new Date();
+      
+      for (const device of devices) {
+        if (!device.notification_interval) continue;
+        
+        // Check if it's time to send (based on interval)
+        // For simplicity, send if current minute is divisible by interval
+        // This is a basic implementation - can be improved
+        const minutesSinceMidnight = now.getHours() * 60 + now.getMinutes();
+        
+        if (minutesSinceMidnight % device.notification_interval === 0) {
+          // It's time to send for this device
+          // We'll send to all eligible devices in one batch
+          await sendScheduledNotifications();
+          break; // Only send once per minute
+        }
+      }
+    } catch (error) {
+      console.error('[SCHEDULER] Error in cron job:', error);
+    }
+  });
+  
+  console.log('[SCHEDULER] Notification scheduler started (runs every minute)');
+}
+
 // Start server (with friendly error handling)
 const server = app.listen(PORT, HOST, () => {
   const lanIp = getLanIPv4();
@@ -472,6 +716,9 @@ const server = app.listen(PORT, HOST, () => {
   } else {
     console.log('[SERVER] Could not detect LAN IPv4 address automatically.');
   }
+  
+  // Note: Scheduler will start automatically when Supabase connection test completes
+  // (see async connection test above)
 });
 
 server.on('error', (err) => {
