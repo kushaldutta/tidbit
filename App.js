@@ -263,24 +263,9 @@ export default function App() {
         }
       );
       
-      // Schedule recurring notifications for iOS (if enabled)
-      if (mounted && notificationEnabled && Platform.OS === 'ios') {
-        const interval = await StorageService.getNotificationInterval();
-        const enabled = await StorageService.getNotificationsEnabled();
-        console.log('[DEBUG] Scheduling notifications:', { notificationEnabled, interval, enabled });
-        if (enabled) {
-          try {
-            await NotificationService.scheduleRecurringNotifications(interval);
-            console.log('[DEBUG] Notifications scheduled successfully');
-          } catch (error) {
-            console.error('[DEBUG] Error scheduling notifications:', error);
-          }
-        } else {
-          console.log('[DEBUG] Notifications disabled in settings');
-        }
-      } else {
-        console.log('[DEBUG] Not scheduling notifications:', { mounted, notificationEnabled, platform: Platform.OS });
-      }
+      // Push notifications are now handled by the server
+      // No need to schedule local notifications anymore
+      console.log('[APP] Push notifications enabled - server will handle scheduling');
       
       if (mounted) {
         isInitializedRef.current = true;
@@ -296,10 +281,7 @@ export default function App() {
           // App came to foreground - check if we should show a tidbit
           handleUnlock();
           
-          // Check and reschedule notifications if running low (iOS auto-refresh)
-          if (Platform.OS === 'ios') {
-            NotificationService.checkAndRescheduleIfNeeded();
-          }
+          // Push notifications are handled by server - no local rescheduling needed
         }
         return nextAppState;
       });

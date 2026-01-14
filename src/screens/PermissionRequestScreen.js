@@ -40,11 +40,7 @@ export default function PermissionRequestScreen({ navigation }) {
         // Enable notifications in settings
         await StorageService.setNotificationsEnabled(true);
         
-        // Schedule notifications if on iOS
-        if (Platform.OS === 'ios') {
-          const interval = await StorageService.getNotificationInterval();
-          await NotificationService.scheduleRecurringNotifications(interval);
-        }
+        // Push notifications are handled by server - token registration will happen automatically
       } else if (status === 'denied') {
         Alert.alert(
           'Permission Denied',

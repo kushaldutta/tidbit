@@ -115,51 +115,40 @@ export default function SettingsScreen({ navigation }) {
     setNotificationsEnabled(enabled);
     await StorageService.setNotificationsEnabled(enabled);
     
-    if (enabled && Platform.OS === 'ios') {
-      // Reschedule notifications
-      await NotificationService.scheduleRecurringNotifications(notificationInterval);
-    } else {
-      // Cancel all notifications
-      await NotificationService.cancelAllNotifications();
-    }
+    // Update preferences on server (will trigger re-registration with new preferences)
+    await NotificationService.registerDeviceToken();
   };
 
   const handleIntervalChange = async (interval) => {
     setNotificationInterval(interval);
     await StorageService.setNotificationInterval(interval);
     
-    if (notificationsEnabled && Platform.OS === 'ios') {
-      // Reschedule notifications with new interval
-      await NotificationService.scheduleRecurringNotifications(interval);
-    }
+    // Update preferences on server
+    await NotificationService.registerDeviceToken();
   };
 
   const handleToggleQuietHours = async (enabled) => {
     setQuietHoursEnabled(enabled);
     await StorageService.setQuietHoursEnabled(enabled);
     
-    if (notificationsEnabled && Platform.OS === 'ios') {
-      // Reschedule notifications to respect quiet hours
-      await NotificationService.scheduleRecurringNotifications(notificationInterval);
-    }
+    // Update preferences on server
+    await NotificationService.registerDeviceToken();
   };
 
   const handleQuietHoursStartChange = async (hour) => {
     setQuietHoursStart(hour);
     await StorageService.setQuietHoursStart(hour);
     
-    if (quietHoursEnabled && notificationsEnabled && Platform.OS === 'ios') {
-      await NotificationService.scheduleRecurringNotifications(notificationInterval);
-    }
+    // Update preferences on server
+    await NotificationService.registerDeviceToken();
   };
 
   const handleQuietHoursEndChange = async (hour) => {
     setQuietHoursEnd(hour);
     await StorageService.setQuietHoursEnd(hour);
     
-    if (quietHoursEnabled && notificationsEnabled && Platform.OS === 'ios') {
-      await NotificationService.scheduleRecurringNotifications(notificationInterval);
-    }
+    // Update preferences on server
+    await NotificationService.registerDeviceToken();
   };
 
   const formatHour = (hour) => {
