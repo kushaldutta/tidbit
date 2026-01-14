@@ -535,7 +535,14 @@ async function sendScheduledNotifications() {
     
     const messages = [];
     
+    console.log(`[SCHEDULER] Processing ${devices.length} devices at ${currentHour}:${currentMinute}`);
+    
     for (const device of devices) {
+      console.log(`[SCHEDULER] Checking device: ${device.token.substring(0, 20)}...`);
+      console.log(`[SCHEDULER]   - Quiet hours enabled: ${device.quiet_hours_enabled}`);
+      console.log(`[SCHEDULER]   - Quiet hours: ${device.quiet_hours_start || 23} - ${device.quiet_hours_end || 9}`);
+      console.log(`[SCHEDULER]   - Selected categories: ${JSON.stringify(device.selected_categories || [])}`);
+      
       // Check quiet hours
       if (device.quiet_hours_enabled) {
         const quietStart = device.quiet_hours_start || 23;
@@ -551,14 +558,19 @@ async function sendScheduledNotifications() {
           inQuietHours = currentHour >= quietStart && currentHour < quietEnd;
         }
         
+        console.log(`[SCHEDULER]   - In quiet hours: ${inQuietHours} (current: ${currentHour}:${currentMinute})`);
+        
         if (inQuietHours) {
+          console.log(`[SCHEDULER]   - SKIPPING: Device in quiet hours`);
           continue; // Skip this device during quiet hours
         }
       }
       
       // Get selected categories for this device
       const selectedCategories = device.selected_categories || [];
+      console.log(`[SCHEDULER]   - Categories count: ${selectedCategories.length}`);
       if (selectedCategories.length === 0) {
+        console.log(`[SCHEDULER]   - SKIPPING: No categories selected`);
         continue; // No categories selected
       }
       
@@ -575,12 +587,15 @@ async function sendScheduledNotifications() {
         }
       }
       
+      console.log(`[SCHEDULER]   - Available tidbits: ${availableTidbits.length}`);
       if (availableTidbits.length === 0) {
+        console.log(`[SCHEDULER]   - SKIPPING: No tidbits available for selected categories`);
         continue; // No tidbits available for selected categories
       }
       
       // Pick random tidbit
       const randomTidbit = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+      console.log(`[SCHEDULER]   - Selected tidbit from category: ${randomTidbit.category}`);
       
       // Generate tidbit ID (same as ContentService)
       function generateTidbitId(text, category) {
@@ -642,16 +657,31 @@ async function sendScheduledNotifications() {
     
     for (const chunk of chunks) {
       try {
+        // Log the exact message format being sent
+        console.log('[SCHEDULER] Sending chunk with', chunk.length, 'notifications');
+        console.log('[SCHEDULER] First message in chunk:', JSON.stringify({
+          to: chunk[0].to.substring(0, 30) + '...',
+          title: chunk[0].title,
+          body: chunk[0].body?.substring(0, 50) + '...',
+          categoryId: chunk[0].categoryId,
+          hasData: !!chunk[0].data,
+          dataKeys: chunk[0].data ? Object.keys(chunk[0].data) : [],
+        }, null, 2));
+        
         const tickets = await expo.sendPushNotificationsAsync(chunk);
         
         // Check for errors in tickets
-        for (const ticket of tickets) {
+        for (let i = 0; i < tickets.length; i++) {
+          const ticket = tickets[i];
           if (ticket.status === 'ok') {
             sentCount++;
-            console.log('[SCHEDULER] Notification sent successfully, ticket:', ticket.id);
+            console.log(`[SCHEDULER] Notification ${i+1} sent successfully, ticket ID: ${ticket.id}`);
           } else {
             errorCount++;
-            console.error('[SCHEDULER] Notification error:', ticket.message || ticket);
+            console.error(`[SCHEDULER] Notification ${i+1} error:`, ticket.message || ticket);
+            if (ticket.details) {
+              console.error('[SCHEDULER] Error details:', ticket.details);
+            }
           }
         }
       } catch (error) {

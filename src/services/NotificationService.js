@@ -306,15 +306,25 @@ class NotificationService {
   // The server handles all scheduling via cron jobs
 
   static async setupNotificationListeners(onNotificationReceived, onNotificationTapped) {
+    // IMPORTANT: Ensure category is registered before setting up listeners
+    // This is critical for push notifications that arrive when app is closed
+    await this.ensureCategorySetup();
+    
     // Handle notifications received while app is foregrounded
-    this.notificationListener = Notifications.addNotificationReceivedListener(notification => {
+    this.notificationListener = Notifications.addNotificationReceivedListener(async (notification) => {
+      // Re-ensure category when notification arrives (in case it wasn't registered)
+      await this.ensureCategorySetup();
+      
       if (onNotificationReceived) {
         onNotificationReceived(notification);
       }
     });
 
     // Handle notification taps and action button presses
-    this.responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+    this.responseListener = Notifications.addNotificationResponseReceivedListener(async (response) => {
+      // Ensure category is registered (should already be, but be safe)
+      await this.ensureCategorySetup();
+      
       // Check if this is an action button press or a tap
       const actionIdentifier = response.actionIdentifier;
       

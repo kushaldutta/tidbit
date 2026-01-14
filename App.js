@@ -184,7 +184,17 @@ export default function App() {
       NotificationService.setupNotificationListeners(
         // Notification received (app in foreground)
         (notification) => {
-          console.log('Notification received:', notification);
+          console.log('[NOTIFICATION_RECEIVED] Notification received in foreground:', {
+            title: notification.request.content.title,
+            body: notification.request.content.body?.substring(0, 50),
+            categoryId: notification.request.content.categoryId,
+            hasData: !!notification.request.content.data,
+          });
+          
+          // Ensure category is registered when notification arrives
+          NotificationService.ensureCategorySetup().catch(err => {
+            console.error('[NOTIFICATION_RECEIVED] Error ensuring category:', err);
+          });
         },
         // Notification tapped or action button pressed
         async (response) => {
@@ -197,7 +207,14 @@ export default function App() {
             hasData: !!data,
             tidbitId: data?.tidbitId,
             categoryId: notification.request.content.categoryId,
+            notificationSource: notification.request.trigger?.type || 'push',
           });
+          
+          // Log if categoryId is missing
+          if (!notification.request.content.categoryId) {
+            console.error('[NOTIFICATION_RESPONSE] ⚠️ WARNING: categoryId is missing from notification!');
+            console.error('[NOTIFICATION_RESPONSE] Full notification:', JSON.stringify(notification.request.content, null, 2));
+          }
           
           // Check if this is an action button press
           if (actionIdentifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
