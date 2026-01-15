@@ -5,9 +5,8 @@
 const API_CONFIG = {
   // Development: Use your local IP or tunnel URL
   // Example: 'http://192.168.1.100:3000' or 'https://your-tunnel-url.ngrok.io'
-  BASE_URL: __DEV__ 
-    ? 'http://10.0.0.8:3001'  // Your Wi‑Fi IPv4 (for physical iPhone testing)
-    : 'https://tidbit-u2qo.onrender.com',  // Replace with your production URL
+  BASE_URL: 'https://tidbit-u2qo.onrender.com',  // Render production server
+  // For local testing, temporarily change to: 'http://10.0.0.8:3001'
   
   ENDPOINTS: {
     TIDBITS: '/api/tidbits',
