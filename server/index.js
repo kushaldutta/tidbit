@@ -302,6 +302,14 @@ app.get('/health', (req, res) => {
 
 // POST /api/register-token - Register device push token
 app.post('/api/register-token', async (req, res) => {
+  console.log('[SERVER] 📥 Received token registration request');
+  console.log('[SERVER] 📥 Request body:', JSON.stringify({
+    token: req.body.token?.substring(0, 20) + '...',
+    platform: req.body.platform,
+    notificationInterval: req.body.notificationInterval,
+    notificationsEnabled: req.body.notificationsEnabled,
+  }, null, 2));
+  
   try {
     const { 
       token, 

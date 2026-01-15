@@ -80,6 +80,16 @@ class NotificationService {
           const quietHoursEnd = await StorageService.getQuietHoursEnd();
           const selectedCategories = await StorageService.getSelectedCategories();
           
+          console.log('[PUSH_NOTIFICATIONS] 📤 Registering token with server:', API_CONFIG.BASE_URL);
+          console.log('[PUSH_NOTIFICATIONS] 📤 Sending preferences:', {
+            notificationInterval,
+            notificationsEnabled,
+            quietHoursEnabled,
+            quietHoursStart,
+            quietHoursEnd,
+            selectedCategories,
+          });
+          
           const response = await fetch(`${API_CONFIG.BASE_URL}/api/register-token`, {
             method: 'POST',
             headers: {
@@ -98,7 +108,9 @@ class NotificationService {
             }),
           });
           
+          console.log('[PUSH_NOTIFICATIONS] 📥 Server response status:', response.status);
           const result = await response.json();
+          console.log('[PUSH_NOTIFICATIONS] 📥 Server response:', result);
           if (result.success) {
             console.log('[PUSH_NOTIFICATIONS] Device token registered successfully');
             // Store token locally for reference
