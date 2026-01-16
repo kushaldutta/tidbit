@@ -168,11 +168,12 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
         }
       }, 300);
       
-      // For "I knew it" or "I didn't" actions, automatically show next tidbit
+      // For "I knew it" or "I didn't" actions, dismiss the modal
+      // User can use "Get Tidbit Now" button if they want another tidbit
       if (action === 'knew' || action === 'didnt') {
-        // Small delay to show feedback, then show next tidbit
+        // Small delay to show feedback, then dismiss
         setTimeout(() => {
-          handleNextTidbit();
+          handleDismiss();
         }, 500);
       }
     } catch (error) {
