@@ -585,26 +585,46 @@ async function sendScheduledNotifications() {
     
     for (const device of devices) {
       console.log(`[SCHEDULER] Checking device: ${device.token.substring(0, 20)}...`);
+      console.log(`[SCHEDULER]   - Notification interval: ${device.notification_interval || 'NOT SET'} min`);
       console.log(`[SCHEDULER]   - Quiet hours enabled: ${device.quiet_hours_enabled}`);
       console.log(`[SCHEDULER]   - Quiet hours: ${device.quiet_hours_start || 23} - ${device.quiet_hours_end || 9}`);
       console.log(`[SCHEDULER]   - Selected categories: ${JSON.stringify(device.selected_categories || [])}`);
       
+      // Check if it's time to send based on interval
+      if (!device.notification_interval) {
+        console.log(`[SCHEDULER]   - SKIPPING: No notification interval set`);
+        continue;
+      }
+      
+      const minutesSinceMidnight = currentHour * 60 + currentMinute;
+      const remainder = minutesSinceMidnight % device.notification_interval;
+      const isTimeToSend = remainder === 0;
+      
+      console.log(`[SCHEDULER]   - Minutes since midnight: ${minutesSinceMidnight}, remainder: ${remainder}, should send: ${isTimeToSend}`);
+      
+      if (!isTimeToSend) {
+        console.log(`[SCHEDULER]   - SKIPPING: Not time to send yet (interval: ${device.notification_interval} min)`);
+        continue; // Skip this device - not time for their interval
+      }
+      
       // Check quiet hours
       if (device.quiet_hours_enabled) {
-        const quietStart = device.quiet_hours_start || 23;
-        const quietEnd = device.quiet_hours_end || 9;
+        const quietStart = device.quiet_hours_start ?? 23;
+        const quietEnd = device.quiet_hours_end ?? 9;
         
         // Handle quiet hours that span midnight (e.g., 23 to 9)
         let inQuietHours = false;
         if (quietStart > quietEnd) {
           // Quiet hours span midnight (e.g., 11 PM to 9 AM)
+          // Example: 23 to 9 means 11 PM to 9 AM next day
           inQuietHours = currentHour >= quietStart || currentHour < quietEnd;
         } else {
-          // Quiet hours within same day (e.g., 10 PM to 11 PM)
+          // Quiet hours within same day (e.g., 2 AM to 7 AM)
+          // Example: 2 to 7 means 2 AM to 7 AM (inclusive start, exclusive end)
           inQuietHours = currentHour >= quietStart && currentHour < quietEnd;
         }
         
-        console.log(`[SCHEDULER]   - In quiet hours: ${inQuietHours} (current: ${currentHour}:${currentMinute})`);
+        console.log(`[SCHEDULER]   - In quiet hours: ${inQuietHours} (current: ${currentHour}:${currentMinute}, quiet: ${quietStart}-${quietEnd})`);
         
         if (inQuietHours) {
           console.log(`[SCHEDULER]   - SKIPPING: Device in quiet hours`);
@@ -779,22 +799,13 @@ async function sendScheduledNotifications() {
  */
 function setupNotificationScheduler() {
   // Run every minute
+  // Note: Interval checking is now done inside sendScheduledNotifications() for each device individually
   cron.schedule('* * * * *', async () => {
     if (!supabase || !supabaseConnected) {
       return; // Skip if Supabase not available
     }
     
     try {
-      // Get all devices and their intervals
-      const { data: devices } = await supabase
-        .from('device_tokens')
-        .select('token, notification_interval, last_active, notifications_enabled')
-        .eq('notifications_enabled', true);
-      
-      if (!devices || devices.length === 0) {
-        return;
-      }
-      
       const now = new Date();
       const currentMinute = now.getMinutes();
       const currentHour = now.getHours();
@@ -802,37 +813,8 @@ function setupNotificationScheduler() {
       
       console.log(`[CRON] Running at ${currentHour}:${currentMinute.toString().padStart(2, '0')} (minute ${minutesSinceMidnight} since midnight)`);
       
-      let shouldSend = false;
-      for (const device of devices) {
-        if (!device.notification_interval) {
-          console.log(`[CRON] Device ${device.token.substring(0, 20)}... has no interval, skipping`);
-          continue;
-        }
-        
-        // Check if it's time to send (based on interval)
-        // For 15 min: sends at :00, :15, :30, :45
-        // For 30 min: sends at :00, :30
-        // For 60 min: sends at :00 every hour
-        // For 120 min: sends at :00 every 2 hours (12:00 AM, 2:00 AM, 4:00 AM, etc.)
-        // For 240 min: sends at :00 every 4 hours (12:00 AM, 4:00 AM, 8:00 AM, 12:00 PM, 4:00 PM, 8:00 PM)
-        const remainder = minutesSinceMidnight % device.notification_interval;
-        const isTimeToSend = remainder === 0;
-        
-        console.log(`[CRON] Device interval: ${device.notification_interval} min, remainder: ${remainder}, should send: ${isTimeToSend}`);
-        
-        if (isTimeToSend) {
-          shouldSend = true;
-          console.log(`[CRON] ✅ It's time to send notifications (interval: ${device.notification_interval} min)`);
-          break; // Found a device that needs notification
-        }
-      }
-      
-      if (shouldSend) {
-        console.log(`[CRON] Calling sendScheduledNotifications()...`);
-        await sendScheduledNotifications();
-      } else {
-        console.log(`[CRON] Not time to send yet (will check again next minute)`);
-      }
+      // sendScheduledNotifications() will check intervals and quiet hours for each device individually
+      await sendScheduledNotifications();
     } catch (error) {
       console.error('[SCHEDULER] Error in cron job:', error);
     }
