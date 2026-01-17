@@ -80,6 +80,10 @@ class NotificationService {
           const quietHoursEnd = await StorageService.getQuietHoursEnd();
           const selectedCategories = await StorageService.getSelectedCategories();
           
+          // Get timezone offset in minutes (e.g., PST is UTC-8 = -480 minutes)
+          const timezoneOffset = new Date().getTimezoneOffset(); // Returns offset in minutes, negative for ahead of UTC
+          const timezoneOffsetMinutes = -timezoneOffset; // Invert to get UTC offset (positive = ahead, negative = behind)
+          
           console.log('[PUSH_NOTIFICATIONS] 📤 Registering token with server:', API_CONFIG.BASE_URL);
           console.log('[PUSH_NOTIFICATIONS] 📤 Sending preferences:', {
             notificationInterval,
@@ -88,6 +92,7 @@ class NotificationService {
             quietHoursStart,
             quietHoursEnd,
             selectedCategories,
+            timezoneOffsetMinutes,
           });
           
           const response = await fetch(`${API_CONFIG.BASE_URL}/api/register-token`, {
@@ -105,6 +110,7 @@ class NotificationService {
               quietHoursStart,
               quietHoursEnd,
               selectedCategories,
+              timezoneOffsetMinutes, // Send timezone offset to server
             }),
           });
           

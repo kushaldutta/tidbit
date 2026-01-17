@@ -171,6 +171,7 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
       // For "I knew it" or "I didn't" actions, dismiss the modal
       // User can use "Get Tidbit Now" button if they want another tidbit
       if (action === 'knew' || action === 'didnt') {
+        console.log(`[TIDBIT_MODAL] Action "${action}" - dismissing modal (not showing next tidbit)`);
         // Small delay to show feedback, then dismiss
         setTimeout(() => {
           handleDismiss();

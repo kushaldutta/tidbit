@@ -118,8 +118,15 @@ export default function App() {
   const navigationRef = useRef(null);
 
   const handleUnlock = useCallback(async () => {
-    // Only show tidbits after initialization
+    // Only show tidbits after initialization AND onboarding is complete
     if (!isInitializedRef.current) return;
+    
+    // Check if onboarding is complete before showing tidbits
+    const onboardingComplete = await StorageService.getOnboardingCompleted();
+    if (!onboardingComplete) {
+      console.log('[APP] Skipping tidbit - onboarding not complete');
+      return;
+    }
     
     const shouldShow = await UnlockService.shouldShowTidbit();
     if (shouldShow) {
@@ -261,6 +268,13 @@ export default function App() {
           }
           
           // Regular notification tap - show tidbit in app
+          // Only show if onboarding is complete
+          const onboardingComplete = await StorageService.getOnboardingCompleted();
+          if (!onboardingComplete) {
+            console.log('[NOTIFICATION_RESPONSE] Skipping tidbit - onboarding not complete');
+            return;
+          }
+          
           // Check if we should show a tidbit
           const shouldShow = await UnlockService.shouldShowTidbit();
           if (shouldShow) {
@@ -307,8 +321,9 @@ export default function App() {
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       setAppState((prevState) => {
         if (prevState.match(/inactive|background/) && nextAppState === 'active') {
-          // App came to foreground - check if we should show a tidbit
-          handleUnlock();
+          // App came to foreground
+          // NOTE: We no longer automatically show tidbits on unlock
+          // Tidbits only show when user explicitly requests them (via "Get Tidbit Now" or notification tap)
           
           // Re-register notification category to ensure action buttons work
           // This is important for push notifications that arrive when app is in background

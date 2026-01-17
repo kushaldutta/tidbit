@@ -322,6 +322,7 @@ app.post('/api/register-token', async (req, res) => {
       quietHoursStart,
       quietHoursEnd,
       selectedCategories,
+      timezoneOffsetMinutes, // Timezone offset in minutes (e.g., PST = -480, EST = -300)
     } = req.body;
     
     if (!token || !platform) {
@@ -379,6 +380,10 @@ app.post('/api/register-token', async (req, res) => {
     if (selectedCategories !== undefined) {
       updateData.selected_categories = selectedCategories;
       console.log(`[SERVER] Updating selected_categories to: ${JSON.stringify(selectedCategories)}`);
+    }
+    if (timezoneOffsetMinutes !== undefined) {
+      updateData.timezone_offset_minutes = timezoneOffsetMinutes;
+      console.log(`[SERVER] Updating timezone_offset_minutes to: ${timezoneOffsetMinutes} (UTC${timezoneOffsetMinutes >= 0 ? '+' : ''}${timezoneOffsetMinutes / 60})`);
     }
     
     // Upsert device token (update if exists, insert if new)
@@ -540,6 +545,21 @@ app.post('/api/send-notification', async (req, res) => {
  * Send push notifications to all eligible devices
  * This function is called by the cron scheduler
  */
+/**
+ * Convert UTC time to user's local time based on timezone offset
+ * @param {Date} utcDate - UTC date object
+ * @param {number} timezoneOffsetMinutes - Timezone offset in minutes (e.g., PST = -480, EST = -300)
+ * @returns {Object} { hour, minute, minutesSinceMidnight }
+ */
+function getLocalTime(utcDate, timezoneOffsetMinutes = 0) {
+  // Create a new date adjusted for timezone offset
+  const localTime = new Date(utcDate.getTime() + (timezoneOffsetMinutes * 60 * 1000));
+  const hour = localTime.getUTCHours();
+  const minute = localTime.getUTCMinutes();
+  const minutesSinceMidnight = hour * 60 + minute;
+  return { hour, minute, minutesSinceMidnight };
+}
+
 async function sendScheduledNotifications() {
   if (!supabase || !supabaseConnected) {
     console.warn('[SCHEDULER] Supabase not available, skipping notification send');
@@ -547,9 +567,9 @@ async function sendScheduledNotifications() {
   }
   
   try {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
+    const now = new Date(); // UTC time
+    const utcHour = now.getUTCHours();
+    const utcMinute = now.getUTCMinutes();
     
     // Get all active device tokens with their preferences
     const { data: devices, error } = await supabase
@@ -569,7 +589,7 @@ async function sendScheduledNotifications() {
     }
     
     console.log(`[SCHEDULER] ========================================`);
-    console.log(`[SCHEDULER] Starting notification check at ${currentHour}:${currentMinute}`);
+    console.log(`[SCHEDULER] Starting notification check at UTC ${utcHour}:${utcMinute.toString().padStart(2, '0')}`);
     console.log(`[SCHEDULER] Found ${devices.length} active device(s)`);
     
     // Get tidbits from Supabase
@@ -581,7 +601,7 @@ async function sendScheduledNotifications() {
     
     const messages = [];
     
-    console.log(`[SCHEDULER] Processing ${devices.length} devices at ${currentHour}:${currentMinute}`);
+    console.log(`[SCHEDULER] Processing ${devices.length} devices`);
     
     for (const device of devices) {
       console.log(`[SCHEDULER] Checking device: ${device.token.substring(0, 20)}...`);
@@ -590,24 +610,31 @@ async function sendScheduledNotifications() {
       console.log(`[SCHEDULER]   - Quiet hours: ${device.quiet_hours_start || 23} - ${device.quiet_hours_end || 9}`);
       console.log(`[SCHEDULER]   - Selected categories: ${JSON.stringify(device.selected_categories || [])}`);
       
+      // Get user's local time based on their timezone offset
+      const timezoneOffset = device.timezone_offset_minutes || 0; // Default to UTC if not set
+      const localTime = getLocalTime(now, timezoneOffset);
+      const { hour: currentHour, minute: currentMinute, minutesSinceMidnight } = localTime;
+      
+      console.log(`[SCHEDULER]   - Timezone offset: ${timezoneOffset} min (UTC${timezoneOffset >= 0 ? '+' : ''}${timezoneOffset / 60})`);
+      console.log(`[SCHEDULER]   - Local time: ${currentHour}:${currentMinute.toString().padStart(2, '0')} (UTC: ${utcHour}:${utcMinute.toString().padStart(2, '0')})`);
+      
       // Check if it's time to send based on interval
       if (!device.notification_interval) {
         console.log(`[SCHEDULER]   - SKIPPING: No notification interval set`);
         continue;
       }
       
-      const minutesSinceMidnight = currentHour * 60 + currentMinute;
       const remainder = minutesSinceMidnight % device.notification_interval;
       const isTimeToSend = remainder === 0;
       
-      console.log(`[SCHEDULER]   - Minutes since midnight: ${minutesSinceMidnight}, remainder: ${remainder}, should send: ${isTimeToSend}`);
+      console.log(`[SCHEDULER]   - Minutes since midnight (local): ${minutesSinceMidnight}, remainder: ${remainder}, should send: ${isTimeToSend}`);
       
       if (!isTimeToSend) {
         console.log(`[SCHEDULER]   - SKIPPING: Not time to send yet (interval: ${device.notification_interval} min)`);
         continue; // Skip this device - not time for their interval
       }
       
-      // Check quiet hours
+      // Check quiet hours (using local time)
       if (device.quiet_hours_enabled) {
         const quietStart = device.quiet_hours_start ?? 23;
         const quietEnd = device.quiet_hours_end ?? 9;
@@ -624,7 +651,7 @@ async function sendScheduledNotifications() {
           inQuietHours = currentHour >= quietStart && currentHour < quietEnd;
         }
         
-        console.log(`[SCHEDULER]   - In quiet hours: ${inQuietHours} (current: ${currentHour}:${currentMinute}, quiet: ${quietStart}-${quietEnd})`);
+        console.log(`[SCHEDULER]   - In quiet hours: ${inQuietHours} (local: ${currentHour}:${currentMinute.toString().padStart(2, '0')}, quiet: ${quietStart}-${quietEnd})`);
         
         if (inQuietHours) {
           console.log(`[SCHEDULER]   - SKIPPING: Device in quiet hours`);
