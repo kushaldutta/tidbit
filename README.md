@@ -7,7 +7,6 @@ A mobile app that delivers short, interesting, and personalized pieces of inform
 - **Personalized Content**: Choose from categories like tech, psychology, finance, history, fun facts, science, and health
 - **Unlock Detection**: Automatically shows tidbits when you unlock your phone
 - **Spaced Repetition**: Smart algorithm that shows tidbits you haven't mastered more frequently
-- **Daily Limits**: Up to 20 tidbits per day to avoid spam
 - **Statistics Tracking**: Track total tidbits seen, daily unlocks, mastered tidbits, and learning progress
 - **Server-Side Content**: Update tidbits without releasing a new app version
 - **Content Management**: Easy-to-use CLI tools for adding and validating tidbits
@@ -194,11 +193,10 @@ The app uses a spaced repetition system to optimize learning:
 5. **Spaced Repetition**: System tracks which tidbits you've seen and adjusts frequency
 6. **Statistics**: Track your learning progress and unlock patterns
 
-### Daily Limits
+### Notification Scheduling
 
-- **Maximum**: 20 tidbits per day
 - **Minimum Interval**: 30 seconds between tidbits
-- **Smart Scheduling**: Respects your notification frequency preferences
+- **Smart Scheduling**: Respects your notification frequency preferences and quiet hours
 
 ## 🛠️ Development
 
@@ -215,7 +213,6 @@ The app uses a spaced repetition system to optimize learning:
 
 ### Configuration
 
-- **Daily Tidbit Limit**: `src/services/UnlockService.js` (default: 20)
 - **Minimum Interval**: `src/services/UnlockService.js` (default: 30 seconds)
 - **API Base URL**: `src/config/api.js`
 - **Categories**: Managed in `src/services/ContentService.js` and `content/tidbits.json`

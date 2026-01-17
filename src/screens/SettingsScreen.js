@@ -480,8 +480,8 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.infoTitle}>About Notifications</Text>
           <Text style={styles.infoText}>
             {Platform.OS === 'ios' 
-              ? 'Notifications are scheduled throughout the day based on your interval setting. You\'ll receive up to 100 tidbits per day.'
-              : 'Notifications are sent when you unlock your phone, up to 100 tidbits per day.'}
+              ? 'Notifications are scheduled throughout the day based on your interval setting.'
+              : 'Notifications are sent when you unlock your phone.'}
           </Text>
         </View>
       </View>

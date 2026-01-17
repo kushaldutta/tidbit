@@ -13,8 +13,8 @@ import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 export default function HomeScreen({ navigation }) {
   const [stats, setStats] = useState({
     tidbitsSeen: 0,
-    dailyUnlocks: 0,
     dailyTidbits: 0,
+    learningStreak: 0,
   });
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
@@ -36,7 +36,6 @@ export default function HomeScreen({ navigation }) {
 
   const loadData = async () => {
     const tidbitsSeen = await StorageService.getTidbitsSeen();
-    const dailyUnlocks = await StorageService.getDailyUnlocks();
     const dailyTidbits = await StorageService.getDailyTidbitCount();
     const selected = await StorageService.getSelectedCategories();
     const available = ContentService.getAvailableCategories();
@@ -50,7 +49,54 @@ export default function HomeScreen({ navigation }) {
       await StorageService.setSelectedCategories(validCategories);
     }
     
-    setStats({ tidbitsSeen, dailyUnlocks, dailyTidbits });
+    // Calculate learning streak (same logic as StatsScreen)
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    const allKeys = await AsyncStorage.getAllKeys();
+    const spacedRepKeys = allKeys.filter(key => key.startsWith('spaced_repetition_'));
+    
+    const today = new Date().toDateString();
+    const last7Days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      last7Days.push(date.toDateString());
+    }
+    
+    const daysWithActivity = new Set();
+    
+    for (const key of spacedRepKeys) {
+      try {
+        const data = await AsyncStorage.getItem(key);
+        if (data) {
+          const state = JSON.parse(data);
+          // Track learning streak (days with activity)
+          if (state.lastSeen) {
+            const lastSeenDate = new Date(state.lastSeen).toDateString();
+            if (last7Days.includes(lastSeenDate)) {
+              daysWithActivity.add(lastSeenDate);
+            }
+          }
+        }
+      } catch (error) {
+        // Ignore parse errors
+      }
+    }
+    
+    // Calculate streak (consecutive days from today backwards)
+    let learningStreak = 0;
+    for (let i = 0; i < 7; i++) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toDateString();
+      if (daysWithActivity.has(dateStr)) {
+        learningStreak++;
+      } else if (i > 0) {
+        // Break streak if we hit a day without activity (but today can be 0)
+        break;
+      }
+    }
+    
+    setStats({ tidbitsSeen, dailyTidbits, learningStreak });
     setSelectedCategories(validCategories);
   };
 
@@ -94,8 +140,8 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.statLabel}>Today</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.dailyUnlocks}</Text>
-          <Text style={styles.statLabel}>Unlocks</Text>
+          <Text style={styles.statNumber}>{stats.learningStreak}</Text>
+          <Text style={styles.statLabel}>Day Streak</Text>
         </View>
       </View>
 

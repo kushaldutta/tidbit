@@ -381,9 +381,13 @@ app.post('/api/register-token', async (req, res) => {
       updateData.selected_categories = selectedCategories;
       console.log(`[SERVER] Updating selected_categories to: ${JSON.stringify(selectedCategories)}`);
     }
+    // Always update timezone if provided (even if 0, to fix devices registered before timezone support)
     if (timezoneOffsetMinutes !== undefined) {
       updateData.timezone_offset_minutes = timezoneOffsetMinutes;
       console.log(`[SERVER] Updating timezone_offset_minutes to: ${timezoneOffsetMinutes} (UTC${timezoneOffsetMinutes >= 0 ? '+' : ''}${timezoneOffsetMinutes / 60})`);
+    } else {
+      // If timezone not provided, log a warning (should always be sent from client)
+      console.warn(`[SERVER] ⚠️ WARNING: timezoneOffsetMinutes not provided in registration request!`);
     }
     
     // Upsert device token (update if exists, insert if new)
@@ -611,11 +615,15 @@ async function sendScheduledNotifications() {
       console.log(`[SCHEDULER]   - Selected categories: ${JSON.stringify(device.selected_categories || [])}`);
       
       // Get user's local time based on their timezone offset
-      const timezoneOffset = device.timezone_offset_minutes || 0; // Default to UTC if not set
+      // If timezone_offset_minutes is null/undefined, default to UTC (0)
+      // This handles devices registered before timezone support was added
+      const timezoneOffset = device.timezone_offset_minutes !== null && device.timezone_offset_minutes !== undefined 
+        ? device.timezone_offset_minutes 
+        : 0;
       const localTime = getLocalTime(now, timezoneOffset);
       const { hour: currentHour, minute: currentMinute, minutesSinceMidnight } = localTime;
       
-      console.log(`[SCHEDULER]   - Timezone offset: ${timezoneOffset} min (UTC${timezoneOffset >= 0 ? '+' : ''}${timezoneOffset / 60})`);
+      console.log(`[SCHEDULER]   - Timezone offset: ${timezoneOffset} min (UTC${timezoneOffset >= 0 ? '+' : ''}${timezoneOffset / 60})${timezoneOffset === 0 ? ' ⚠️ WARNING: Timezone not set! Device needs to re-register.' : ''}`);
       console.log(`[SCHEDULER]   - Local time: ${currentHour}:${currentMinute.toString().padStart(2, '0')} (UTC: ${utcHour}:${utcMinute.toString().padStart(2, '0')})`);
       
       // Check if it's time to send based on interval

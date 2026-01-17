@@ -1,6 +1,5 @@
 import { StorageService } from './StorageService';
 
-const DAILY_TIDBIT_LIMIT = 100; // Maximum tidbits per day
 const MIN_UNLOCK_INTERVAL = 30000; // 30 seconds minimum between tidbits
 
 class UnlockService {
@@ -30,12 +29,6 @@ class UnlockService {
 
   static async shouldShowTidbit() {
     await this.checkAndResetDailyStats();
-
-    // Check daily limit
-    const dailyCount = await StorageService.getDailyTidbitCount();
-    if (dailyCount >= DAILY_TIDBIT_LIMIT) {
-      return false;
-    }
 
     // Check minimum interval
     const now = Date.now();

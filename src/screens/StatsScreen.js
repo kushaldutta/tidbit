@@ -137,7 +137,7 @@ export default function StatsScreen() {
         <View style={styles.dailyStatCard}>
           <Text style={styles.dailyStatNumber}>{stats.dailyTidbits}</Text>
           <Text style={styles.dailyStatLabel}>Tidbits Today</Text>
-          <Text style={styles.dailyStatSubtext}>Out of 100 daily limit</Text>
+          <Text style={styles.dailyStatSubtext}>Today</Text>
         </View>
         <View style={styles.dailyStatCard}>
           <Text style={styles.dailyStatNumber}>{stats.dailyUnlocks}</Text>
@@ -196,7 +196,7 @@ export default function StatsScreen() {
         <Text style={styles.infoTitle}>About Your Stats</Text>
         <Text style={styles.infoText}>
           • Total Tidbits: All tidbits you've seen since installing Tidbit{'\n'}
-          • Daily Limit: You can see up to 20 tidbits per day{'\n'}
+          • Tidbits Today: Number of tidbits you've seen today{'\n'}
           • Unlocks: Number of times you've unlocked your phone today{'\n'}
           • Stats reset daily at midnight
         </Text>
