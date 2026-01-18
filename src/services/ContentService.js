@@ -380,9 +380,8 @@ class ContentService {
   }
 
   /**
-   * Get a smart tidbit that prioritizes due tidbits for spaced repetition
-   * First checks for due tidbits (filtered by user's selected categories),
-   * then falls back to random selection
+   * Get a smart tidbit with 50/50 chance between due tidbits and random selection
+   * This encourages both learning new content and reviewing previously seen tidbits
    * @returns {Promise<Object|null>} A tidbit object or null
    */
   static async getSmartTidbit() {
@@ -394,36 +393,36 @@ class ContentService {
         return null;
       }
 
-      // First, check for due tidbits
+      // 50% chance to show due tidbit (if available), 50% chance to show random
+      const shouldShowDueTidbit = Math.random() < 0.5;
+      
+      // Check for due tidbits (even if we might not use them)
       const dueTidbitIds = await SpacedRepetitionService.getDueTidbits();
+      let filteredDueTidbits = [];
       
       if (dueTidbitIds.length > 0) {
         // Filter due tidbits by user's selected categories
-        // First, try to find tidbits (searching all categories to find by ID)
-        // Then filter by selected categories
-        const filteredDueTidbits = [];
-        
         for (const tidbitId of dueTidbitIds) {
-          // Search all categories to find the tidbit by ID
           const tidbit = await this.getTidbitById(tidbitId, false);
-          // Then check if it's in a selected category
           if (tidbit && selectedCategories.includes(tidbit.category)) {
             filteredDueTidbits.push(tidbit);
           }
         }
-        
-        if (filteredDueTidbits.length > 0) {
-          // Pick a random due tidbit from filtered list
-          const randomDueTidbit = filteredDueTidbits[Math.floor(Math.random() * filteredDueTidbits.length)];
-          console.log(`[SMART_TIDBIT] Selected due tidbit: ${randomDueTidbit.id} (${filteredDueTidbits.length}/${dueTidbitIds.length} due in selected categories)`);
-          return randomDueTidbit;
-        } else {
-          console.log(`[SMART_TIDBIT] ${dueTidbitIds.length} due tidbits, but none in selected categories`);
-        }
       }
       
-      // No due tidbits in selected categories, fall back to random selection
-      console.log('[SMART_TIDBIT] No due tidbits in selected categories, selecting random');
+      // If we want to show due tidbit AND have due tidbits available, show one
+      if (shouldShowDueTidbit && filteredDueTidbits.length > 0) {
+        const randomDueTidbit = filteredDueTidbits[Math.floor(Math.random() * filteredDueTidbits.length)];
+        console.log(`[SMART_TIDBIT] 50/50 selected: Due tidbit (${filteredDueTidbits.length}/${dueTidbitIds.length} due in selected categories)`);
+        return randomDueTidbit;
+      }
+      
+      // Otherwise, show random tidbit (either by choice or because no due tidbits available)
+      if (shouldShowDueTidbit && filteredDueTidbits.length === 0) {
+        console.log(`[SMART_TIDBIT] 50/50 selected: Due tidbit, but none available in selected categories, showing random instead`);
+      } else {
+        console.log('[SMART_TIDBIT] 50/50 selected: Random tidbit (new learning)');
+      }
       return await this.getRandomTidbit();
     } catch (error) {
       console.error('[SMART_TIDBIT] Error in getSmartTidbit, falling back to random:', error);
