@@ -614,12 +614,10 @@ async function sendScheduledNotifications() {
       console.log(`[SCHEDULER]   - Quiet hours: ${device.quiet_hours_start || 23} - ${device.quiet_hours_end || 9}`);
       console.log(`[SCHEDULER]   - Selected categories: ${JSON.stringify(device.selected_categories || [])}`);
       
-      // Get user's local time based on their timezone offset
-      // If timezone_offset_minutes is null/undefined, default to UTC (0)
-      // This handles devices registered before timezone support was added
-      const timezoneOffset = device.timezone_offset_minutes !== null && device.timezone_offset_minutes !== undefined 
-        ? device.timezone_offset_minutes 
-        : 0;
+      // TEMPORARY: Hardcode PST (UTC-8, -480 minutes) for all devices in California
+      // TODO: Remove this hardcode once app build includes proper timezone support
+      // PST = UTC-8 = -480 minutes
+      const timezoneOffset = -480; // Hardcoded PST for California users
       const localTime = getLocalTime(now, timezoneOffset);
       const { hour: currentHour, minute: currentMinute, minutesSinceMidnight } = localTime;
       
