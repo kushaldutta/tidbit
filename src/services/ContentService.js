@@ -442,6 +442,10 @@ class ContentService {
   static formatCategoryName(categoryId) {
     const names = {
       'math-54': 'MATH 54',
+      'cs-61a': 'CS 61A',
+      'cs61b': 'CS 61B',
+      'data-8': 'Data 8',
+      'econ-1': 'ECON 1',
       history: 'History',
       science: 'Science',
       'berkeley-fun-facts': 'Berkeley Fun Facts',
@@ -453,6 +457,10 @@ class ContentService {
   static getCategoryDescription(categoryId) {
     const descriptions = {
       'math-54': 'Linear algebra and differential equations',
+      'cs-61a': 'Structure and Interpretation of Computer Programs',
+      'cs61b': 'Data Structures and Algorithms',
+      'data-8': 'Foundations of Data Science',
+      'econ-1': 'Introduction to Economics',
       history: 'Fascinating historical moments',
       science: 'Scientific discoveries and phenomena',
       'berkeley-fun-facts': 'Interesting facts about UC Berkeley',
