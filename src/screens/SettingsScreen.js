@@ -624,7 +624,7 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.aboutText}>
               <Text style={styles.aboutLabel}>Contact:</Text>{' '}
               <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
-                kushald@berkeley.edu
+                support@tidbit.app
               </Text>
             </Text>
           </TouchableOpacity>
