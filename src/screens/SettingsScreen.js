@@ -368,6 +368,9 @@ export default function SettingsScreen({ navigation }) {
                     No notifications during selected hours
                   </Text>
                 )}
+                <Text style={styles.settingSubnote}>
+                  Quiet hours are applied in PST.
+                </Text>
               </View>
               <Switch
                 value={quietHoursEnabled}
@@ -755,6 +758,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     lineHeight: 20,
+  },
+  settingSubnote: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 18,
