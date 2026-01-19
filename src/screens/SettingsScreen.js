@@ -630,7 +630,7 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
-              const privacyUrl = 'https://kushaldutta.github.io/tidbit/privacy'; // TODO: Update with your GitHub Pages URL
+              const privacyUrl = 'https://kushaldutta.github.io/tidbit/privacy'; 
               Linking.canOpenURL(privacyUrl).then(supported => {
                 if (supported) {
                   Linking.openURL(privacyUrl);
