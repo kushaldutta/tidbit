@@ -115,8 +115,16 @@ export default function HomeScreen({ navigation }) {
         // App.js will listen for this and show the modal
         navigation.navigate('Tidbit', { tidbit: tidbitWithId });
         
-        // Count this as a tidbit seen
+        // Count this as a tidbit seen (total + today)
         await StorageService.incrementTidbitsSeen();
+        await StorageService.incrementDailyTidbitCount();
+
+        // Update UI immediately (avoid waiting for navigation focus reload)
+        setStats(prev => ({
+          ...prev,
+          tidbitsSeen: (prev.tidbitsSeen || 0) + 1,
+          dailyTidbits: (prev.dailyTidbits || 0) + 1,
+        }));
       }
     } catch (error) {
       console.error('Error getting tidbit:', error);
