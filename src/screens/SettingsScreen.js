@@ -32,8 +32,6 @@ export default function SettingsScreen({ navigation }) {
   const [quietHoursEnd, setQuietHoursEnd] = useState(9); // 9 AM
   const [showQuietHoursPicker, setShowQuietHoursPicker] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [devModeEnabled, setDevModeEnabled] = useState(false);
-  const [devModeTapCount, setDevModeTapCount] = useState(0);
   const [spacedRepStats, setSpacedRepStats] = useState({
     totalTidbits: 0,
     dueTidbits: 0,
@@ -45,7 +43,6 @@ export default function SettingsScreen({ navigation }) {
   useEffect(() => {
     loadSettings();
     loadSpacedRepStats();
-    loadDevMode();
     
     // Refresh stats when screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
@@ -54,38 +51,6 @@ export default function SettingsScreen({ navigation }) {
     
     return unsubscribe;
   }, [navigation]);
-
-  const loadDevMode = async () => {
-    const enabled = await StorageService.getDevModeEnabled();
-    setDevModeEnabled(enabled);
-  };
-
-  const handleDevModeToggle = async () => {
-    const newState = !devModeEnabled;
-    setDevModeEnabled(newState);
-    await StorageService.setDevModeEnabled(newState);
-    if (newState) {
-      Alert.alert('🔧 Dev Mode', 'Developer mode enabled. Debug tools are now visible.');
-    } else {
-      Alert.alert('🔧 Dev Mode', 'Developer mode disabled.');
-    }
-  };
-
-  const handleSecretTap = () => {
-    const newCount = devModeTapCount + 1;
-    setDevModeTapCount(newCount);
-    
-    // Reset after 3 seconds
-    setTimeout(() => {
-      setDevModeTapCount(0);
-    }, 3000);
-    
-    // Enable dev mode after 5 taps
-    if (newCount >= 5) {
-      handleDevModeToggle();
-      setDevModeTapCount(0);
-    }
-  };
 
   const loadSpacedRepStats = async () => {
     try {
@@ -489,7 +454,7 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </View>
 
-      {devModeEnabled && (
+      {false && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Testing</Text>
           <TouchableOpacity
@@ -502,7 +467,7 @@ export default function SettingsScreen({ navigation }) {
             Send an immediate push notification with action buttons
           </Text>
         
-        {Platform.OS === 'ios' && devModeEnabled && (
+        {Platform.OS === 'ios' && false && (
           <>
             <TouchableOpacity
               style={[styles.testButton, styles.testButtonSecondary]}
@@ -539,7 +504,7 @@ export default function SettingsScreen({ navigation }) {
         </View>
       )}
 
-      {devModeEnabled && (
+      {false && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>🔧 Spaced Repetition Debug</Text>
         <View style={styles.debugStats}>
@@ -665,8 +630,6 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
-              // Update this URL to your GitHub Pages URL once deployed
-              // Example: https://yourusername.github.io/tidbit/privacy
               const privacyUrl = 'https://kushaldutta.github.io/tidbit/privacy'; // TODO: Update with your GitHub Pages URL
               Linking.canOpenURL(privacyUrl).then(supported => {
                 if (supported) {
@@ -685,21 +648,6 @@ export default function SettingsScreen({ navigation }) {
               Privacy Policy
             </Text>
           </TouchableOpacity>
-        </View>
-        
-        <View style={[styles.settingRow, { marginTop: 16 }]}>
-          <View style={styles.settingInfo}>
-            <Text style={styles.settingLabel}>🔧 Developer Mode</Text>
-            <Text style={styles.settingDescription}>
-              {devModeEnabled ? 'Debug tools are visible' : 'Enable to show debug tools'}
-            </Text>
-          </View>
-          <Switch
-            value={devModeEnabled}
-            onValueChange={handleDevModeToggle}
-            trackColor={{ false: '#e5e7eb', true: '#6366f1' }}
-            thumbColor="#ffffff"
-          />
         </View>
       </View>
     </ScrollView>
