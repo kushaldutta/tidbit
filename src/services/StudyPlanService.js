@@ -189,6 +189,61 @@ class StudyPlanService {
   }
 
   /**
+   * Generate an ad-hoc session (for Study Mode)
+   * Uses same mixing logic as daily plan but does not persist anything
+   * @param {number} totalCount - Desired number of tidbits
+   * @returns {Promise<Object[]>} Array of tidbit objects
+   */
+  static async generateSessionTidbits(totalCount) {
+    try {
+      const selectedCategories = await StorageService.getSelectedCategories();
+
+      if (selectedCategories.length === 0) {
+        console.log('[STUDY_PLAN] No categories selected, cannot generate session');
+        return [];
+      }
+
+      // 1. Get due tidbits
+      const dueTidbitIds = await SpacedRepetitionService.getDueTidbits();
+      const dueTidbits = [];
+
+      for (const tidbitId of dueTidbitIds) {
+        const tidbit = await ContentService.getTidbitById(tidbitId, false);
+        if (tidbit && selectedCategories.includes(tidbit.category)) {
+          dueTidbits.push(tidbit);
+        }
+      }
+
+      // 2. Get new tidbits
+      const newTidbits = await this.getNewTidbits(selectedCategories);
+
+      // 3. Calculate mix
+      const targetTotal = totalCount || PLAN_CONFIG.DEFAULT_TOTAL;
+      const dueCount = Math.min(
+        dueTidbits.length,
+        Math.ceil(targetTotal * PLAN_CONFIG.DUE_RATIO)
+      );
+      const newCount = Math.min(
+        newTidbits.length,
+        targetTotal - dueCount
+      );
+
+      const actualNewCount = Math.min(newCount, targetTotal - dueCount);
+
+      const selectedDue = shuffleArray(dueTidbits).slice(0, dueCount);
+      const selectedNew = shuffleArray(newTidbits).slice(0, actualNewCount);
+
+      const sessionTidbits = shuffleArray([...selectedDue, ...selectedNew]);
+
+      console.log(`[STUDY_PLAN] Generated session tidbits: ${selectedDue.length} due + ${selectedNew.length} new (total ${sessionTidbits.length})`);
+      return sessionTidbits;
+    } catch (error) {
+      console.error('[STUDY_PLAN] Error generating session tidbits:', error);
+      return [];
+    }
+  }
+
+  /**
    * Mark the study plan as completed
    * @param {number} completedCount - Number of tidbits actually completed
    */

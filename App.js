@@ -16,6 +16,7 @@ import CategorySelectionScreen from './src/screens/CategorySelectionScreen';
 import PermissionRequestScreen from './src/screens/PermissionRequestScreen';
 import LoadingScreen from './src/screens/LoadingScreen';
 import StudySessionScreen from './src/screens/StudySessionScreen';
+import StudyModeScreen from './src/screens/StudyModeScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
 import { StorageService } from './src/services/StorageService';
@@ -48,6 +49,16 @@ function MainTabs() {
           tabBarLabel: 'Home',
           tabBarIcon: ({ color }) => (
             <TabIcon name="home" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Study" 
+        component={StudyModeScreen}
+        options={{
+          tabBarLabel: 'Study',
+          tabBarIcon: ({ color }) => (
+            <TabIcon name="study" color={color} />
           ),
         }}
       />
@@ -89,6 +100,7 @@ function TabIcon({ name, color }) {
   // Simple text-based icons
   const iconMap = {
     home: '🏠',
+    study: '📚',
     grid: '📋',
     'stats-chart': '📊',
     settings: '⚙️',
