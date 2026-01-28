@@ -15,6 +15,7 @@ import FrequencySelectionScreen from './src/screens/FrequencySelectionScreen';
 import CategorySelectionScreen from './src/screens/CategorySelectionScreen';
 import PermissionRequestScreen from './src/screens/PermissionRequestScreen';
 import LoadingScreen from './src/screens/LoadingScreen';
+import StudySessionScreen from './src/screens/StudySessionScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
 import { StorageService } from './src/services/StorageService';
@@ -413,6 +414,10 @@ export default function App() {
             >
               {() => null}
             </Stack.Screen>
+            <Stack.Screen 
+              name="StudySession" 
+              component={StudySessionScreen}
+            />
           </Stack.Navigator>
         ) : (
           <OnboardingStack />

@@ -287,6 +287,15 @@ class ContentService {
     return success;
   }
 
+  /**
+   * Get all tidbits for a specific category
+   * @param {string} category - Category ID
+   * @returns {string[]} Array of tidbit texts
+   */
+  static getTidbitsByCategory(category) {
+    return TIDBITS[category] || [];
+  }
+
   static async getRandomTidbit() {
     const selectedCategories = await StorageService.getSelectedCategories();
     

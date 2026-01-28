@@ -9,6 +9,8 @@ import {
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
+import { StudyPlanService } from '../services/StudyPlanService';
+import StudyPlanCard from '../components/StudyPlanCard';
 
 export default function HomeScreen({ navigation }) {
   const [stats, setStats] = useState({
@@ -18,13 +20,17 @@ export default function HomeScreen({ navigation }) {
   });
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
+  const [studyPlan, setStudyPlan] = useState(null);
+  const [studyPlanLoading, setStudyPlanLoading] = useState(true);
 
   useEffect(() => {
     loadData();
     loadDevMode();
+    loadStudyPlan();
     const unsubscribe = navigation.addListener('focus', () => {
       loadData();
       loadDevMode();
+      loadStudyPlan();
     });
     return unsubscribe;
   }, [navigation]);
@@ -32,6 +38,30 @@ export default function HomeScreen({ navigation }) {
   const loadDevMode = async () => {
     const enabled = await StorageService.getDevModeEnabled();
     setDevModeEnabled(enabled);
+  };
+
+  const loadStudyPlan = async () => {
+    try {
+      setStudyPlanLoading(true);
+      const plan = await StudyPlanService.getDailyPlan();
+      setStudyPlan(plan);
+    } catch (error) {
+      console.error('Error loading study plan:', error);
+      setStudyPlan(null);
+    } finally {
+      setStudyPlanLoading(false);
+    }
+  };
+
+  const handleStartStudySession = async () => {
+    if (!studyPlan || studyPlan.completed) return;
+    
+    try {
+      // Navigate to study session with plan tidbits
+      navigation.navigate('StudySession', { tidbits: studyPlan.tidbits });
+    } catch (error) {
+      console.error('Error starting study session:', error);
+    }
   };
 
   const loadData = async () => {
@@ -152,6 +182,12 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.statLabel}>Day Streak</Text>
         </View>
       </View>
+
+      <StudyPlanCard
+        plan={studyPlan}
+        onPress={handleStartStudySession}
+        isLoading={studyPlanLoading}
+      />
 
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>How it works</Text>
