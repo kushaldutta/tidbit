@@ -11,6 +11,8 @@ import { ContentService } from '../services/ContentService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import { StudyPlanService } from '../services/StudyPlanService';
 import StudyPlanCard from '../components/StudyPlanCard';
+import CategoryProgressPreview from '../components/CategoryProgressPreview';
+import { CategoryProgressService } from '../services/CategoryProgressService';
 
 export default function HomeScreen({ navigation }) {
   const [stats, setStats] = useState({
@@ -22,15 +24,18 @@ export default function HomeScreen({ navigation }) {
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [studyPlan, setStudyPlan] = useState(null);
   const [studyPlanLoading, setStudyPlanLoading] = useState(true);
+  const [categoryProgress, setCategoryProgress] = useState([]);
 
   useEffect(() => {
     loadData();
     loadDevMode();
     loadStudyPlan();
+    loadCategoryProgress();
     const unsubscribe = navigation.addListener('focus', () => {
       loadData();
       loadDevMode();
       loadStudyPlan();
+      loadCategoryProgress();
     });
     return unsubscribe;
   }, [navigation]);
@@ -61,6 +66,17 @@ export default function HomeScreen({ navigation }) {
       navigation.navigate('StudySession', { tidbits: studyPlan.tidbits });
     } catch (error) {
       console.error('Error starting study session:', error);
+    }
+  };
+
+  const loadCategoryProgress = async () => {
+    try {
+      const progress = await CategoryProgressService.getSelectedCategoriesProgress();
+      const sorted = CategoryProgressService.sortForHome(progress);
+      setCategoryProgress(sorted.slice(0, 3));
+    } catch (error) {
+      console.error('Error loading category progress:', error);
+      setCategoryProgress([]);
     }
   };
 
@@ -187,6 +203,11 @@ export default function HomeScreen({ navigation }) {
         plan={studyPlan}
         onPress={handleStartStudySession}
         isLoading={studyPlanLoading}
+      />
+
+      <CategoryProgressPreview
+        items={categoryProgress}
+        onViewAll={() => navigation.navigate('CategoryProgress')}
       />
 
       <View style={styles.infoCard}>
