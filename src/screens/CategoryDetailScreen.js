@@ -67,8 +67,19 @@ export default function CategoryDetailScreen({ route, navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>{progress.name}</Text>
-        <Text style={styles.subtitle}>{progress.description || 'Your learning progress'}</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backText}>←</Text>
+          </TouchableOpacity>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>{progress.name}</Text>
+            <Text style={styles.subtitle}>{progress.description || 'Your learning progress'}</Text>
+          </View>
+        </View>
       </View>
 
       {/* Mastery Card */}
@@ -134,8 +145,29 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
-    marginTop: 12,
+    marginTop: 36,
     marginBottom: 24,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  backText: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
     fontSize: 32,

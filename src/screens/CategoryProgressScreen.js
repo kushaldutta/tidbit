@@ -52,8 +52,19 @@ export default function CategoryProgressScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <Text style={styles.title}>Category Progress</Text>
-        <Text style={styles.subtitle}>See how you’re doing in each class/category</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.backText}>←</Text>
+          </TouchableOpacity>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Category Progress</Text>
+            <Text style={styles.subtitle}>See how you’re doing in each class/category</Text>
+          </View>
+        </View>
       </View>
 
       {loading ? (
@@ -76,7 +87,23 @@ export default function CategoryProgressScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { padding: 20 },
-  header: { marginTop: 12, marginBottom: 16 },
+  header: { marginTop: 36, marginBottom: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center' },
+  backButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e5e7eb',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  backText: {
+    fontSize: 18,
+    color: '#374151',
+    fontWeight: '600',
+  },
+  headerText: { flex: 1 },
   title: { fontSize: 28, fontWeight: 'bold', color: '#1f2937', marginBottom: 6 },
   subtitle: { fontSize: 14, color: '#6b7280' },
   loadingText: { marginTop: 16, color: '#6b7280', fontStyle: 'italic' },
