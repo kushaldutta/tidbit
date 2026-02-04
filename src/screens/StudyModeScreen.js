@@ -42,26 +42,26 @@ export default function StudyModeScreen({ navigation }) {
       <View style={styles.optionsContainer}>
         <SessionOption
           label="Quick Session"
-          description="5 minutes · light review"
+          description="5 tidbits · light review"
           onPress={() => startSession(5)}
           disabled={isGenerating}
         />
         <SessionOption
           label="Standard Session"
-          description="10 minutes · balanced"
+          description="10 tidbits · balanced"
           onPress={() => startSession(10)}
           disabled={isGenerating}
         />
         <SessionOption
           label="Focused Session"
-          description="15 minutes · deeper practice"
+          description="15 tidbits · deeper practice"
           onPress={() => startSession(15)}
           disabled={isGenerating}
         />
         <SessionOption
           label="Deep Session"
-          description="20 minutes · serious study"
-          onPress={() => startSession(20)}
+          description="30 tidbits · serious study"
+          onPress={() => startSession(30)}
           disabled={isGenerating}
         />
       </View>
