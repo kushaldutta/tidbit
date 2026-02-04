@@ -106,6 +106,25 @@ class CategoryProgressService {
   }
 
   /**
+   * Get progress for a single category
+   * @param {string} categoryId
+   * @returns {Promise<Object|null>} Category progress object or null
+   */
+  static async getCategoryProgress(categoryId) {
+    if (!categoryId) return null;
+    
+    const results = await this.getCategoriesProgress([categoryId]);
+    if (results.length === 0) return null;
+    
+    const progress = results[0];
+    
+    // Add description if available
+    progress.description = ContentService.getCategoryDescription(categoryId);
+    
+    return progress;
+  }
+
+  /**
    * Sort categories for the Home "top 3" view:
    * - due desc (most urgent first)
    * - masteryPercent asc (lowest mastery first)

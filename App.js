@@ -18,6 +18,7 @@ import LoadingScreen from './src/screens/LoadingScreen';
 import StudySessionScreen from './src/screens/StudySessionScreen';
 import StudyModeScreen from './src/screens/StudyModeScreen';
 import CategoryProgressScreen from './src/screens/CategoryProgressScreen';
+import CategoryDetailScreen from './src/screens/CategoryDetailScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
 import { StorageService } from './src/services/StorageService';
@@ -434,6 +435,10 @@ export default function App() {
             <Stack.Screen
               name="CategoryProgress"
               component={CategoryProgressScreen}
+            />
+            <Stack.Screen
+              name="CategoryDetail"
+              component={CategoryDetailScreen}
             />
           </Stack.Navigator>
         ) : (

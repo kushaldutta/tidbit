@@ -208,6 +208,7 @@ export default function HomeScreen({ navigation }) {
       <CategoryProgressPreview
         items={categoryProgress}
         onViewAll={() => navigation.navigate('CategoryProgress')}
+        onCategoryPress={(categoryId) => navigation.navigate('CategoryDetail', { categoryId })}
       />
 
       <View style={styles.infoCard}>

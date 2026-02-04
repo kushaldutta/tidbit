@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { CategoryProgressService } from '../services/CategoryProgressService';
 
-function ProgressCard({ item }) {
+function ProgressCard({ item, onPress }) {
   const progress = item.total > 0 ? item.mastered / item.total : 0;
   const progressWidth = `${Math.min(100, Math.max(0, progress * 100))}%`;
 
   return (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{item.name}</Text>
         <Text style={styles.cardPercent}>{item.masteryPercent}%</Text>
@@ -21,7 +25,7 @@ function ProgressCard({ item }) {
         <Text style={styles.metaText}>Mastered: {item.mastered}/{item.total}</Text>
         <Text style={styles.metaText}>Due: {item.due}</Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -57,7 +61,13 @@ export default function CategoryProgressScreen({ navigation }) {
       ) : items.length === 0 ? (
         <Text style={styles.emptyText}>Select some categories to start tracking progress.</Text>
       ) : (
-        items.map((item) => <ProgressCard key={item.categoryId} item={item} />)
+        items.map((item) => (
+          <ProgressCard 
+            key={item.categoryId} 
+            item={item} 
+            onPress={() => navigation.navigate('CategoryDetail', { categoryId: item.categoryId })}
+          />
+        ))
       )}
     </ScrollView>
   );

@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cinnamiddles.tidbit",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "icon": "./assets/tidbit.png",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false

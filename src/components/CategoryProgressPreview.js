@@ -1,12 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-function ProgressRow({ item }) {
+function ProgressRow({ item, onPress }) {
   const progress = item.total > 0 ? item.mastered / item.total : 0;
   const progressWidth = `${Math.min(100, Math.max(0, progress * 100))}%`;
 
   return (
-    <View style={styles.row}>
+    <TouchableOpacity 
+      style={styles.row} 
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.rowHeader}>
         <Text style={styles.rowTitle}>{item.name}</Text>
         <Text style={styles.rowRight}>
@@ -17,11 +21,11 @@ function ProgressRow({ item }) {
       <View style={styles.progressBar}>
         <View style={[styles.progressFill, { width: progressWidth }]} />
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
-export default function CategoryProgressPreview({ items, onViewAll }) {
+export default function CategoryProgressPreview({ items, onViewAll, onCategoryPress }) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -32,7 +36,13 @@ export default function CategoryProgressPreview({ items, onViewAll }) {
       </View>
 
       {items?.length ? (
-        items.map((item) => <ProgressRow key={item.categoryId} item={item} />)
+        items.map((item) => (
+          <ProgressRow 
+            key={item.categoryId} 
+            item={item} 
+            onPress={() => onCategoryPress?.(item.categoryId)}
+          />
+        ))
       ) : (
         <Text style={styles.emptyText}>No categories selected.</Text>
       )}

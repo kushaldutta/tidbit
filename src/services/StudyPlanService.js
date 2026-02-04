@@ -192,11 +192,12 @@ class StudyPlanService {
    * Generate an ad-hoc session (for Study Mode)
    * Uses same mixing logic as daily plan but does not persist anything
    * @param {number} totalCount - Desired number of tidbits
+   * @param {string[]} categoryFilter - Optional array of category IDs to filter by (if not provided, uses all selected categories)
    * @returns {Promise<Object[]>} Array of tidbit objects
    */
-  static async generateSessionTidbits(totalCount) {
+  static async generateSessionTidbits(totalCount, categoryFilter = null) {
     try {
-      const selectedCategories = await StorageService.getSelectedCategories();
+      const selectedCategories = categoryFilter || await StorageService.getSelectedCategories();
 
       if (selectedCategories.length === 0) {
         console.log('[STUDY_PLAN] No categories selected, cannot generate session');
@@ -214,7 +215,7 @@ class StudyPlanService {
         }
       }
 
-      // 2. Get new tidbits
+      // 2. Get new tidbits (filtered to selected categories)
       const newTidbits = await this.getNewTidbits(selectedCategories);
 
       // 3. Calculate mix
