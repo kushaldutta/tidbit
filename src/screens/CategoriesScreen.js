@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Switch,
+  TextInput,
 } from 'react-native';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
@@ -13,6 +14,7 @@ import { ContentService } from '../services/ContentService';
 export default function CategoriesScreen() {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadCategories();
@@ -34,6 +36,20 @@ export default function CategoriesScreen() {
     setSelectedCategories(validSelected);
     setAvailableCategories(available);
   };
+
+  const filterCategories = (categories, query) => {
+    if (!query.trim()) {
+      return categories;
+    }
+    const lowerQuery = query.toLowerCase();
+    return categories.filter(category => {
+      const nameMatch = category.name.toLowerCase().includes(lowerQuery);
+      const descMatch = category.description?.toLowerCase().includes(lowerQuery);
+      return nameMatch || descMatch;
+    });
+  };
+
+  const filteredCategories = filterCategories(availableCategories, searchQuery);
 
   const toggleCategory = async (categoryId) => {
     let newSelected;
@@ -63,8 +79,27 @@ export default function CategoriesScreen() {
         </Text>
       </View>
 
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search categories..."
+          placeholderTextColor="#9ca3af"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </View>
+
       <View style={styles.categoriesList}>
-        {availableCategories.map((category) => {
+        {filteredCategories.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>
+              No categories found matching "{searchQuery}"
+            </Text>
+          </View>
+        ) : (
+          filteredCategories.map((category) => {
           const isSelected = selectedCategories.includes(category.id);
           return (
             <TouchableOpacity
@@ -95,9 +130,10 @@ export default function CategoriesScreen() {
                   thumbColor="#ffffff"
                 />
               </View>
-            </TouchableOpacity>
-          );
-        })}
+              </TouchableOpacity>
+            );
+          })
+        )}
       </View>
 
       {selectedCategories.length === 0 && (
@@ -146,8 +182,30 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: '#1e40af',
   },
+  searchContainer: {
+    marginBottom: 20,
+  },
+  searchInput: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#1f2937',
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
   categoriesList: {
     marginBottom: 24,
+  },
+  emptyState: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
   },
   categoryCard: {
     backgroundColor: '#ffffff',
