@@ -454,6 +454,33 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Content</Text>
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: '#6366f1' }]}
+          onPress={async () => {
+            const cleared = await ContentService.clearCache();
+            if (cleared) {
+              // Force refresh content
+              await ContentService.refresh();
+              Alert.alert(
+                'Cache Cleared',
+                'Content cache cleared. The app will fetch fresh data from the server. Please restart the app to see the updated content.',
+                [{ text: 'OK' }]
+              );
+            } else {
+              Alert.alert('Error', 'Failed to clear cache.');
+            }
+          }}
+        >
+          <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>Clear Content Cache & Refresh</Text>
+          <Text style={[styles.chevron, { color: '#ffffff' }]}>›</Text>
+        </TouchableOpacity>
+        <Text style={styles.sectionDescription}>
+          Clear cached content and fetch fresh data from the server. Use this if categories or tidbits aren't showing up correctly.
+        </Text>
+      </View>
+
       {false && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Testing</Text>
@@ -597,6 +624,26 @@ export default function SettingsScreen({ navigation }) {
           }}
         >
           <Text style={[styles.testButtonText, { color: '#ffffff' }]}>Clear All Learning State</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.testButton, { backgroundColor: '#6366f1' }]}
+          onPress={async () => {
+            const cleared = await ContentService.clearCache();
+            if (cleared) {
+              // Force refresh content
+              await ContentService.refresh();
+              Alert.alert(
+                'Cache Cleared',
+                'Content cache cleared. App will fetch fresh data from server. Restart the app to see changes.',
+                [{ text: 'OK' }]
+              );
+            } else {
+              Alert.alert('Error', 'Failed to clear cache.');
+            }
+          }}
+        >
+          <Text style={[styles.testButtonText, { color: '#ffffff' }]}>Clear Content Cache & Refresh</Text>
         </TouchableOpacity>
         
         <Text style={styles.testButtonDescription}>

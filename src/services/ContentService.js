@@ -303,6 +303,25 @@ class ContentService {
   }
 
   /**
+   * Clear all cached content (forces fresh fetch on next init)
+   */
+  static async clearCache() {
+    try {
+      await AsyncStorage.removeItem(CACHE_KEYS.TIDBITS);
+      await AsyncStorage.removeItem(CACHE_KEYS.VERSION);
+      await AsyncStorage.removeItem(CACHE_KEYS.LAST_FETCH);
+      await AsyncStorage.removeItem(CACHE_KEYS.LAST_VERSION_CHECK);
+      TIDBITS = FALLBACK_TIDBITS;
+      CONTENT_VERSION = null;
+      console.log('[CONTENT_SERVICE] Cache cleared');
+      return true;
+    } catch (error) {
+      console.error('[CONTENT_SERVICE] Error clearing cache:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get all tidbits for a specific category
    * @param {string} category - Category ID
    * @returns {string[]} Array of tidbit texts
