@@ -346,6 +346,20 @@ export default function App() {
             console.error('[APP] Error re-registering category on foreground:', err);
           });
           
+          // Check for content updates when app comes to foreground
+          ContentService.checkVersion().then(hasUpdate => {
+            if (hasUpdate) {
+              console.log('[APP] New content version detected on foreground, auto-refreshing...');
+              ContentService.fetchFromServer().then(success => {
+                if (success) {
+                  console.log('[APP] Content auto-refreshed on foreground');
+                }
+              });
+            }
+          }).catch(err => {
+            console.warn('[APP] Error checking version on foreground:', err);
+          });
+          
           // Push notifications are handled by server - no local rescheduling needed
         }
         return nextAppState;

@@ -264,8 +264,15 @@ class ContentService {
       // Check for updates in background (non-blocking)
       this.checkVersion().then(hasUpdate => {
         if (hasUpdate) {
-          console.log('[CONTENT_SERVICE] New version available, will fetch on next check');
-          // Could trigger a background refresh here if needed
+          console.log('[CONTENT_SERVICE] New version detected! Auto-refreshing content...');
+          // Auto-refresh when new version is detected
+          this.fetchFromServer().then(success => {
+            if (success) {
+              console.log('[CONTENT_SERVICE] Content auto-refreshed successfully');
+            } else {
+              console.warn('[CONTENT_SERVICE] Auto-refresh failed, will retry later');
+            }
+          });
         }
       });
       
