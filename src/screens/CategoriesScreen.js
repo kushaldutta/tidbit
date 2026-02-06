@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
+import { NotificationService } from '../services/NotificationService';
 
 export default function CategoriesScreen() {
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -61,6 +62,9 @@ export default function CategoriesScreen() {
     
     setSelectedCategories(newSelected);
     await StorageService.setSelectedCategories(newSelected);
+    
+    // Sync category changes to server so notifications use correct categories
+    await NotificationService.syncPreferences();
   };
 
   return (

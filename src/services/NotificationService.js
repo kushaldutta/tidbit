@@ -138,6 +138,65 @@ class NotificationService {
   }
 
   /**
+   * Sync user preferences (including selected categories) with server
+   * Call this whenever categories or notification preferences change
+   */
+  static async syncPreferences() {
+    try {
+      // Get current push token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+      
+      const pushToken = tokenData.data;
+      
+      // Get all current preferences
+      const notificationInterval = await StorageService.getNotificationInterval();
+      const notificationsEnabled = await StorageService.getNotificationsEnabled();
+      const quietHoursEnabled = await StorageService.getQuietHoursEnabled();
+      const quietHoursStart = await StorageService.getQuietHoursStart();
+      const quietHoursEnd = await StorageService.getQuietHoursEnd();
+      const selectedCategories = await StorageService.getSelectedCategories();
+      
+      // Get timezone offset
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const timezoneOffsetMinutes = -timezoneOffset;
+      
+      if (API_CONFIG && API_CONFIG.BASE_URL && API_CONFIG.BASE_URL !== 'https://your-production-server.com') {
+        console.log('[NOTIFICATION_SERVICE] Syncing preferences with server...');
+        const response = await fetch(`${API_CONFIG.BASE_URL}/api/register-token`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            token: pushToken,
+            platform: Platform.OS,
+            appVersion: Constants.expoConfig?.version || '1.0.0',
+            notificationInterval,
+            notificationsEnabled,
+            quietHoursEnabled,
+            quietHoursStart,
+            quietHoursEnd,
+            selectedCategories,
+            timezoneOffsetMinutes,
+          }),
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+          console.log('[NOTIFICATION_SERVICE] Preferences synced successfully');
+        } else {
+          console.error('[NOTIFICATION_SERVICE] Failed to sync preferences:', result.error);
+        }
+      }
+    } catch (error) {
+      console.error('[NOTIFICATION_SERVICE] Error syncing preferences:', error);
+      // Don't throw - this is a background sync
+    }
+  }
+
+  /**
    * Ensure notification category is set up (call before sending notifications)
    */
   static async ensureCategorySetup() {

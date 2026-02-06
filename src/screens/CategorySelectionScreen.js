@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, TextInput
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
+import { NotificationService } from '../services/NotificationService';
 
 export default function CategorySelectionScreen({ navigation }) {
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -62,6 +63,9 @@ export default function CategorySelectionScreen({ navigation }) {
     
     setSelectedCategories(newSelected);
     await StorageService.setSelectedCategories(newSelected);
+    
+    // Sync category changes to server so notifications use correct categories
+    await NotificationService.syncPreferences();
   };
 
   const handleNext = () => {
