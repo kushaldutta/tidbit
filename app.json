@@ -51,19 +51,7 @@
           "mode": "production"
         }
       ],
-      "expo-apple-authentication",
-      [
-        "expo-camera",
-        {
-          "cameraPermission": "Tidbit uses your camera to turn textbook pages and notes into flashcards."
-        }
-      ],
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "Tidbit needs access to your photos so you can pick an image to turn into flashcards."
-        }
-      ]
+      "expo-apple-authentication"
     ],
     "notification": {
       "icon": "./assets/tidbit.png",
