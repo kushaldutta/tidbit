@@ -1,0 +1,81 @@
+{
+  "expo": {
+    "name": "Tidbit",
+    "slug": "tidbit",
+    "version": "1.0.3",
+    "scheme": "tidbit",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/tidbit.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cinnamiddles.tidbit",
+      "buildNumber": "3",
+      "icon": "./assets/tidbit.png",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "Tidbit uses the camera to snap pages of your notes or textbook and turn them into flashcards.",
+        "NSMicrophoneUsageDescription": "Tidbit uses the microphone for voice answers in recall mode and to record study voice memos."
+      }
+    },
+    "android": {
+      "icon": "./assets/tidbit.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/tidbit.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.tidbit.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff",
+          "sounds": [],
+          "mode": "production"
+        }
+      ],
+      "expo-apple-authentication",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Tidbit uses your camera to turn textbook pages and notes into flashcards."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Tidbit needs access to your photos so you can pick an image to turn into flashcards."
+        }
+      ]
+    ],
+    "notification": {
+      "icon": "./assets/tidbit.png",
+      "color": "#ffffff",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new tidbits"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4337afcf-a02c-4ea8-b202-e3b836db1771"
+      }
+    }
+  }
+}

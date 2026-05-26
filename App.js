@@ -1,0 +1,552 @@
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppState, Text, Platform } from 'react-native';
+
+import HomeScreen from './src/screens/HomeScreen';
+import CategoriesScreen from './src/screens/CategoriesScreen';
+import StatsScreen from './src/screens/StatsScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import WelcomeScreen from './src/screens/WelcomeScreen';
+import FrequencySelectionScreen from './src/screens/FrequencySelectionScreen';
+import CategorySelectionScreen from './src/screens/CategorySelectionScreen';
+import PermissionRequestScreen from './src/screens/PermissionRequestScreen';
+import LoadingScreen from './src/screens/LoadingScreen';
+import StudySessionScreen from './src/screens/StudySessionScreen';
+import StudyModeScreen from './src/screens/StudyModeScreen';
+import CategoryProgressScreen from './src/screens/CategoryProgressScreen';
+import CategoryDetailScreen from './src/screens/CategoryDetailScreen';
+import LoginScreen from './src/screens/auth/LoginScreen';
+import SignUpScreen from './src/screens/auth/SignUpScreen';
+import OnboardingProfileScreen from './src/screens/auth/OnboardingProfileScreen';
+import ClassSelectionScreen from './src/screens/auth/ClassSelectionScreen';
+import MyDecksScreen from './src/screens/decks/MyDecksScreen';
+import DeckEditorScreen from './src/screens/decks/DeckEditorScreen';
+import CardEditorScreen from './src/screens/decks/CardEditorScreen';
+import TidbitModal from './src/components/TidbitModal';
+import { UnlockService } from './src/services/UnlockService';
+import { StorageService } from './src/services/StorageService';
+import { ContentService } from './src/services/ContentService';
+import { NotificationService } from './src/services/NotificationService';
+import { SpacedRepetitionService } from './src/services/SpacedRepetitionService';
+import { AuthService } from './src/services/AuthService';
+import { ProfileService } from './src/services/ProfileService';
+import { SyncService } from './src/services/SyncService';
+import * as Notifications from 'expo-notifications';
+
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#6366f1',
+        tabBarInactiveTintColor: '#9ca3af',
+        tabBarStyle: {
+          backgroundColor: '#ffffff',
+          borderTopWidth: 1,
+          borderTopColor: '#e5e7eb',
+        },
+      }}
+    >
+      <Tab.Screen 
+        name="Home" 
+        component={HomeScreen}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ color }) => (
+            <TabIcon name="home" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Study" 
+        component={StudyModeScreen}
+        options={{
+          tabBarLabel: 'Study',
+          tabBarIcon: ({ color }) => (
+            <TabIcon name="study" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Categories" 
+        component={CategoriesScreen}
+        options={{
+          tabBarLabel: 'Categories',
+          tabBarIcon: ({ color }) => (
+            <TabIcon name="grid" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Stats" 
+        component={StatsScreen}
+        options={{
+          tabBarLabel: 'Stats',
+          tabBarIcon: ({ color }) => (
+            <TabIcon name="stats-chart" color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen 
+        name="Settings" 
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ color }) => (
+            <TabIcon name="settings" color={color} />
+          ),
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
+function TabIcon({ name, color }) {
+  // Simple text-based icons
+  const iconMap = {
+    home: '🏠',
+    study: '📚',
+    grid: '📋',
+    'stats-chart': '📊',
+    settings: '⚙️',
+  };
+  return (
+    <Text style={{ fontSize: 20 }}>{iconMap[name] || '•'}</Text>
+  );
+}
+
+function OnboardingStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      <Stack.Screen name="FrequencySelection" component={FrequencySelectionScreen} />
+      <Stack.Screen name="CategorySelection" component={CategorySelectionScreen} />
+      <Stack.Screen name="PermissionRequest" component={PermissionRequestScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function AuthStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Login"
+    >
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
+    </Stack.Navigator>
+  );
+}
+
+function ProfileSetupStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="OnboardingProfile" component={OnboardingProfileScreen} />
+      <Stack.Screen name="ClassSelection" component={ClassSelectionScreen} />
+    </Stack.Navigator>
+  );
+}
+
+export default function App() {
+  const [showTidbit, setShowTidbit] = useState(false);
+  const [currentTidbit, setCurrentTidbit] = useState(null);
+  const [appState, setAppState] = useState(AppState.currentState);
+  const [isOnboardingComplete, setIsOnboardingComplete] = useState(null); // null = checking, true/false = determined
+  const [isLoading, setIsLoading] = useState(true); // Show loading screen initially
+  // Auth gate state. null while resolving, then 'unauthenticated' | 'needs_profile' | 'ready'.
+  const [authStatus, setAuthStatus] = useState(null);
+  const authStatusRef = useRef(null);
+  const isInitializedRef = useRef(false);
+  const navigationRef = useRef(null);
+
+  useEffect(() => {
+    authStatusRef.current = authStatus;
+  }, [authStatus]);
+
+  // Resolve auth + profile to decide which stack to mount.
+  const resolveAuthStatus = useCallback(async () => {
+    const session = AuthService.getSession();
+    if (!session?.user?.id) {
+      setAuthStatus('unauthenticated');
+      return;
+    }
+    try {
+      // Fire-and-forget legacy state sync on first authenticated launch.
+      SyncService.syncIfNeeded().catch(() => {});
+      const hasProfile = await ProfileService.hasCompletedProfile();
+      setAuthStatus(hasProfile ? 'ready' : 'needs_profile');
+    } catch (err) {
+      console.warn('[APP] resolveAuthStatus profile check failed:', err);
+      // Fail open so a bad network doesn't lock the user out.
+      setAuthStatus('ready');
+    }
+  }, []);
+
+  const handleUnlock = useCallback(async () => {
+    // Only show tidbits after initialization AND onboarding is complete
+    if (!isInitializedRef.current) return;
+    
+    // Check if onboarding is complete before showing tidbits
+    const onboardingComplete = await StorageService.getOnboardingCompleted();
+    if (!onboardingComplete) {
+      console.log('[APP] Skipping tidbit - onboarding not complete');
+      return;
+    }
+    
+    const shouldShow = await UnlockService.shouldShowTidbit();
+    if (shouldShow) {
+      const tidbit = await ContentService.getSmartTidbit();
+      if (tidbit) {
+        // Mark tidbit as shown (will mark as "shown as due" if it was due)
+        const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
+        if (tidbitWithId.id) {
+          await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
+        }
+        
+        setCurrentTidbit(tidbit);
+        setShowTidbit(true);
+        await UnlockService.recordUnlock();
+        await StorageService.incrementTidbitsSeen();
+      }
+    }
+  }, []);
+
+  // Check onboarding status
+  const checkOnboardingStatus = useCallback(async () => {
+    const onboardingComplete = await StorageService.getOnboardingCompleted();
+    setIsOnboardingComplete(onboardingComplete);
+  }, []);
+
+  useEffect(() => {
+    // Resolve auth + onboarding once on mount, then drop the loading screen.
+    const bootstrap = async () => {
+      await AuthService.init();
+      await Promise.all([resolveAuthStatus(), checkOnboardingStatus()]);
+      setIsLoading(false);
+    };
+    bootstrap();
+
+    // React to sign in / sign out events from anywhere in the app.
+    const unsubscribeAuth = AuthService.onAuthChange(() => {
+      resolveAuthStatus();
+    });
+
+    // Re-check device-local onboarding flag periodically (legacy behavior).
+    // Also re-resolve auth status while we're waiting for the user to finish
+    // profile setup, so screens like OnboardingProfile / ClassSelection can
+    // advance the gate just by writing to Supabase / AsyncStorage.
+    const interval = setInterval(() => {
+      if (!isLoading) {
+        checkOnboardingStatus();
+        if (
+          authStatusRef.current === 'needs_profile' ||
+          authStatusRef.current === null
+        ) {
+          resolveAuthStatus();
+        }
+      }
+    }, 500);
+
+    return () => {
+      clearInterval(interval);
+      unsubscribeAuth?.();
+    };
+  }, [checkOnboardingStatus, isLoading, resolveAuthStatus]);
+
+  useEffect(() => {
+    let mounted = true;
+    
+      // Initialize services
+      const init = async () => {
+        await StorageService.init();
+        await ContentService.init();
+        await UnlockService.init();
+        
+        const notificationEnabled = await NotificationService.init();
+        
+        // Ensure notification category is set up after permissions are granted
+        if (notificationEnabled) {
+          await NotificationService.ensureCategorySetup();
+        }
+      
+      // Setup notification listeners
+      NotificationService.setupNotificationListeners(
+        // Notification received (app in foreground)
+        (notification) => {
+          // iOS uses categoryIdentifier, Android/Expo uses categoryId
+          const categoryId = notification.request.content.categoryId || notification.request.content.categoryIdentifier;
+          
+          console.log('[NOTIFICATION_RECEIVED] Notification received in foreground:', {
+            title: notification.request.content.title,
+            body: notification.request.content.body?.substring(0, 50),
+            categoryId: categoryId,
+            hasData: !!notification.request.content.data,
+          });
+          
+          // Ensure category is registered when notification arrives
+          NotificationService.ensureCategorySetup().catch(err => {
+            console.error('[NOTIFICATION_RECEIVED] Error ensuring category:', err);
+          });
+        },
+        // Notification tapped or action button pressed
+        async (response) => {
+          const { notification, actionIdentifier } = response;
+          const data = notification.request.content.data;
+          
+          // iOS uses categoryIdentifier (capital I), Android/Expo uses categoryId (lowercase)
+          // Check both to handle platform differences
+          const categoryId = notification.request.content.categoryId || notification.request.content.categoryIdentifier;
+          
+          console.log('[NOTIFICATION_RESPONSE] Received response:', {
+            actionIdentifier,
+            defaultActionId: Notifications.DEFAULT_ACTION_IDENTIFIER,
+            hasData: !!data,
+            tidbitId: data?.tidbitId,
+            categoryId: categoryId,
+            categoryIdField: notification.request.content.categoryId,
+            categoryIdentifierField: notification.request.content.categoryIdentifier,
+            notificationSource: notification.request.trigger?.type || 'push',
+          });
+          
+          // Log if category is missing (check both field names)
+          if (!categoryId) {
+            console.error('[NOTIFICATION_RESPONSE] ⚠️ WARNING: categoryId/categoryIdentifier is missing from notification!');
+            console.error('[NOTIFICATION_RESPONSE] Full notification:', JSON.stringify(notification.request.content, null, 2));
+          } else {
+            console.log('[NOTIFICATION_RESPONSE] ✅ category present:', categoryId);
+          }
+          
+          // Check if this is an action button press
+          if (actionIdentifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+            // Handle action button press
+            const tidbitId = data?.tidbitId;
+            
+            if (!tidbitId) {
+              console.warn('[NOTIFICATION_ACTION] No tidbitId in notification data');
+              return;
+            }
+
+            // Map action identifier to spaced repetition action
+            let spacedRepAction = null;
+            if (actionIdentifier === 'knew') {
+              spacedRepAction = 'knew';
+            } else if (actionIdentifier === 'didnt_know') {
+              spacedRepAction = 'didnt_know';
+            } else if (actionIdentifier === 'save') {
+              spacedRepAction = 'save';
+            }
+
+            if (spacedRepAction) {
+              try {
+                console.log(`[NOTIFICATION_ACTION] Recording feedback: tidbitId=${tidbitId}, action=${spacedRepAction}`);
+                await SpacedRepetitionService.recordFeedback(tidbitId, spacedRepAction);
+                console.log('[NOTIFICATION_ACTION] Feedback recorded successfully');
+              } catch (error) {
+                console.error('[NOTIFICATION_ACTION] Error recording feedback:', error);
+              }
+            }
+            return; // Don't open app for action button presses
+          }
+          
+          // Regular notification tap - show tidbit in app
+          // Only show if onboarding is complete
+          const onboardingComplete = await StorageService.getOnboardingCompleted();
+          if (!onboardingComplete) {
+            console.log('[NOTIFICATION_RESPONSE] Skipping tidbit - onboarding not complete');
+            return;
+          }
+          
+          // Check if we should show a tidbit
+          const shouldShow = await UnlockService.shouldShowTidbit();
+          if (shouldShow) {
+            let tidbit = null;
+            
+            // Try to get tidbit from notification data
+            if (data && data.tidbit) {
+              try {
+                tidbit = JSON.parse(data.tidbit);
+                // Ensure tidbit has an ID (for backward compatibility)
+                tidbit = ContentService.ensureTidbitHasId(tidbit);
+              } catch (e) {
+                console.error('Error parsing tidbit from notification:', e);
+              }
+            }
+            
+            // If no tidbit in data, generate a new one (prioritize due tidbits)
+            if (!tidbit) {
+              tidbit = await ContentService.getSmartTidbit();
+            }
+            
+            if (tidbit) {
+              setCurrentTidbit(tidbit);
+              setShowTidbit(true);
+              await UnlockService.recordUnlock();
+              await StorageService.incrementTidbitsSeen();
+            }
+          }
+        }
+      );
+      
+      // Push notifications are now handled by the server
+      // No need to schedule local notifications anymore
+      console.log('[APP] Push notifications enabled - server will handle scheduling');
+      
+      if (mounted) {
+        isInitializedRef.current = true;
+      }
+    };
+    
+    init();
+
+    // Listen for app state changes
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      setAppState((prevState) => {
+        if (prevState.match(/inactive|background/) && nextAppState === 'active') {
+          // App came to foreground
+          // NOTE: We no longer automatically show tidbits on unlock
+          // Tidbits only show when user explicitly requests them (via "Get Tidbit Now" or notification tap)
+          
+          // Re-register notification category to ensure action buttons work
+          // This is important for push notifications that arrive when app is in background
+          NotificationService.ensureCategorySetup().catch(err => {
+            console.error('[APP] Error re-registering category on foreground:', err);
+          });
+          
+          // Check for content updates when app comes to foreground
+          ContentService.checkVersion().then(hasUpdate => {
+            if (hasUpdate) {
+              console.log('[APP] New content version detected on foreground, auto-refreshing...');
+              ContentService.fetchFromServer().then(success => {
+                if (success) {
+                  console.log('[APP] Content auto-refreshed on foreground');
+                }
+              });
+            }
+          }).catch(err => {
+            console.warn('[APP] Error checking version on foreground:', err);
+          });
+          
+          // Push notifications are handled by server - no local rescheduling needed
+        }
+        return nextAppState;
+      });
+    });
+
+    return () => {
+      mounted = false;
+      subscription?.remove();
+      NotificationService.removeListeners();
+    };
+  }, [handleUnlock]);
+
+  const handleDismissTidbit = useCallback(() => {
+    setShowTidbit(false);
+    setCurrentTidbit(null);
+  }, []);
+
+  // Manual \"Reveal Next Tidbit\" should ALWAYS show the next tidbit,
+  // without being blocked by unlock limits or notification rules.
+  // Prioritizes due tidbits for spaced repetition.
+  const handleNextTidbit = useCallback(async () => {
+    try {
+      const tidbit = await ContentService.getSmartTidbit();
+      if (tidbit) {
+        // Mark tidbit as shown (will mark as "shown as due" if it was due)
+        const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
+        if (tidbitWithId.id) {
+          await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
+        }
+        
+        setCurrentTidbit(tidbit);
+        setShowTidbit(true);
+        // Count this as a tidbit seen, but don't affect unlock-based limits
+        await StorageService.incrementTidbitsSeen();
+      }
+    } catch (error) {
+      console.error('Error getting next tidbit:', error);
+    }
+  }, []);
+
+  // Listen for navigation to Tidbit route and show modal
+  // This must be before any early returns to follow Rules of Hooks
+  useEffect(() => {
+    if (!isOnboardingComplete || !navigationRef.current) return;
+    
+    const unsubscribe = navigationRef.current.addListener('state', (e) => {
+      const route = e.data?.state?.routes?.[e.data?.state?.index];
+      if (route?.name === 'Tidbit' && route?.params?.tidbit && !showTidbit) {
+        setCurrentTidbit(route.params.tidbit);
+        setShowTidbit(true);
+        // Navigate back to Main after showing modal
+        setTimeout(() => {
+          navigationRef.current?.navigate('Main');
+        }, 100);
+      }
+    });
+    return unsubscribe;
+  }, [showTidbit, isOnboardingComplete]);
+
+  // Show loading screen initially
+  if (isLoading || isOnboardingComplete === null || authStatus === null) {
+    return (
+      <SafeAreaProvider>
+        <LoadingScreen />
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    );
+  }
+
+  // Pick the active stack based on auth + profile + onboarding state.
+  let activeStack;
+  if (authStatus === 'unauthenticated') {
+    activeStack = <AuthStack />;
+  } else if (authStatus === 'needs_profile') {
+    activeStack = <ProfileSetupStack />;
+  } else if (!isOnboardingComplete) {
+    // Authenticated + profile complete, but legacy device onboarding not done.
+    // Existing OnboardingStack handles notification prefs etc.
+    activeStack = <OnboardingStack />;
+  } else {
+    activeStack = (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen
+          name="Tidbit"
+          options={{ presentation: 'transparentModal', headerShown: false }}
+        >
+          {() => null}
+        </Stack.Screen>
+        <Stack.Screen name="StudySession" component={StudySessionScreen} />
+        <Stack.Screen name="CategoryProgress" component={CategoryProgressScreen} />
+        <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
+        <Stack.Screen name="MyDecks" component={MyDecksScreen} />
+        <Stack.Screen name="DeckEditor" component={DeckEditorScreen} />
+        <Stack.Screen name="CardEditor" component={CardEditorScreen} />
+      </Stack.Navigator>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <NavigationContainer ref={navigationRef}>
+        {activeStack}
+        {showTidbit && currentTidbit && (
+          <TidbitModal
+            tidbit={currentTidbit}
+            onDismiss={handleDismissTidbit}
+            onNextTidbit={handleNextTidbit}
+          />
+        )}
+      </NavigationContainer>
+      <StatusBar style="auto" />
+    </SafeAreaProvider>
+  );
+}
+
