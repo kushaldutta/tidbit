@@ -658,6 +658,18 @@ export default function SettingsScreen({ navigation }) {
       )}
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Classes</Text>
+        <TouchableOpacity
+          style={styles.classesButton}
+          onPress={() => navigation.navigate('MyClasses')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.classesButtonText}>View &amp; Edit My Classes</Text>
+          <Text style={styles.classesChevron}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <View style={styles.aboutContent}>
           <Text style={styles.aboutText}>
@@ -1029,6 +1041,17 @@ const styles = StyleSheet.create({
     color: '#1e40af',
     textAlign: 'center',
   },
+  classesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  classesButtonText: { fontSize: 15, fontWeight: '500', color: '#111827' },
+  classesChevron: { fontSize: 20, color: '#9ca3af' },
   devResetButton: {
     backgroundColor: '#fef2f2',
     borderWidth: 1,

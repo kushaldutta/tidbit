@@ -73,6 +73,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
     try {
       if (classIds.length > 0) {
         await ClassService.joinClasses(classIds);
+        await ClassService.syncCategoriesToEnrollment(classIds);
       }
       // Move to notification setup — PermissionRequestScreen will mark onboarding done.
       navigation.navigate('FrequencySelection');

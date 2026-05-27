@@ -23,6 +23,7 @@ import LoginScreen from './src/screens/auth/LoginScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
 import OnboardingProfileScreen from './src/screens/auth/OnboardingProfileScreen';
 import ClassSelectionScreen from './src/screens/auth/ClassSelectionScreen';
+import MyClassesScreen from './src/screens/MyClassesScreen';
 import MyDecksScreen from './src/screens/decks/MyDecksScreen';
 import DeckEditorScreen from './src/screens/decks/DeckEditorScreen';
 import CardEditorScreen from './src/screens/decks/CardEditorScreen';
@@ -520,6 +521,7 @@ export default function App() {
         <Stack.Screen name="StudySession" component={StudySessionScreen} />
         <Stack.Screen name="CategoryProgress" component={CategoryProgressScreen} />
         <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
+        <Stack.Screen name="MyClasses" component={MyClassesScreen} />
         <Stack.Screen name="MyDecks" component={MyDecksScreen} />
         <Stack.Screen name="DeckEditor" component={DeckEditorScreen} />
         <Stack.Screen name="CardEditor" component={CardEditorScreen} />

@@ -1,5 +1,41 @@
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
+import { StorageService } from './StorageService';
+
+// Maps class IDs → content category IDs in ContentService.
+// Only includes classes that have matching preset content.
+const CLASS_TO_CATEGORY = {
+  // UC Berkeley
+  'uc-berkeley:math53:fa26':   'math53',
+  'uc-berkeley:math54:fa26':   'math-54',
+  'uc-berkeley:math51:fa26':   'math51',
+  'uc-berkeley:math52:fa26':   'math52',
+  'uc-berkeley:math128a:fa26': 'math128a',
+  'uc-berkeley:cs61a:fa26':    'cs-61a',
+  'uc-berkeley:cs61b:fa26':    'cs61b',
+  'uc-berkeley:cs61c:fa26':    'cs61c',
+  'uc-berkeley:cs70:fa26':     'cs70',
+  'uc-berkeley:cs188:fa26':    'cs188',
+  'uc-berkeley:cs161:fa26':    'cs161',
+  'uc-berkeley:data8:fa26':    'data-8',
+  'uc-berkeley:data100:fa26':  'data100',
+  'uc-berkeley:econ1:fa26':    'econ-1',
+  'uc-berkeley:econ100a:fa26': 'econ100a',
+  'uc-berkeley:econ100b:fa26': 'econ100b',
+  'uc-berkeley:bio1a:fa26':    'science',
+  'uc-berkeley:bio1b:fa26':    'science',
+  // High School AP
+  'hs-ap:ap_ush:ap26':         'history',
+  'hs-ap:ap_wh:ap26':          'history',
+  'hs-ap:ap_euro:ap26':        'history',
+  'hs-ap:ap_bio:ap26':         'science',
+  'hs-ap:ap_chem:ap26':        'science',
+  'hs-ap:ap_phys1:ap26':       'science',
+  'hs-ap:ap_phys2:ap26':       'science',
+  'hs-ap:ap_phys_cm:ap26':     'science',
+  'hs-ap:ap_phys_ce:ap26':     'science',
+  'hs-ap:ap_enviro:ap26':      'science',
+};
 
 // Fallback class list used when the DB isn't seeded yet or network is unavailable.
 const FALLBACK_CLASSES = {
@@ -119,6 +155,34 @@ class ClassService {
       .eq('user_id', userId)
       .eq('class_id', classId);
     if (error) throw error;
+  }
+
+  /**
+   * Returns the content category IDs (used by ContentService / StorageService)
+   * that correspond to the given class IDs.
+   */
+  static categoryIdsForClasses(classIds) {
+    const cats = new Set();
+    classIds.forEach((id) => {
+      if (CLASS_TO_CATEGORY[id]) cats.add(CLASS_TO_CATEGORY[id]);
+    });
+    return [...cats];
+  }
+
+  /**
+   * After joining/leaving classes, sync the selectedCategories in AsyncStorage
+   * so the Categories tab and notification system reflect the enrollment.
+   * - Adds categories for newly enrolled classes.
+   * - Removes categories that no longer have any enrolled class backing them,
+   *   unless they were manually added by the user (we keep a union approach:
+   *   we only add, never remove, so the user's manual picks are preserved).
+   */
+  static async syncCategoriesToEnrollment(enrolledClassIds) {
+    const newCats = this.categoryIdsForClasses(enrolledClassIds);
+    if (newCats.length === 0) return;
+    const existing = (await StorageService.getSelectedCategories()) || [];
+    const merged = Array.from(new Set([...existing, ...newCats]));
+    await StorageService.setSelectedCategories(merged);
   }
 }
 
