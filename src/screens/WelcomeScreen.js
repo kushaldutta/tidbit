@@ -4,9 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function WelcomeScreen({ navigation }) {
   const handleGetStarted = () => {
-    // Navigate to next onboarding screen (FrequencySelectionScreen)
-    // For now, just navigate to frequency selection
-    navigation.navigate('FrequencySelection');
+    navigation.navigate('Login');
   };
 
   return (

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
@@ -15,6 +16,7 @@ import CategoryProgressPreview from '../components/CategoryProgressPreview';
 import { CategoryProgressService } from '../services/CategoryProgressService';
 
 export default function HomeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [stats, setStats] = useState({
     tidbitsSeen: 0,
     dailyTidbits: 0,
@@ -178,7 +180,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Tidbit</Text>
         <Text style={styles.subtitle}>Learn something new with every unlock</Text>
@@ -278,7 +280,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 32,
-    marginTop: 20,
   },
   title: {
     fontSize: 42,

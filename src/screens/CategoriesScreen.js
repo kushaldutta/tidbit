@@ -8,11 +8,13 @@ import {
   Switch,
   TextInput,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
 import { NotificationService } from '../services/NotificationService';
 
 export default function CategoriesScreen() {
+  const insets = useSafeAreaInsets();
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,7 +70,7 @@ export default function CategoriesScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Categories</Text>
         <Text style={styles.subtitle}>
@@ -161,7 +163,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
-    marginTop: 20,
   },
   title: {
     fontSize: 32,

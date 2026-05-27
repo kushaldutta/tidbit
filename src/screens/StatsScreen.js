@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import SavedTidbitsViewer from '../components/SavedTidbitsViewer';
@@ -13,6 +14,7 @@ import MasteredTidbitsViewer from '../components/MasteredTidbitsViewer';
 import DueTidbitsViewer from '../components/DueTidbitsViewer';
 
 export default function StatsScreen() {
+  const insets = useSafeAreaInsets();
   const [stats, setStats] = useState({
     tidbitsSeen: 0,
     dailyUnlocks: 0,
@@ -119,7 +121,7 @@ export default function StatsScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Your Stats</Text>
         <Text style={styles.subtitle}>Track your learning journey</Text>
@@ -228,7 +230,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 24,
-    marginTop: 20,
   },
   title: {
     fontSize: 32,

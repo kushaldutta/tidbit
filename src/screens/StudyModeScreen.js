@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StudyPlanService } from '../services/StudyPlanService';
 
 export default function StudyModeScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -33,7 +35,7 @@ export default function StudyModeScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <Text style={styles.title}>Study Mode</Text>
       <Text style={styles.subtitle}>
         Pick a focused session length. Tidbit will mix reviews you owe with new material.

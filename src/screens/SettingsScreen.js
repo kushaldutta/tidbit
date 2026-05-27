@@ -10,6 +10,10 @@ import {
   Alert,
   Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { supabase } from '../config/supabase';
+import { AuthService } from '../services/AuthService';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
 import { ContentService } from '../services/ContentService';
@@ -25,6 +29,7 @@ const INTERVAL_OPTIONS = [
 ];
 
 export default function SettingsScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [notificationInterval, setNotificationInterval] = useState(60);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
@@ -264,7 +269,7 @@ export default function SettingsScreen({ navigation }) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
         <Text style={styles.subtitle}>Manage your notification preferences</Text>
@@ -697,6 +702,56 @@ export default function SettingsScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Dev-only reset section — only visible in Expo Go / __DEV__ builds */}
+      {__DEV__ && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Developer</Text>
+          <TouchableOpacity
+            style={styles.devResetButton}
+            onPress={async () => {
+              Alert.alert(
+                'Reset Onboarding',
+                'This will clear your profile name/school so you see the onboarding flow again on next launch.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Reset',
+                    style: 'destructive',
+                    onPress: async () => {
+                      const userId = AuthService.getUserId();
+                      if (userId) {
+                        const { error } = await supabase
+                          .from('profiles')
+                          .update({ display_name: null, school_id: null })
+                          .eq('id', userId);
+                        if (error) {
+                          Alert.alert('Supabase update failed', error.message);
+                          return;
+                        }
+                        // Also remove any existing class memberships so class selection is fresh
+                        await supabase
+                          .from('class_memberships')
+                          .delete()
+                          .eq('user_id', userId);
+                      }
+                      await StorageService.setOnboardingCompleted(false);
+                      await AsyncStorage.removeItem('cloud_sync_completed_v1');
+                      Alert.alert(
+                        'Done — Force close required',
+                        'Profile cleared. Now FORCE CLOSE Expo Go from the iOS app switcher, then reopen it. (Pressing R in terminal is not enough.)'
+                      );
+                    },
+                  },
+                ]
+              );
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.devResetText}>Reset Onboarding (Dev Only)</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -711,7 +766,6 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 32,
-    marginTop: 20,
   },
   title: {
     fontSize: 32,
@@ -974,6 +1028,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1e40af',
     textAlign: 'center',
+  },
+  devResetButton: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  devResetText: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

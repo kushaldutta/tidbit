@@ -20,8 +20,7 @@ export default function FrequencySelectionScreen({ navigation }) {
   };
 
   const handleNext = () => {
-    // Navigate to category selection screen
-    navigation.navigate('CategorySelection');
+    navigation.navigate('PermissionRequest');
   };
 
   return (

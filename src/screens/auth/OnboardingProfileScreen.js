@@ -60,7 +60,7 @@ export default function OnboardingProfileScreen({ navigation }) {
         grad_year: gradYear,
       });
       // App.js will re-check profile completion and route to class selection.
-      navigation.replace('ClassSelection');
+      navigation.replace('ClassSelection', { schoolId });
     } catch (err) {
       Alert.alert('Could not save profile', err.message || 'Try again.');
     } finally {

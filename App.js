@@ -122,34 +122,25 @@ function TabIcon({ name, color }) {
   );
 }
 
-function OnboardingStack() {
+// Shown to unauthenticated users: splash → login/signup.
+function UnauthStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Welcome">
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="FrequencySelection" component={FrequencySelectionScreen} />
-      <Stack.Screen name="CategorySelection" component={CategorySelectionScreen} />
-      <Stack.Screen name="PermissionRequest" component={PermissionRequestScreen} />
-    </Stack.Navigator>
-  );
-}
-
-function AuthStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{ headerShown: false }}
-      initialRouteName="Login"
-    >
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />
     </Stack.Navigator>
   );
 }
 
-function ProfileSetupStack() {
+// Shown after auth when profile is incomplete: profile → classes → notifications.
+function FullSetupStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="OnboardingProfile">
       <Stack.Screen name="OnboardingProfile" component={OnboardingProfileScreen} />
       <Stack.Screen name="ClassSelection" component={ClassSelectionScreen} />
+      <Stack.Screen name="FrequencySelection" component={FrequencySelectionScreen} />
+      <Stack.Screen name="PermissionRequest" component={PermissionRequestScreen} />
     </Stack.Navigator>
   );
 }
@@ -171,6 +162,10 @@ export default function App() {
   }, [authStatus]);
 
   // Resolve auth + profile to decide which stack to mount.
+  // 'ready' requires BOTH a complete profile AND completed onboarding so that
+  // the FullSetupStack stays mounted through all setup screens (profile →
+  // classes → notification frequency → permission) and only exits to MainTabs
+  // when PermissionRequestScreen sets the onboardingCompleted flag.
   const resolveAuthStatus = useCallback(async () => {
     const session = AuthService.getSession();
     if (!session?.user?.id) {
@@ -178,10 +173,12 @@ export default function App() {
       return;
     }
     try {
-      // Fire-and-forget legacy state sync on first authenticated launch.
       SyncService.syncIfNeeded().catch(() => {});
-      const hasProfile = await ProfileService.hasCompletedProfile();
-      setAuthStatus(hasProfile ? 'ready' : 'needs_profile');
+      const [hasProfile, onboardingDone] = await Promise.all([
+        ProfileService.hasCompletedProfile(),
+        StorageService.getOnboardingCompleted(),
+      ]);
+      setAuthStatus(hasProfile && onboardingDone ? 'ready' : 'needs_profile');
     } catch (err) {
       console.warn('[APP] resolveAuthStatus profile check failed:', err);
       // Fail open so a bad network doesn't lock the user out.
@@ -503,16 +500,13 @@ export default function App() {
     );
   }
 
-  // Pick the active stack based on auth + profile + onboarding state.
+  // Pick the active stack based on auth + profile state.
+  // Order: unauthenticated → welcome+auth, needs_profile → full setup, else → main app.
   let activeStack;
   if (authStatus === 'unauthenticated') {
-    activeStack = <AuthStack />;
+    activeStack = <UnauthStack />;
   } else if (authStatus === 'needs_profile') {
-    activeStack = <ProfileSetupStack />;
-  } else if (!isOnboardingComplete) {
-    // Authenticated + profile complete, but legacy device onboarding not done.
-    // Existing OnboardingStack handles notification prefs etc.
-    activeStack = <OnboardingStack />;
+    activeStack = <FullSetupStack />;
   } else {
     activeStack = (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
