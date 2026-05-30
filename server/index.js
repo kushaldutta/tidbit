@@ -190,7 +190,7 @@ async function fetchTidbitsFromSupabase() {
     // Fetch all active tidbits
     const { data: tidbits, error: tidbitsError } = await supabase
       .from('tidbits')
-      .select('id, category_id, text')
+      .select('id, category_id, text, term')
       .eq('is_active', true)
       .order('created_at', { ascending: true });
     
@@ -212,7 +212,7 @@ async function fetchTidbitsFromSupabase() {
       if (!tidbitsByCategory[tidbit.category_id]) {
         tidbitsByCategory[tidbit.category_id] = [];
       }
-      tidbitsByCategory[tidbit.category_id].push(tidbit.text);
+      tidbitsByCategory[tidbit.category_id].push({ text: tidbit.text, term: tidbit.term || null });
     }
     
     console.log('[SERVER] Loaded from Supabase:', Object.keys(tidbitsByCategory).length, 'categories,', tidbits.length, 'tidbits');
@@ -1044,11 +1044,10 @@ async function sendScheduledNotifications() {
       const availableTidbits = [];
       for (const categoryId of selectedCategories) {
         if (tidbitsData[categoryId] && tidbitsData[categoryId].length > 0) {
-          for (const tidbitText of tidbitsData[categoryId]) {
-            availableTidbits.push({
-              text: tidbitText,
-              category: categoryId,
-            });
+          for (const tidbitItem of tidbitsData[categoryId]) {
+            const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
+            const term = typeof tidbitItem === 'string' ? null : tidbitItem.term;
+            availableTidbits.push({ text, term, category: categoryId });
           }
         }
       }
@@ -1084,11 +1083,12 @@ async function sendScheduledNotifications() {
       const message = {
         to: device.token,
         sound: 'default',
-        title: '📚 Tidbit',
+        title: randomTidbit.term ? randomTidbit.term : '📚 Tidbit',
         body: randomTidbit.text,
         data: {
           tidbit: JSON.stringify({
             text: randomTidbit.text,
+            term: randomTidbit.term || null,
             category: randomTidbit.category,
             id: tidbitId,
           }),
@@ -1239,8 +1239,10 @@ async function sendBedtimeBriefs() {
       const availableTidbits = [];
       for (const categoryId of selectedCategories) {
         if (tidbitsData[categoryId]?.length > 0) {
-          for (const tidbitText of tidbitsData[categoryId]) {
-            availableTidbits.push({ text: tidbitText, category: categoryId });
+          for (const tidbitItem of tidbitsData[categoryId]) {
+            const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
+            const term = typeof tidbitItem === 'string' ? null : tidbitItem.term;
+            availableTidbits.push({ text, term, category: categoryId });
           }
         }
       }
@@ -1263,10 +1265,10 @@ async function sendBedtimeBriefs() {
       messages.push({
         to: device.token,
         sound: 'default',
-        title: '🌙 Bedtime Tidbit',
+        title: tidbit.term ? tidbit.term : '🌙 Bedtime Tidbit',
         body: tidbit.text,
         data: {
-          tidbit: JSON.stringify({ text: tidbit.text, category: tidbit.category, id: tidbitId }),
+          tidbit: JSON.stringify({ text: tidbit.text, term: tidbit.term || null, category: tidbit.category, id: tidbitId }),
           tidbitId,
           category: tidbit.category,
         },

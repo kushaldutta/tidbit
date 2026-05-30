@@ -20,6 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FeedService } from '../services/FeedService';
 import { GroupService } from '../services/GroupService';
 import { AuthService } from '../services/AuthService';
+import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,10 +46,12 @@ const REACTION_EMOJIS = ['👍', '❤️', '🔥'];
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
+const avatarStyles = { avatar: { alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#fff', fontWeight: '700' } };
+
 function Avatar({ name, size = 36, anon = false }) {
   if (anon) {
     return (
-      <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#6b7280' }]}>
+      <View style={[avatarStyles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#6b7280' }]}>
         <Text style={{ fontSize: size * 0.45 }}>🎭</Text>
       </View>
     );
@@ -59,8 +62,8 @@ function Avatar({ name, size = 36, anon = false }) {
   const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
   const bg = colors[initials.charCodeAt(0) % colors.length];
   return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
-      <Text style={[styles.avatarText, { fontSize: size * 0.38 }]}>{initials}</Text>
+    <View style={[avatarStyles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
+      <Text style={[avatarStyles.avatarText, { fontSize: size * 0.38 }]}>{initials}</Text>
     </View>
   );
 }
@@ -68,6 +71,8 @@ function Avatar({ name, size = 36, anon = false }) {
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 
 function PostCard({ post, myUserId, onReact }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const isAnon = post.postType === 'dumb_question';
   const isActivity = post.postType === 'activity';
   const isDeckShare = post.postType === 'deck_share';
@@ -146,6 +151,8 @@ function PostCard({ post, myUserId, onReact }) {
 // ─── ComposeModal ─────────────────────────────────────────────────────────────
 
 function ComposeModal({ visible, groups, onClose, onPost }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [text, setText] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState(groups[0]?.groupId || '');
   const [anonymous, setAnonymous] = useState(false);
@@ -283,6 +290,8 @@ function ComposeModal({ visible, groups, onClose, onPost }) {
 
 export default function FeedScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const myUserId = AuthService.getUserId();
 
   const [posts, setPosts] = useState([]);
@@ -454,8 +463,8 @@ export default function FeedScreen({ navigation }) {
 
 // ─── styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
 
   // ── header ────────────────────────────────────────────────────────────────
   header: {
@@ -464,16 +473,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: '#111827' },
+  headerTitle: { fontSize: 26, fontWeight: '800', color: theme.text },
   composeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -484,7 +493,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
@@ -492,23 +501,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.background,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   filterChipActive: {
-    backgroundColor: '#eef2ff',
-    borderColor: '#6366f1',
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
   },
-  filterChipText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  filterChipTextActive: { color: '#4338ca' },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: theme.textSecondary },
+  filterChipTextActive: { color: theme.primary },
 
   // ── list ──────────────────────────────────────────────────────────────────
   listContent: { paddingTop: 8, paddingBottom: 16 },
 
   // ── post card ─────────────────────────────────────────────────────────────
   postCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 10,
     borderRadius: 16,
@@ -539,9 +548,9 @@ const styles = StyleSheet.create({
   postHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
   postMeta: { flex: 1, marginLeft: 10 },
   postMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  postAuthor: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  postAuthor: { fontSize: 14, fontWeight: '700', color: theme.text },
   postSubRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  groupLabel: { fontSize: 11, fontWeight: '700', color: '#6366f1' },
+  groupLabel: { fontSize: 11, fontWeight: '700', color: theme.primary },
   postDot: { fontSize: 11, color: '#d1d5db' },
   postTime: { fontSize: 11, color: '#9ca3af' },
   anonBadge: {
@@ -562,7 +571,7 @@ const styles = StyleSheet.create({
   activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '700' },
   postBody: {
     fontSize: 15,
-    color: '#1f2937',
+    color: theme.text,
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -576,20 +585,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
-  reactionBtnActive: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
+  reactionBtnActive: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
   reactionEmoji: { fontSize: 14 },
-  reactionCount: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
-  reactionCountActive: { color: '#4338ca' },
+  reactionCount: { fontSize: 12, fontWeight: '600', color: theme.textSecondary },
+  reactionCountActive: { color: theme.primary },
 
   // ── empty state ───────────────────────────────────────────────────────────
   empty: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 32 },
   emptyEmoji: { fontSize: 48, marginBottom: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#374151', marginBottom: 8 },
-  emptyBody: { fontSize: 14, color: '#6b7280', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: theme.text, marginBottom: 8 },
+  emptyBody: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   emptyBtn: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 24,
@@ -597,7 +606,7 @@ const styles = StyleSheet.create({
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   // ── compose modal ─────────────────────────────────────────────────────────
-  modalContainer: { flex: 1, backgroundColor: '#fff' },
+  modalContainer: { flex: 1, backgroundColor: theme.card },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -607,15 +616,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
-  modalCancel: { fontSize: 15, color: '#6b7280', fontWeight: '500' },
-  modalTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  modalPost: { fontSize: 15, color: '#6366f1', fontWeight: '700' },
+  modalCancel: { fontSize: 15, color: theme.textSecondary, fontWeight: '500' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+  modalPost: { fontSize: 15, color: theme.primary, fontWeight: '700' },
   modalPostDisabled: { opacity: 0.4 },
   modalBody: { flex: 1, padding: 20 },
   modalLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#374151',
+    color: theme.text,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginBottom: 10,
@@ -627,19 +636,19 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
-  groupChipActive: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
-  groupChipText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  groupChipTextActive: { color: '#4338ca' },
+  groupChipActive: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
+  groupChipText: { fontSize: 13, fontWeight: '600', color: theme.textSecondary },
+  groupChipTextActive: { color: theme.primary },
   modalInput: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
     borderRadius: 14,
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
     padding: 16,
     fontSize: 16,
-    color: '#111827',
+    color: theme.text,
     minHeight: 120,
     textAlignVertical: 'top',
     marginBottom: 20,
@@ -647,7 +656,7 @@ const styles = StyleSheet.create({
   anonRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
@@ -655,7 +664,7 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   anonInfo: { flex: 1, marginRight: 12 },
-  anonLabel: { fontSize: 15, fontWeight: '600', color: '#111827' },
+  anonLabel: { fontSize: 15, fontWeight: '600', color: theme.text },
   anonSubtitle: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
   anonWarning: {
     backgroundColor: '#ede9fe',

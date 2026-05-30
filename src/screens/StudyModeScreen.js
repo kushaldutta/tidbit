@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StudyPlanService } from '../services/StudyPlanService';
+import { useTheme } from '../context/ThemeContext';
 
 export default function StudyModeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
 
@@ -35,7 +38,7 @@ export default function StudyModeScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <Text style={styles.title}>Study Mode</Text>
       <Text style={styles.subtitle}>
         Pick a focused session length. Tidbit will mix reviews you owe with new material.
@@ -98,6 +101,8 @@ export default function StudyModeScreen({ navigation }) {
 }
 
 function SessionOption({ label, description, onPress, disabled }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   return (
     <TouchableOpacity
       style={[styles.optionCard, disabled && styles.optionCardDisabled]}
@@ -111,10 +116,10 @@ function SessionOption({ label, description, onPress, disabled }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   content: {
     padding: 20,
@@ -122,19 +127,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
     marginBottom: 24,
   },
   optionsContainer: {
     marginBottom: 24,
   },
   optionCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -150,12 +155,12 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 4,
   },
   optionDescription: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   errorText: {
     marginTop: 8,
@@ -164,7 +169,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 8,
-    color: '#6b7280',
+    color: theme.textSecondary,
     fontSize: 14,
     fontStyle: 'italic',
   },
@@ -175,26 +180,26 @@ const styles = StyleSheet.create({
   learnSectionTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#111827',
+    color: theme.text,
     marginBottom: 4,
   },
   learnSectionSub: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
     marginBottom: 16,
   },
   learnBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
     borderRadius: 18,
     padding: 20,
     borderWidth: 2,
-    borderColor: '#c7d2fe',
+    borderColor: theme.accent,
   },
   learnBtnEmoji: { fontSize: 32 },
-  learnBtnLabel: { fontSize: 17, fontWeight: '800', color: '#4338ca', marginBottom: 2 },
-  learnBtnSub: { fontSize: 13, color: '#6366f1' },
-  learnBtnArrow: { fontSize: 28, color: '#6366f1', fontWeight: '700' },
+  learnBtnLabel: { fontSize: 17, fontWeight: '800', color: theme.primary, marginBottom: 2 },
+  learnBtnSub: { fontSize: 13, color: theme.primary },
+  learnBtnArrow: { fontSize: 28, color: theme.primary, fontWeight: '700' },
 });

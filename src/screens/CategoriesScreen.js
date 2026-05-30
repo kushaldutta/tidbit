@@ -13,6 +13,7 @@ import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
 import { NotificationService } from '../services/NotificationService';
 import { ClassService } from '../services/ClassService';
+import { useTheme } from '../context/ThemeContext';
 
 // ─── Department map ────────────────────────────────────────────────────────────
 // Maps department display name → array of category IDs from ContentService.
@@ -141,6 +142,7 @@ function DeptSection({ dept, allCategories, selected, onToggle, query }) {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function CategoriesScreen({ navigation }) {
+  const { theme } = useTheme();
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [allCategories, setAllCategories] = useState([]);
   const [query, setQuery] = useState('');
@@ -178,7 +180,7 @@ export default function CategoriesScreen({ navigation }) {
   const selectedList = allCategories.filter((c) => selectedIds.has(c.id));
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Study Feed</Text>
         <Text style={styles.subtitle}>

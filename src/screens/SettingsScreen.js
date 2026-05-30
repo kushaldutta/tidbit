@@ -13,6 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../config/supabase';
+import { useTheme } from '../context/ThemeContext';
 import { AuthService } from '../services/AuthService';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
@@ -30,6 +31,8 @@ const INTERVAL_OPTIONS = [
 
 export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [notificationInterval, setNotificationInterval] = useState(60);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
@@ -810,10 +813,10 @@ export default function SettingsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   content: {
     padding: 20,
@@ -824,15 +827,15 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   section: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
@@ -854,12 +857,12 @@ const styles = StyleSheet.create({
   settingLabel: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 4,
   },
   settingDescription: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
     lineHeight: 20,
   },
   settingSubnote: {
@@ -870,12 +873,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
     lineHeight: 20,
     marginBottom: 16,
   },
@@ -888,26 +891,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.background,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   intervalOptionSelected: {
-    backgroundColor: '#ede9fe',
-    borderColor: '#6366f1',
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
   },
   intervalOptionText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1f2937',
+    color: theme.text,
   },
   intervalOptionTextSelected: {
-    color: '#6366f1',
+    color: theme.primary,
     fontWeight: '600',
   },
   checkmark: {
     fontSize: 20,
-    color: '#6366f1',
+    color: theme.primary,
     fontWeight: 'bold',
   },
   infoBox: {
@@ -915,7 +918,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: theme.primary,
   },
   infoTitle: {
     fontSize: 16,
@@ -930,12 +933,12 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
     marginTop: 50,
   },
   testButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -948,7 +951,7 @@ const styles = StyleSheet.create({
   },
   testButtonDescription: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 12,
@@ -970,12 +973,12 @@ const styles = StyleSheet.create({
   },
   debugStatLabel: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   debugStatValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
   },
   premiumBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -988,18 +991,18 @@ const styles = StyleSheet.create({
   premiumBannerArrow: { fontSize: 24, color: '#a5b4fc', fontWeight: '700' },
   analyticsBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    backgroundColor: theme.card, borderRadius: 16, padding: 16,
     marginHorizontal: 20, marginTop: 10,
     borderWidth: 1.5, borderColor: '#e5e7eb',
   },
   analyticsBtnEmoji: { fontSize: 26 },
-  analyticsBtnTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 2 },
-  analyticsBtnSub: { fontSize: 12, color: '#6b7280' },
+  analyticsBtnTitle: { fontSize: 15, fontWeight: '700', color: theme.text, marginBottom: 2 },
+  analyticsBtnSub: { fontSize: 12, color: theme.textSecondary },
   actionButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.background,
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
@@ -1007,7 +1010,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1f2937',
+    color: theme.text,
   },
   chevron: {
     fontSize: 24,
@@ -1019,12 +1022,12 @@ const styles = StyleSheet.create({
   aboutText: {
     fontSize: 14,
     lineHeight: 24,
-    color: '#4b5563',
+    color: theme.textSecondary,
     marginBottom: 8,
   },
   aboutLabel: {
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
   },
   quietHoursExpanded: {
     marginTop: 16,
@@ -1038,17 +1041,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.background,
     borderRadius: 8,
   },
   expandButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6366f1',
+    color: theme.primary,
   },
   expandButtonIcon: {
     fontSize: 12,
-    color: '#6366f1',
+    color: theme.primary,
   },
   quietHoursPicker: {
     marginTop: 16,
@@ -1059,7 +1062,7 @@ const styles = StyleSheet.create({
   timePickerLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 8,
   },
   hourSelector: {
@@ -1071,23 +1074,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.background,
     borderWidth: 2,
     borderColor: 'transparent',
     minWidth: 70,
     alignItems: 'center',
   },
   hourButtonSelected: {
-    backgroundColor: '#ede9fe',
-    borderColor: '#6366f1',
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
   },
   hourButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#1f2937',
+    color: theme.text,
   },
   hourButtonTextSelected: {
-    color: '#6366f1',
+    color: theme.primary,
     fontWeight: '600',
   },
   quietHoursInfo: {
@@ -1105,12 +1108,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.background,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  classesButtonText: { fontSize: 15, fontWeight: '500', color: '#111827' },
+  classesButtonText: { fontSize: 15, fontWeight: '500', color: theme.text },
   classesChevron: { fontSize: 20, color: '#9ca3af' },
   devResetButton: {
     backgroundColor: '#fef2f2',

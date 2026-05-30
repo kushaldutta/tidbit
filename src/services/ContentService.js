@@ -355,12 +355,17 @@ class ContentService {
     // Pick a random tidbit from that category
     const randomTidbit = categoryTidbits[Math.floor(Math.random() * categoryTidbits.length)];
 
+    // Handle both old string format and new { text, term } object format
+    const text = typeof randomTidbit === 'string' ? randomTidbit : randomTidbit.text;
+    const term = typeof randomTidbit === 'string' ? null : (randomTidbit.term || null);
+
     // Generate stable ID based on content
-    const id = generateTidbitId(randomTidbit, randomCategory);
+    const id = generateTidbitId(text, randomCategory);
 
     return {
       id,
-      text: randomTidbit,
+      text,
+      term,
       category: randomCategory,
       timestamp: new Date().toISOString(),
     };
@@ -413,12 +418,15 @@ class ContentService {
     for (const category of selectedCategories) {
       const categoryTidbits = TIDBITS[category] || [];
       
-      for (const tidbitText of categoryTidbits) {
-        const id = generateTidbitId(tidbitText, category);
+      for (const tidbitItem of categoryTidbits) {
+        const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
+        const term = typeof tidbitItem === 'string' ? null : (tidbitItem.term || null);
+        const id = generateTidbitId(text, category);
         if (id === tidbitId) {
           return {
             id,
-            text: tidbitText,
+            text,
+            term,
             category,
             timestamp: new Date().toISOString(),
           };

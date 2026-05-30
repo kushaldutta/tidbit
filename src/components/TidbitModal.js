@@ -291,17 +291,28 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
                   activeOpacity={0.9}
                   onPress={handleFlip}
                 >
-                  <Text style={styles.tidbitText}>{tidbit.text}</Text>
-                  {learningState && learningState.lastSeen && (
-                    <View style={styles.learningInfo}>
-                      <Text style={styles.learningInfoText}>
-                        Last seen: {formatTimeAgo(learningState.lastSeen)}
-                      </Text>
-                    </View>
+                  {tidbit.term ? (
+                    <>
+                      <Text style={styles.termText}>{tidbit.term}</Text>
+                      <View style={styles.flipHint}>
+                        <Text style={styles.flipHintText}>Tap to reveal definition</Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.tidbitText}>{tidbit.text}</Text>
+                      {learningState && learningState.lastSeen && (
+                        <View style={styles.learningInfo}>
+                          <Text style={styles.learningInfoText}>
+                            Last seen: {formatTimeAgo(learningState.lastSeen)}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.flipHint}>
+                        <Text style={styles.flipHintText}>Tap to flip</Text>
+                      </View>
+                    </>
                   )}
-                  <View style={styles.flipHint}>
-                    <Text style={styles.flipHintText}>Tap to flip</Text>
-                  </View>
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -323,6 +334,11 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
                   </TouchableOpacity>
                 </View>
                 <View style={styles.actionsContainer}>
+                  {tidbit.term && (
+                    <View style={styles.definitionBox}>
+                      <Text style={styles.definitionText}>{tidbit.text}</Text>
+                    </View>
+                  )}
                   <Text style={styles.actionsTitle}>What did you think?</Text>
                   
                   <TouchableOpacity
@@ -476,6 +492,30 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  termText: {
+    fontSize: 28,
+    lineHeight: 38,
+    color: '#1f2937',
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 'auto',
+    marginTop: 'auto',
+    paddingVertical: 16,
+  },
+  definitionBox: {
+    backgroundColor: '#eef2ff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366f1',
+  },
+  definitionText: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#1f2937',
+    fontWeight: '500',
   },
   learningInfo: {
     marginBottom: 16,

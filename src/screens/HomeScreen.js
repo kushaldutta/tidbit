@@ -17,9 +17,12 @@ import CategoryProgressPreview from '../components/CategoryProgressPreview';
 import { CategoryProgressService } from '../services/CategoryProgressService';
 import { GroupService } from '../services/GroupService';
 import { AuthService } from '../services/AuthService';
+import { useTheme } from '../context/ThemeContext';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [groups, setGroups] = useState([]);
   const [stats, setStats] = useState({
     tidbitsSeen: 0,
@@ -343,10 +346,10 @@ export default function HomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   content: {
     padding: 20,
@@ -357,12 +360,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -372,7 +375,7 @@ const styles = StyleSheet.create({
   myDecksCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -380,31 +383,31 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   myDecksEmoji: { fontSize: 32, marginRight: 14 },
-  myDecksTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  myDecksSubtitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  myDecksTitle: { fontSize: 16, fontWeight: '600', color: theme.text },
+  myDecksSubtitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
   myDecksChevron: { fontSize: 28, color: '#9ca3af', marginLeft: 8 },
 
   groupsSection: { marginTop: 20 },
   feedEntryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
     borderRadius: 14,
     padding: 14,
     marginTop: 10,
     borderWidth: 1.5,
-    borderColor: '#c7d2fe',
+    borderColor: theme.accent,
   },
   feedEntryEmoji: { fontSize: 22, marginRight: 12 },
   feedEntryInfo: { flex: 1 },
-  feedEntryTitle: { fontSize: 15, fontWeight: '700', color: '#3730a3' },
-  feedEntrySubtitle: { fontSize: 12, color: '#6366f1', marginTop: 2 },
-  feedEntryChevron: { fontSize: 20, color: '#6366f1', marginLeft: 8 },
+  feedEntryTitle: { fontSize: 15, fontWeight: '700', color: theme.primary },
+  feedEntrySubtitle: { fontSize: 12, color: theme.primary, marginTop: 2 },
+  feedEntryChevron: { fontSize: 20, color: theme.primary, marginLeft: 8 },
   groupCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
@@ -419,21 +422,21 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  groupIconText: { fontSize: 18, fontWeight: '700', color: '#6366f1' },
+  groupIconText: { fontSize: 18, fontWeight: '700', color: theme.primary },
   groupInfo: { flex: 1 },
-  groupCode: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  groupTitle: { fontSize: 12, color: '#6b7280', marginTop: 1 },
+  groupCode: { fontSize: 15, fontWeight: '700', color: theme.text },
+  groupTitle: { fontSize: 12, color: theme.textSecondary, marginTop: 1 },
   groupRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  groupCount: { fontSize: 13, color: '#6b7280' },
+  groupCount: { fontSize: 13, color: theme.textSecondary },
   groupChevron: { fontSize: 20, color: '#9ca3af' },
   statCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginHorizontal: 4,
@@ -447,17 +450,17 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#6366f1',
+    color: theme.primary,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   infoCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 24,
@@ -470,16 +473,16 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#4b5563',
+    color: theme.textSecondary,
   },
   categoriesPreview: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 24,
@@ -492,7 +495,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 12,
   },
   categoryTags: {
@@ -501,7 +504,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   categoryTag: {
-    backgroundColor: '#ede9fe',
+    backgroundColor: theme.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -511,7 +514,7 @@ const styles = StyleSheet.create({
   categoryTagText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#6366f1',
+    color: theme.primary,
   },
   emptyText: {
     fontSize: 14,
@@ -520,7 +523,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

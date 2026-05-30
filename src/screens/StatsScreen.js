@@ -12,17 +12,20 @@ import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import SavedTidbitsViewer from '../components/SavedTidbitsViewer';
 import MasteredTidbitsViewer from '../components/MasteredTidbitsViewer';
 import DueTidbitsViewer from '../components/DueTidbitsViewer';
+import { useTheme } from '../context/ThemeContext';
 
 export default function StatsScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [stats, setStats] = useState({
     tidbitsSeen: 0,
-    dailyUnlocks: 0,
     dailyTidbits: 0,
     mastered: 0,
     due: 0,
     saved: 0,
     learningStreak: 0,
+    todayAccuracy: null,
   });
   const [showSavedViewer, setShowSavedViewer] = useState(false);
   const [showMasteredViewer, setShowMasteredViewer] = useState(false);
@@ -36,7 +39,6 @@ export default function StatsScreen() {
 
   const loadStats = async () => {
     const tidbitsSeen = await StorageService.getTidbitsSeen();
-    const dailyUnlocks = await StorageService.getDailyUnlocks();
     const dailyTidbits = await StorageService.getDailyTidbitCount();
     
     // Load spaced repetition stats
@@ -95,14 +97,36 @@ export default function StatsScreen() {
       }
     }
     
+    // Today's quiz accuracy
+    let todayAccuracy = null;
+    try {
+      const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
+      const { AuthService } = require('../services/AuthService');
+      if (SUPABASE_CONFIGURED) {
+        const userId = AuthService.getUserId();
+        if (userId) {
+          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+          const { data: attempts } = await supabase
+            .from('card_attempts')
+            .select('was_correct')
+            .eq('user_id', userId)
+            .gte('attempted_at', todayStart.toISOString());
+          if (attempts && attempts.length > 0) {
+            const correct = attempts.filter(a => a.was_correct).length;
+            todayAccuracy = Math.round((correct / attempts.length) * 100);
+          }
+        }
+      }
+    } catch {}
+
     setStats({ 
       tidbitsSeen, 
-      dailyUnlocks, 
       dailyTidbits,
       mastered: masteredCount,
       due: dueTidbits.length,
       saved: savedTidbits.length,
       learningStreak,
+      todayAccuracy,
     });
   };
 
@@ -142,8 +166,10 @@ export default function StatsScreen() {
           <Text style={styles.dailyStatSubtext}>Today</Text>
         </View>
         <View style={styles.dailyStatCard}>
-          <Text style={styles.dailyStatNumber}>{stats.dailyUnlocks}</Text>
-          <Text style={styles.dailyStatLabel}>Phone Unlocks</Text>
+          <Text style={styles.dailyStatNumber}>
+            {stats.todayAccuracy !== null ? `${stats.todayAccuracy}%` : '—'}
+          </Text>
+          <Text style={styles.dailyStatLabel}>Accuracy</Text>
           <Text style={styles.dailyStatSubtext}>Today</Text>
         </View>
       </View>
@@ -199,7 +225,7 @@ export default function StatsScreen() {
         <Text style={styles.infoText}>
           • Total Tidbits: All tidbits you've seen since installing Tidbit{'\n'}
           • Tidbits Today: Number of tidbits you've seen today{'\n'}
-          • Unlocks: Number of times you've unlocked your phone today{'\n'}
+          • Accuracy: Your quiz correct-answer rate for today{'\n'}
           • Stats reset daily at midnight
         </Text>
       </View>
@@ -220,10 +246,10 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   content: {
     padding: 20,
@@ -234,20 +260,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   mainStatCard: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#6366f1',
+    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -279,7 +305,7 @@ const styles = StyleSheet.create({
   },
   dailyStatCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     marginHorizontal: 4,
@@ -293,18 +319,18 @@ const styles = StyleSheet.create({
   dailyStatNumber: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#6366f1',
+    color: theme.primary,
     marginBottom: 8,
   },
   dailyStatLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 4,
   },
   dailyStatSubtext: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   messageCard: {
     backgroundColor: '#f0fdf4',
@@ -321,7 +347,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   infoCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 24,
@@ -334,13 +360,13 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#4b5563',
+    color: theme.textSecondary,
   },
   learningSection: {
     marginBottom: 24,
@@ -348,7 +374,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 16,
   },
   learningStatsContainer: {
@@ -358,7 +384,7 @@ const styles = StyleSheet.create({
   },
   learningStatCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     marginHorizontal: 4,
@@ -372,19 +398,19 @@ const styles = StyleSheet.create({
   learningStatNumber: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#6366f1',
+    color: theme.primary,
     marginBottom: 8,
   },
   learningStatLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 4,
     textAlign: 'center',
   },
   learningStatSubtext: {
     fontSize: 11,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
   },
 });

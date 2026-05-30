@@ -11,8 +11,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { DeckService } from '../../services/DeckService';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function MyDecksScreen({ navigation }) {
+  const { theme } = useTheme();
   const [myDecks, setMyDecks] = useState([]);
   const [presetDecks, setPresetDecks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +130,7 @@ export default function MyDecksScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <FlatList
         data={data}
         renderItem={renderItem}
