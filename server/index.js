@@ -6,6 +6,8 @@ require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // OpenAI client (W10)
 const OpenAI = require('openai');
+const multer = require('multer');
+const snapUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const openaiClient = process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('sk-...')
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
@@ -819,6 +821,93 @@ async function generateDeckTitle(prompt, mode) {
     return mode === 'snap_page' ? 'Snap-a-Page Deck' : 'AI Generated Deck';
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Snap-a-Page endpoint — multipart upload (avoids base64 JSON size limits)
+// POST /api/ai/snap-page   (multipart/form-data)
+//   Fields: userId, deckTitle (optional)
+//   File:   image (jpeg/png)
+// ─────────────────────────────────────────────────────────────────────────────
+app.post('/api/ai/snap-page', snapUpload.single('image'), async (req, res) => {
+  if (!openaiClient) return res.status(503).json({ error: 'AI not configured.' });
+  if (!supabase || !supabaseConnected) return res.status(503).json({ error: 'Database unavailable.' });
+
+  const { userId, deckTitle } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId is required.' });
+  if (!req.file) return res.status(400).json({ error: 'image file is required.' });
+
+  // Quota check
+  try {
+    const used = await getMonthlyUsage(userId);
+    if (used >= AI_MONTHLY_QUOTA) {
+      return res.status(429).json({ error: 'quota_exceeded', used, limit: AI_MONTHLY_QUOTA });
+    }
+  } catch {}
+
+  try {
+    const imageBase64 = req.file.buffer.toString('base64');
+    const mimeType = req.file.mimetype || 'image/jpeg';
+
+    console.log(`[AI/SNAP] user=${userId} size=${req.file.size} bytes`);
+
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: buildSystemPrompt('snap_page') },
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Generate flashcards from this page.' },
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'high' } },
+          ],
+        },
+      ],
+      temperature: 0.4,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' },
+    });
+
+    let cards;
+    try {
+      const parsed = JSON.parse(completion.choices[0].message.content.trim());
+      cards = Array.isArray(parsed) ? parsed : (parsed.cards || parsed.flashcards || Object.values(parsed)[0]);
+    } catch {
+      return res.status(500).json({ error: 'AI returned invalid JSON. Please try again.' });
+    }
+
+    if (!Array.isArray(cards) || cards.length === 0) {
+      return res.status(500).json({ error: 'AI returned no cards. Try a clearer photo.' });
+    }
+
+    cards = cards
+      .filter(c => c.front?.trim() && c.back?.trim())
+      .map(c => ({ front: String(c.front).trim(), back: String(c.back).trim() }))
+      .slice(0, 25);
+
+    const title = deckTitle?.trim() || await generateDeckTitle('Snap-a-Page notes', 'snap_page');
+
+    const { data: deck, error: deckErr } = await supabase
+      .from('decks')
+      .insert({ owner_id: userId, title, cover_emoji: '📸', source: 'ai_generated', card_count: cards.length, is_public: false })
+      .select().single();
+    if (deckErr) throw deckErr;
+
+    await supabase.from('cards').insert(
+      cards.map((c, i) => ({ deck_id: deck.id, front: c.front, back: c.back, card_type: 'basic', position: i }))
+    );
+
+    await supabase.from('ai_generation_log').insert({
+      user_id: userId, source: 'snap_page', deck_id: deck.id,
+      cards_generated: cards.length, prompt_chars: 0,
+    });
+
+    console.log(`[AI/SNAP] Generated ${cards.length} cards → deck "${title}" (${deck.id})`);
+    res.json({ deckId: deck.id, title, cards });
+  } catch (err) {
+    console.error('[AI/SNAP] Error:', err);
+    res.status(500).json({ error: err.message || 'Generation failed. Please try again.' });
+  }
+});
 
 /**
  * Convert UTC time to user's local time based on timezone offset

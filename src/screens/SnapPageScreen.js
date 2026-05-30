@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
 import { AuthService } from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import PremiumGate from '../components/PremiumGate';
@@ -31,7 +30,7 @@ function SnapPageInner({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.3,
     });
     if (!result.canceled && result.assets?.[0]) {
@@ -47,7 +46,7 @@ function SnapPageInner({ navigation }) {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       quality: 0.3,
     });
     if (!result.canceled && result.assets?.[0]) {
@@ -61,26 +60,24 @@ function SnapPageInner({ navigation }) {
     setGenerating(true);
 
     try {
-      // Read image as base64
-      const base64 = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
       const userId = AuthService.getUserId();
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      const formData = new FormData();
+      formData.append('userId', userId);
+      if (deckTitle?.trim()) formData.append('deckTitle', deckTitle.trim());
+      formData.append('image', {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'snap.jpg',
+      });
 
-      const res = await fetch(`${API_CONFIG.BASE_URL}/api/ai/generate-deck`, {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000); // 45s for vision AI
+
+      const res = await fetch(`${API_CONFIG.BASE_URL}/api/ai/snap-page`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({
-          userId,
-          mode: 'snap_page',
-          prompt: 'Generate flashcards from this page.',
-          imageBase64: base64,
-        }),
+        body: formData,
       });
       clearTimeout(timeout);
 
