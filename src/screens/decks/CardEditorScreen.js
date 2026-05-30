@@ -15,12 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../config/supabase';
 import { DeckService } from '../../services/DeckService';
 
-const CARD_TYPES = [
-  { id: 'basic', label: 'Basic' },
-  { id: 'cloze', label: 'Cloze' },
-  { id: 'mc', label: 'Multiple choice' },
-];
-
 export default function CardEditorScreen({ route, navigation }) {
   const { deckId, cardId, mode } = route.params || {};
   const isCreate = mode === 'create' || !cardId;
@@ -28,7 +22,6 @@ export default function CardEditorScreen({ route, navigation }) {
 
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
-  const [cardType, setCardType] = useState('basic');
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +41,6 @@ export default function CardEditorScreen({ route, navigation }) {
       if (alive && data) {
         setFront(data.front);
         setBack(data.back);
-        setCardType(data.card_type || 'basic');
       }
       if (alive) setLoading(false);
     })();
@@ -65,9 +57,9 @@ export default function CardEditorScreen({ route, navigation }) {
     setSaving(true);
     try {
       if (isCreate) {
-        await DeckService.addCard(deckId, { front, back, cardType });
+        await DeckService.addCard(deckId, { front, back });
       } else {
-        await DeckService.updateCard(cardId, { front, back, cardType });
+        await DeckService.updateCard(cardId, { front, back });
       }
       navigation.goBack();
     } catch (err) {
@@ -128,30 +120,6 @@ export default function CardEditorScreen({ route, navigation }) {
           <Text style={styles.heading}>
             {isCreate ? 'New card' : readOnly ? 'Card' : 'Edit card'}
           </Text>
-
-          <Text style={styles.label}>Type</Text>
-          <View style={styles.typeRow}>
-            {CARD_TYPES.map((t) => (
-              <TouchableOpacity
-                key={t.id}
-                style={[
-                  styles.typeChip,
-                  cardType === t.id && styles.typeChipActive,
-                ]}
-                onPress={() => setCardType(t.id)}
-                disabled={readOnly}
-              >
-                <Text
-                  style={[
-                    styles.typeChipText,
-                    cardType === t.id && styles.typeChipTextActive,
-                  ]}
-                >
-                  {t.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
 
           <Text style={styles.label}>Front (prompt)</Text>
           <TextInput
@@ -228,18 +196,6 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
   inputMultiline: { minHeight: 96, textAlignVertical: 'top' },
-  typeRow: { flexDirection: 'row', gap: 8 },
-  typeChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-  },
-  typeChipActive: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
-  typeChipText: { fontSize: 14, fontWeight: '500', color: '#374151' },
-  typeChipTextActive: { color: '#4338ca', fontWeight: '600' },
   deleteButton: {
     marginTop: 32,
     paddingVertical: 14,

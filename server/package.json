@@ -15,7 +15,8 @@
     "dotenv": "^16.6.1",
     "expo-server-sdk": "^3.15.0",
     "express": "^4.22.1",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "openai": "^6.39.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

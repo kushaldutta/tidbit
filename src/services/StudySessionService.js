@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SpacedRepetitionService } from './SpacedRepetitionService';
 import { StorageService } from './StorageService';
+import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
+import { AuthService } from './AuthService';
 
 const STORAGE_KEY = 'study_session_history';
 const SESSION_STORAGE_KEY = 'current_study_session';
@@ -164,6 +166,9 @@ class StudySessionService {
       // Clear current session
       await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
 
+      // Fire-and-forget cloud sync so the server cron can detect milestones
+      this._syncToCloud(finalSession).catch(() => {});
+
       console.log(`[STUDY_SESSION] Ended session: ${finalSession.stats.completed}/${finalSession.stats.total} completed, ${finalSession.durationMinutes} min`);
 
       return finalSession;
@@ -202,6 +207,48 @@ class StudySessionService {
     } catch (error) {
       console.error('[STUDY_SESSION] Error getting session history:', error);
       return [];
+    }
+  }
+
+  /**
+   * Push session results to Supabase user_stats so the server-side cron can
+   * detect milestone crossings and generate activity posts.
+   * Non-fatal: all errors are swallowed so a network failure never crashes a session.
+   */
+  static async _syncToCloud(session) {
+    if (!SUPABASE_CONFIGURED) return;
+    const userId = AuthService.getUserId();
+    if (!userId) return;
+
+    try {
+      // Absolute tidbits_seen from local storage (source of truth on device)
+      const tidbitsSeen = await StorageService.getTidbitsSeen();
+
+      // Fetch existing cloud stats to safely increment cards_mastered
+      const { data: existing } = await supabase
+        .from('user_stats')
+        .select('cards_mastered')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const prevMastered = existing?.cards_mastered || 0;
+      const sessionKnew = session.stats?.knew || 0;
+
+      await supabase
+        .from('user_stats')
+        .upsert(
+          {
+            user_id: userId,
+            tidbits_seen: tidbitsSeen,
+            cards_mastered: prevMastered + sessionKnew,
+            last_active_date: new Date().toISOString().split('T')[0],
+          },
+          { onConflict: 'user_id' }
+        );
+
+      console.log(`[STUDY_SESSION] Cloud stats synced — tidbits_seen: ${tidbitsSeen}, +${sessionKnew} mastered`);
+    } catch (e) {
+      console.warn('[STUDY_SESSION] _syncToCloud failed (non-fatal):', e.message);
     }
   }
 

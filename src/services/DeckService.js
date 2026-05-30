@@ -249,6 +249,17 @@ class DeckService {
       .match({ deck_id: deckId, group_id: groupId });
     if (error) throw error;
   }
+
+  /** Returns group IDs this deck is currently shared to. */
+  static async getSharedGroupIds(deckId) {
+    if (!SUPABASE_CONFIGURED) return [];
+    const { data, error } = await supabase
+      .from('deck_shares')
+      .select('group_id')
+      .eq('deck_id', deckId);
+    if (error) return [];
+    return (data || []).map((r) => r.group_id);
+  }
 }
 
 export { DeckService };

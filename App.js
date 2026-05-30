@@ -8,6 +8,7 @@ import { AppState, Text, Platform } from 'react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
+import FeedScreen from './src/screens/FeedScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -24,9 +25,23 @@ import SignUpScreen from './src/screens/auth/SignUpScreen';
 import OnboardingProfileScreen from './src/screens/auth/OnboardingProfileScreen';
 import ClassSelectionScreen from './src/screens/auth/ClassSelectionScreen';
 import MyClassesScreen from './src/screens/MyClassesScreen';
+import GroupScreen from './src/screens/GroupScreen';
+import GroupDeckStudyScreen from './src/screens/GroupDeckStudyScreen';
+import GroupDeckStudySummaryScreen from './src/screens/GroupDeckStudySummaryScreen';
 import MyDecksScreen from './src/screens/decks/MyDecksScreen';
 import DeckEditorScreen from './src/screens/decks/DeckEditorScreen';
 import CardEditorScreen from './src/screens/decks/CardEditorScreen';
+import LearnModePickerScreen from './src/screens/LearnModePickerScreen';
+import QuizScreen from './src/screens/QuizScreen';
+import RecallScreen from './src/screens/RecallScreen';
+import MatchScreen from './src/screens/MatchScreen';
+import LearnSummaryScreen from './src/screens/LearnSummaryScreen';
+import PaywallScreen from './src/screens/PaywallScreen';
+import AIGenerationScreen from './src/screens/AIGenerationScreen';
+import SnapPageScreen from './src/screens/SnapPageScreen';
+import AdvancedStatsScreen from './src/screens/AdvancedStatsScreen';
+import { ThemeProvider } from './src/context/ThemeContext';
+import ThemePickerScreen from './src/screens/ThemePickerScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
 import { StorageService } from './src/services/StorageService';
@@ -36,6 +51,9 @@ import { SpacedRepetitionService } from './src/services/SpacedRepetitionService'
 import { AuthService } from './src/services/AuthService';
 import { ProfileService } from './src/services/ProfileService';
 import { SyncService } from './src/services/SyncService';
+import { SameBoatService } from './src/services/SameBoatService';
+import { EntitlementService } from './src/services/EntitlementService';
+import { supabase, SUPABASE_CONFIGURED } from './src/config/supabase';
 import * as Notifications from 'expo-notifications';
 
 const Stack = createStackNavigator();
@@ -75,8 +93,8 @@ function MainTabs() {
           ),
         }}
       />
-      <Tab.Screen 
-        name="Categories" 
+      <Tab.Screen
+        name="Categories"
         component={CategoriesScreen}
         options={{
           tabBarLabel: 'Categories',
@@ -115,6 +133,7 @@ function TabIcon({ name, color }) {
     home: '🏠',
     study: '📚',
     grid: '📋',
+    newspaper: '📰',
     'stats-chart': '📊',
     settings: '⚙️',
   };
@@ -146,6 +165,64 @@ function FullSetupStack() {
   );
 }
 
+/**
+ * Syncs a notification button tap (knew / didnt_know / save) to Supabase.
+ *
+ * - knew / didnt_know → writes a card_attempt row (feeds Same-Boat stats)
+ *                      → upserts user_stats tidbits_seen + cards_mastered
+ * - save              → writes a saved_tidbits row so the bookmark is cloud-persisted
+ *
+ * Runs silently — never throws, so a network failure won't break the flow.
+ */
+async function syncNotificationFeedbackToCloud(tidbitId, action) {
+  if (!SUPABASE_CONFIGURED) return;
+  const userId = AuthService.getUserId();
+  if (!userId) return;
+
+  try {
+    if (action === 'knew' || action === 'didnt_know') {
+      const wasCorrect = action === 'knew';
+
+      // Record in card_attempts (used by Same-Boat views)
+      await supabase.from('card_attempts').insert({
+        user_id: userId,
+        card_id: tidbitId,        // tidbitId doubles as card_id for preset tidbits
+        was_correct: wasCorrect,
+        source: 'notification',
+        attempted_at: new Date().toISOString(),
+      });
+
+      // Upsert user_stats: increment tidbits_seen; increment cards_mastered only for 'knew'
+      const { data: existing } = await supabase
+        .from('user_stats')
+        .select('tidbits_seen, cards_mastered')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      await supabase.from('user_stats').upsert({
+        user_id: userId,
+        tidbits_seen: (existing?.tidbits_seen ?? 0) + 1,
+        cards_mastered: (existing?.cards_mastered ?? 0) + (wasCorrect ? 1 : 0),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+      console.log(`[NOTIFICATION_ACTION] Cloud sync: ${action} for tidbit ${tidbitId}`);
+    } else if (action === 'save') {
+      // Upsert into saved_tidbits so the bookmark survives reinstalls / cross-device
+      await supabase.from('saved_tidbits').upsert({
+        user_id: userId,
+        tidbit_id: tidbitId,
+        saved_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,tidbit_id' });
+
+      console.log(`[NOTIFICATION_ACTION] Cloud sync: saved tidbit ${tidbitId}`);
+    }
+  } catch (err) {
+    // Non-fatal — local state is already updated
+    console.warn('[NOTIFICATION_ACTION] Cloud sync failed (non-fatal):', err.message);
+  }
+}
+
 export default function App() {
   const [showTidbit, setShowTidbit] = useState(false);
   const [currentTidbit, setCurrentTidbit] = useState(null);
@@ -175,6 +252,9 @@ export default function App() {
     }
     try {
       SyncService.syncIfNeeded().catch(() => {});
+      EntitlementService.init().catch(() => {});
+      const userId = session.user.id;
+      EntitlementService.identifyUser(userId).catch(() => {});
       const [hasProfile, onboardingDone] = await Promise.all([
         ProfileService.hasCompletedProfile(),
         StorageService.getOnboardingCompleted(),
@@ -344,8 +424,12 @@ export default function App() {
             if (spacedRepAction) {
               try {
                 console.log(`[NOTIFICATION_ACTION] Recording feedback: tidbitId=${tidbitId}, action=${spacedRepAction}`);
+                // 1. Update local spaced-repetition state (AsyncStorage)
                 await SpacedRepetitionService.recordFeedback(tidbitId, spacedRepAction);
-                console.log('[NOTIFICATION_ACTION] Feedback recorded successfully');
+                console.log('[NOTIFICATION_ACTION] Local feedback recorded');
+
+                // 2. Sync to Supabase so it counts toward cloud stats + Same-Boat
+                await syncNotificationFeedbackToCloud(tidbitId, spacedRepAction);
               } catch (error) {
                 console.error('[NOTIFICATION_ACTION] Error recording feedback:', error);
               }
@@ -522,14 +606,29 @@ export default function App() {
         <Stack.Screen name="CategoryProgress" component={CategoryProgressScreen} />
         <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
         <Stack.Screen name="MyClasses" component={MyClassesScreen} />
+        <Stack.Screen name="Feed" component={FeedScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Group" component={GroupScreen} />
+        <Stack.Screen name="GroupDeckStudy" component={GroupDeckStudyScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="GroupDeckStudySummary" component={GroupDeckStudySummaryScreen} options={{ headerShown: false }} />
         <Stack.Screen name="MyDecks" component={MyDecksScreen} />
         <Stack.Screen name="DeckEditor" component={DeckEditorScreen} />
         <Stack.Screen name="CardEditor" component={CardEditorScreen} />
+        <Stack.Screen name="LearnModePicker" component={LearnModePickerScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Quiz" component={QuizScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Recall" component={RecallScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Match" component={MatchScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="LearnSummary" component={LearnSummaryScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="AIGeneration" component={AIGenerationScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="SnapPage" component={SnapPageScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="AdvancedStats" component={AdvancedStatsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ThemePicker" component={ThemePickerScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     );
   }
 
   return (
+    <ThemeProvider>
     <SafeAreaProvider>
       <NavigationContainer ref={navigationRef}>
         {activeStack}
@@ -543,6 +642,7 @@ export default function App() {
       </NavigationContainer>
       <StatusBar style="auto" />
     </SafeAreaProvider>
+    </ThemeProvider>
   );
 }
 

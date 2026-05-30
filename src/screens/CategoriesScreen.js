@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
 import { NotificationService } from '../services/NotificationService';
+import { ClassService } from '../services/ClassService';
 
 export default function CategoriesScreen() {
   const insets = useSafeAreaInsets();
@@ -55,16 +56,22 @@ export default function CategoriesScreen() {
   const filteredCategories = filterCategories(availableCategories, searchQuery);
 
   const toggleCategory = async (categoryId) => {
-    let newSelected;
-    if (selectedCategories.includes(categoryId)) {
-      newSelected = selectedCategories.filter(id => id !== categoryId);
-    } else {
-      newSelected = [...selectedCategories, categoryId];
-    }
-    
+    const isRemoving = selectedCategories.includes(categoryId);
+    const newSelected = isRemoving
+      ? selectedCategories.filter(id => id !== categoryId)
+      : [...selectedCategories, categoryId];
+
     setSelectedCategories(newSelected);
     await StorageService.setSelectedCategories(newSelected);
-    
+
+    // Keep class memberships in Supabase aligned with selected categories
+    // so My Groups and the Feed stay in sync.
+    if (isRemoving) {
+      ClassService.leaveClassForCategory(categoryId).catch(() => {});
+    } else {
+      ClassService.joinClassesForCategories(newSelected).catch(() => {});
+    }
+
     // Sync category changes to server so notifications use correct categories
     await NotificationService.syncPreferences();
   };

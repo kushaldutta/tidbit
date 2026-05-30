@@ -172,10 +172,7 @@ class ClassService {
   /**
    * After joining/leaving classes, sync the selectedCategories in AsyncStorage
    * so the Categories tab and notification system reflect the enrollment.
-   * - Adds categories for newly enrolled classes.
-   * - Removes categories that no longer have any enrolled class backing them,
-   *   unless they were manually added by the user (we keep a union approach:
-   *   we only add, never remove, so the user's manual picks are preserved).
+   * Only adds, never removes, so manually-picked categories are preserved.
    */
   static async syncCategoriesToEnrollment(enrolledClassIds) {
     const newCats = this.categoryIdsForClasses(enrolledClassIds);
@@ -183,6 +180,66 @@ class ClassService {
     const existing = (await StorageService.getSelectedCategories()) || [];
     const merged = Array.from(new Set([...existing, ...newCats]));
     await StorageService.setSelectedCategories(merged);
+  }
+
+  /**
+   * When the user deselects a category, leave the corresponding class so that
+   * My Groups and the Feed stay in sync.
+   * Only acts on categories that map 1:1 to a single class (unambiguous).
+   */
+  static async leaveClassForCategory(removedCategoryId) {
+    if (!SUPABASE_CONFIGURED) return;
+
+    const catToClasses = {};
+    Object.entries(CLASS_TO_CATEGORY).forEach(([classId, catId]) => {
+      if (!catToClasses[catId]) catToClasses[catId] = [];
+      catToClasses[catId].push(classId);
+    });
+
+    const classes = catToClasses[removedCategoryId];
+    if (!classes || classes.length !== 1) return; // skip ambiguous mappings
+    try {
+      await this.leaveClass(classes[0]);
+    } catch (e) {
+      console.warn('[ClassService] leaveClassForCategory error:', e.message);
+    }
+  }
+
+  /**
+   * Reverse direction: when the user selects categories in the Categories tab,
+   * also join the corresponding class(es) in Supabase so the My Groups section
+   * stays in sync.
+   *
+   * Only acts on categories that map 1:1 to a single class (unambiguous).
+   * Shared categories (e.g. 'science' → multiple classes) are skipped.
+   * Only ever joins — never auto-leaves — to avoid overriding manual picks.
+   */
+  static async joinClassesForCategories(selectedCategoryIds) {
+    if (!SUPABASE_CONFIGURED || !selectedCategoryIds.length) return;
+
+    // Build reverse map, counting how many classes map to each category.
+    const catToClasses = {};
+    Object.entries(CLASS_TO_CATEGORY).forEach(([classId, catId]) => {
+      if (!catToClasses[catId]) catToClasses[catId] = [];
+      catToClasses[catId].push(classId);
+    });
+
+    // Collect class IDs for unambiguous (1:1) category→class mappings.
+    const classIdsToJoin = [];
+    selectedCategoryIds.forEach((catId) => {
+      const classes = catToClasses[catId];
+      if (classes && classes.length === 1) {
+        classIdsToJoin.push(classes[0]);
+      }
+    });
+
+    if (classIdsToJoin.length === 0) return;
+    try {
+      await this.joinClasses(classIdsToJoin);
+    } catch (e) {
+      // Non-fatal: class might not exist in DB yet (e.g. seed not run).
+      console.warn('[ClassService] joinClassesForCategories error:', e.message);
+    }
   }
 }
 

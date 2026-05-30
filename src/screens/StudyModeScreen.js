@@ -73,6 +73,26 @@ export default function StudyModeScreen({ navigation }) {
       {isGenerating && (
         <Text style={styles.loadingText}>Building your session...</Text>
       )}
+
+      {/* W7: Interactive Learn Modes */}
+      <View style={styles.learnSection}>
+        <Text style={styles.learnSectionTitle}>Interactive Learn Modes</Text>
+        <Text style={styles.learnSectionSub}>
+          Quiz, Recall, and Match — study from your own decks
+        </Text>
+        <TouchableOpacity
+          style={styles.learnBtn}
+          onPress={() => navigation.navigate('LearnModePicker')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.learnBtnEmoji}>🎯</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.learnBtnLabel}>Start Learning</Text>
+            <Text style={styles.learnBtnSub}>Quiz · Recall · Match</Text>
+          </View>
+          <Text style={styles.learnBtnArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -148,4 +168,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
   },
+  learnSection: {
+    marginTop: 8,
+    marginBottom: 32,
+  },
+  learnSectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  learnSectionSub: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+  },
+  learnBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#eef2ff',
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: '#c7d2fe',
+  },
+  learnBtnEmoji: { fontSize: 32 },
+  learnBtnLabel: { fontSize: 17, fontWeight: '800', color: '#4338ca', marginBottom: 2 },
+  learnBtnSub: { fontSize: 13, color: '#6366f1' },
+  learnBtnArrow: { fontSize: 28, color: '#6366f1', fontWeight: '700' },
 });

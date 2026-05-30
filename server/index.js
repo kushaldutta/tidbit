@@ -4,6 +4,12 @@ const path = require('path');
 const os = require('os');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
+// OpenAI client (W10)
+const OpenAI = require('openai');
+const openaiClient = process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY.startsWith('sk-...')
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
 // Supabase client
 const { createClient } = require('@supabase/supabase-js');
 // Expo Push Notification SDK
@@ -549,10 +555,271 @@ app.post('/api/send-notification', async (req, res) => {
   }
 });
 
-/**
- * Send push notifications to all eligible devices
- * This function is called by the cron scheduler
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// RevenueCat webhook (W9)
+// RevenueCat POSTs here on every subscription lifecycle event.
+// We upsert the entitlements table so the DB is always the source of truth.
+// Set the webhook URL in RevenueCat dashboard → Project → Integrations → Webhooks.
+// Set Authorization header value to match REVENUECAT_WEBHOOK_AUTH in .env.
+// ─────────────────────────────────────────────────────────────────────────────
+const REVENUECAT_WEBHOOK_AUTH = process.env.REVENUECAT_WEBHOOK_AUTH || '';
+
+app.post('/api/revenuecat-webhook', express.json(), async (req, res) => {
+  // Validate the shared secret so only RevenueCat can call this
+  const auth = req.headers.authorization || '';
+  if (REVENUECAT_WEBHOOK_AUTH && auth !== REVENUECAT_WEBHOOK_AUTH) {
+    console.warn('[RC_WEBHOOK] Unauthorized request');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const event = req.body;
+  const eventType = event?.event?.type;
+  const appUserId = event?.event?.app_user_id;   // This is the Supabase user UUID we set via logIn()
+  const expiresAt = event?.event?.expiration_at_ms
+    ? new Date(event.event.expiration_at_ms).toISOString()
+    : null;
+
+  console.log(`[RC_WEBHOOK] Event: ${eventType}, user: ${appUserId}`);
+
+  if (!supabase || !appUserId) {
+    return res.status(200).json({ received: true });
+  }
+
+  try {
+    const activeEvents = [
+      'INITIAL_PURCHASE', 'RENEWAL', 'UNCANCELLATION', 'SUBSCRIPTION_EXTENDED',
+    ];
+    const revokedEvents = [
+      'CANCELLATION', 'EXPIRATION', 'BILLING_ISSUE', 'SUBSCRIBER_ALIAS',
+    ];
+
+    if (activeEvents.includes(eventType)) {
+      await supabase.from('entitlements').upsert({
+        user_id:    appUserId,
+        product:    'premium_monthly',
+        expires_at: expiresAt,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,product' });
+      console.log(`[RC_WEBHOOK] Entitlement granted for ${appUserId}`);
+    } else if (revokedEvents.includes(eventType)) {
+      await supabase.from('entitlements')
+        .delete()
+        .eq('user_id', appUserId)
+        .eq('product', 'premium_monthly');
+      console.log(`[RC_WEBHOOK] Entitlement revoked for ${appUserId}`);
+    }
+
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('[RC_WEBHOOK] Error:', err);
+    res.status(500).json({ error: 'Internal error' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Deck Generation (W10)
+// POST /api/ai/generate-deck
+//
+// Body: {
+//   userId:    string  (Supabase auth UID — client sends it, server trusts Supabase RLS)
+//   mode:      'text_prompt' | 'paste_notes' | 'snap_page'
+//   prompt:    string  (topic description or pasted text)
+//   imageBase64?: string  (for snap_page mode only)
+//   deckTitle?: string  (optional override, server auto-generates if omitted)
+//   classId?:  string  (optional, attached to the saved deck)
+// }
+//
+// Returns: { deckId, title, cards: [{front, back}] }
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AI_MONTHLY_QUOTA = 30;
+
+async function getMonthlyUsage(userId) {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  const { count } = await supabase
+    .from('ai_generation_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', startOfMonth.toISOString());
+  return count ?? 0;
+}
+
+function buildSystemPrompt(mode) {
+  const base = `You are an expert flashcard creator for college and AP-level students.
+Your job is to produce high-quality study flashcards from the user's input.
+
+Rules:
+- Each card's FRONT is a concise question, term, or prompt (max 15 words).
+- Each card's BACK is a clear, self-contained answer (max 40 words). One concept only.
+- Do not include card numbers or labels.
+- Be academically rigorous and precise. Do not make things up.
+- Produce between 10 and 20 cards depending on how much material is provided.
+- Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
+
+Format:
+[{"front": "...", "back": "..."}, ...]`;
+
+  if (mode === 'paste_notes') {
+    return base + '\n\nThe user will paste raw notes or text. Extract the key concepts and turn each into a flashcard.';
+  }
+  if (mode === 'snap_page') {
+    return base + '\n\nThe user photographed a page of notes or a textbook. Extract every distinct concept visible and turn each into a flashcard.';
+  }
+  // text_prompt
+  return base + '\n\nThe user will describe a topic. Generate flashcards covering the most important concepts for that topic.';
+}
+
+app.post('/api/ai/generate-deck', express.json({ limit: '10mb' }), async (req, res) => {
+  if (!openaiClient) {
+    return res.status(503).json({ error: 'AI generation is not configured on this server.' });
+  }
+  if (!supabase || !supabaseConnected) {
+    return res.status(503).json({ error: 'Database unavailable.' });
+  }
+
+  const { userId, mode = 'text_prompt', prompt, imageBase64, deckTitle, classId } = req.body;
+
+  if (!userId || !prompt?.trim()) {
+    return res.status(400).json({ error: 'userId and prompt are required.' });
+  }
+
+  // Quota check
+  try {
+    const used = await getMonthlyUsage(userId);
+    if (used >= AI_MONTHLY_QUOTA) {
+      const resetDate = new Date();
+      resetDate.setMonth(resetDate.getMonth() + 1);
+      resetDate.setDate(1);
+      return res.status(429).json({
+        error: 'quota_exceeded',
+        used,
+        limit: AI_MONTHLY_QUOTA,
+        resetsAt: resetDate.toISOString(),
+      });
+    }
+  } catch (err) {
+    console.error('[AI] Quota check failed:', err);
+    // Fail open — don't block the user if quota check errors
+  }
+
+  try {
+    // Build messages for OpenAI
+    const messages = [{ role: 'system', content: buildSystemPrompt(mode) }];
+
+    if (mode === 'snap_page' && imageBase64) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt || 'Generate flashcards from this page.' },
+          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}`, detail: 'high' } },
+        ],
+      });
+    } else {
+      messages.push({ role: 'user', content: prompt });
+    }
+
+    console.log(`[AI] Generating deck for user ${userId}, mode: ${mode}, prompt length: ${prompt.length}`);
+
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages,
+      temperature: 0.4,
+      max_tokens: 2000,
+      response_format: { type: 'json_object' },
+    });
+
+    // Parse response — model returns JSON object with array inside
+    let rawText = completion.choices[0].message.content.trim();
+
+    // gpt-4o-mini with json_object sometimes wraps in {"cards": [...]}
+    let cards;
+    try {
+      const parsed = JSON.parse(rawText);
+      cards = Array.isArray(parsed) ? parsed : (parsed.cards || parsed.flashcards || Object.values(parsed)[0]);
+    } catch {
+      return res.status(500).json({ error: 'AI returned invalid JSON. Please try again.' });
+    }
+
+    if (!Array.isArray(cards) || cards.length === 0) {
+      return res.status(500).json({ error: 'AI returned no cards. Try a more specific prompt.' });
+    }
+
+    // Sanitise cards
+    cards = cards
+      .filter(c => c.front?.trim() && c.back?.trim())
+      .map(c => ({ front: String(c.front).trim(), back: String(c.back).trim() }))
+      .slice(0, 25); // hard cap
+
+    // Auto-generate deck title if not provided
+    const title = deckTitle?.trim() || await generateDeckTitle(prompt, mode);
+
+    // Save deck + cards to Supabase
+    const { data: deck, error: deckErr } = await supabase
+      .from('decks')
+      .insert({
+        owner_id: userId,
+        title,
+        class_id: classId || null,
+        cover_emoji: '🤖',
+        source: 'ai_generated',
+        card_count: cards.length,
+        is_public: false,
+      })
+      .select()
+      .single();
+
+    if (deckErr) throw deckErr;
+
+    const cardRows = cards.map((c, i) => ({
+      deck_id: deck.id,
+      front: c.front,
+      back: c.back,
+      card_type: 'basic',
+      position: i,
+    }));
+
+    const { error: cardsErr } = await supabase.from('cards').insert(cardRows);
+    if (cardsErr) throw cardsErr;
+
+    // Log usage
+    await supabase.from('ai_generation_log').insert({
+      user_id: userId,
+      source: mode,
+      deck_id: deck.id,
+      cards_generated: cards.length,
+      prompt_chars: prompt.length,
+    });
+
+    console.log(`[AI] Generated ${cards.length} cards, deck "${title}" (${deck.id})`);
+
+    res.json({ deckId: deck.id, title, cards });
+  } catch (err) {
+    console.error('[AI] Generation error:', err);
+    res.status(500).json({ error: err.message || 'Generation failed. Please try again.' });
+  }
+});
+
+async function generateDeckTitle(prompt, mode) {
+  try {
+    const short = prompt.slice(0, 200);
+    const completion = await openaiClient.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'Generate a short, specific deck title (4-6 words) for a set of flashcards. Return only the title, no quotes.' },
+        { role: 'user', content: short },
+      ],
+      max_tokens: 20,
+      temperature: 0.3,
+    });
+    return completion.choices[0].message.content.trim() || 'AI Generated Deck';
+  } catch {
+    return mode === 'snap_page' ? 'Snap-a-Page Deck' : 'AI Generated Deck';
+  }
+}
+
 /**
  * Convert UTC time to user's local time based on timezone offset
  * @param {Date} utcDate - UTC date object
@@ -643,7 +910,14 @@ async function sendScheduledNotifications() {
         console.log(`[SCHEDULER]   - SKIPPING: Not time to send yet (interval: ${device.notification_interval} min)`);
         continue; // Skip this device - not time for their interval
       }
-      
+
+      // If it's 10 PM local, let the bedtime brief handle this slot instead
+      // so the user only gets one notification (the branded 🌙 one, not a plain one)
+      if (currentHour === 22) {
+        console.log(`[SCHEDULER]   - SKIPPING: 10 PM slot deferred to bedtime brief`);
+        continue;
+      }
+
       // Check quiet hours (using local time)
       if (device.quiet_hours_enabled) {
         const quietStart = device.quiet_hours_start ?? 23;
@@ -830,34 +1104,267 @@ async function sendScheduledNotifications() {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bedtime brief (W8)
+// Fires once per day at 22:00 local time for each device.
+// Sends exactly one card regardless of the user's normal notification interval.
+// Bypasses quiet hours (10pm is before everyone's quiet window).
+// Uses a separate "bedtime_sent_date" field on device_tokens to ensure
+// we only send once per calendar day per device.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function sendBedtimeBriefs() {
+  if (!supabase || !supabaseConnected) return;
+
+  try {
+    const now = new Date();
+
+    const { data: devices, error } = await supabase
+      .from('device_tokens')
+      .select('*')
+      .eq('notifications_enabled', true);
+
+    if (error || !devices || devices.length === 0) return;
+
+    const tidbitsData = await fetchTidbitsFromSupabase();
+    if (!tidbitsData) return;
+
+    const messages = [];
+    const todayUTC = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+    for (const device of devices) {
+      // Derive local hour using stored timezone offset (fallback PST)
+      const timezoneOffset = device.timezone_offset_minutes ?? -480;
+      const localTime = getLocalTime(now, timezoneOffset);
+      const { hour: localHour } = localTime;
+
+      // Only fire at 22:xx local (10 PM)
+      if (localHour !== 22) continue;
+
+      // Only send once per calendar day
+      if (device.bedtime_sent_date === todayUTC) continue;
+
+      const selectedCategories = device.selected_categories || [];
+      if (selectedCategories.length === 0) continue;
+
+      const availableTidbits = [];
+      for (const categoryId of selectedCategories) {
+        if (tidbitsData[categoryId]?.length > 0) {
+          for (const tidbitText of tidbitsData[categoryId]) {
+            availableTidbits.push({ text: tidbitText, category: categoryId });
+          }
+        }
+      }
+      if (availableTidbits.length === 0) continue;
+
+      const tidbit = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+
+      function generateTidbitId(text, category) {
+        const content = `${text}|${category}`;
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+          hash = ((hash << 5) - hash) + content.charCodeAt(i);
+          hash = hash & hash;
+        }
+        return `tidbit_${Math.abs(hash).toString(16)}`;
+      }
+
+      const tidbitId = generateTidbitId(tidbit.text, tidbit.category);
+
+      messages.push({
+        to: device.token,
+        sound: 'default',
+        title: '🌙 Bedtime Tidbit',
+        body: tidbit.text,
+        data: {
+          tidbit: JSON.stringify({ text: tidbit.text, category: tidbit.category, id: tidbitId }),
+          tidbitId,
+          category: tidbit.category,
+        },
+        categoryId: 'tidbit_feedback',
+        priority: 'high',
+      });
+
+      // Mark this device as sent for today (fire-and-forget)
+      supabase
+        .from('device_tokens')
+        .update({ bedtime_sent_date: todayUTC })
+        .eq('id', device.id)
+        .then(() => {})
+        .catch(() => {});
+    }
+
+    if (messages.length === 0) return;
+
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      try {
+        await expo.sendPushNotificationsAsync(chunk);
+        console.log(`[BEDTIME] Sent ${chunk.length} bedtime brief(s)`);
+      } catch (err) {
+        console.error('[BEDTIME] Error sending chunk:', err);
+      }
+    }
+  } catch (err) {
+    console.error('[BEDTIME] Unexpected error:', err);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Activity-post generation (W5)
+// Runs every 15 minutes. Detects milestone crossings in user_stats and creates
+// feed_posts so classmates see social signals in their group feeds.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TIDBITS_MILESTONES = [25, 50, 100, 250, 500, 1000];
+const STREAK_MILESTONES  = [3, 7, 14, 30, 60, 100];
+
+/**
+ * Return the highest milestone value that `count` has crossed, or null.
+ * e.g. highestCrossed([25,50,100], 73) → 50
+ */
+function highestCrossed(milestones, count) {
+  return [...milestones].reverse().find((m) => count >= m) ?? null;
+}
+
+/**
+ * Check whether this user has already received a post for this exact milestone.
+ * Uses the `cs` (JSONB contains) operator against payload.
+ */
+async function milestoneAlreadyPosted(userId, eventKey, milestoneValue) {
+  const { data } = await supabase
+    .from('feed_posts')
+    .select('id')
+    .eq('author_id', userId)
+    .eq('post_type', 'activity')
+    .filter('payload', 'cs', JSON.stringify({ event: eventKey, milestone: milestoneValue }))
+    .limit(1);
+  return !!(data && data.length > 0);
+}
+
+/**
+ * Post an activity into every group the user belongs to.
+ */
+async function postMilestoneToAllGroups(userId, eventKey, milestone, text) {
+  // Already posted this milestone? Skip.
+  if (await milestoneAlreadyPosted(userId, eventKey, milestone)) return;
+
+  // Get all groups this user is a member of
+  const { data: memberships } = await supabase
+    .from('class_memberships')
+    .select('class_id, groups!inner(id)')
+    .eq('user_id', userId);
+
+  if (!memberships || memberships.length === 0) return;
+
+  const rows = memberships.map((m) => ({
+    author_id: userId,
+    group_id:  m.groups.id,
+    post_type: 'activity',
+    payload: {
+      event:     eventKey,
+      milestone: milestone,
+      text,
+    },
+  }));
+
+  const { error } = await supabase.from('feed_posts').insert(rows);
+  if (error) {
+    console.error(`[ACTIVITY_POSTS] insert error for user ${userId}:`, error.message);
+  } else {
+    console.log(`[ACTIVITY_POSTS] Posted "${eventKey}:${milestone}" for user ${userId} in ${rows.length} group(s)`);
+  }
+}
+
+async function generateActivityPosts() {
+  if (!supabase || !supabaseConnected) return;
+
+  // Look at users whose stats were updated in the last 20 minutes (cron window + buffer)
+  const since = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+
+  const { data: activeStats, error } = await supabase
+    .from('user_stats')
+    .select('user_id, tidbits_seen, current_streak')
+    .gt('updated_at', since);
+
+  if (error) {
+    console.error('[ACTIVITY_POSTS] Error fetching user_stats:', error.message);
+    return;
+  }
+  if (!activeStats || activeStats.length === 0) return;
+
+  console.log(`[ACTIVITY_POSTS] Checking ${activeStats.length} active user(s) for milestones`);
+
+  for (const stats of activeStats) {
+    const { user_id, tidbits_seen, current_streak } = stats;
+
+    // Tidbits-seen milestone
+    const tidbitMilestone = highestCrossed(TIDBITS_MILESTONES, tidbits_seen || 0);
+    if (tidbitMilestone) {
+      await postMilestoneToAllGroups(
+        user_id,
+        'milestone_tidbits',
+        tidbitMilestone,
+        `just studied their ${tidbitMilestone}th tidbit! 📚`
+      );
+    }
+
+    // Study-streak milestone
+    const streakMilestone = highestCrossed(STREAK_MILESTONES, current_streak || 0);
+    if (streakMilestone) {
+      await postMilestoneToAllGroups(
+        user_id,
+        'milestone_streak',
+        streakMilestone,
+        `is on a ${streakMilestone}-day study streak! 🔥`
+      );
+    }
+  }
+}
+
 /**
  * Setup cron jobs for sending notifications
  * Runs every minute and checks if it's time to send based on user intervals
  */
 function setupNotificationScheduler() {
-  // Run every minute
-  // Note: Interval checking is now done inside sendScheduledNotifications() for each device individually
+  // Per-minute: send scheduled notifications
   cron.schedule('* * * * *', async () => {
-    if (!supabase || !supabaseConnected) {
-      return; // Skip if Supabase not available
-    }
-    
+    if (!supabase || !supabaseConnected) return;
     try {
       const now = new Date();
       const currentMinute = now.getMinutes();
       const currentHour = now.getHours();
       const minutesSinceMidnight = currentHour * 60 + currentMinute;
-      
       console.log(`[CRON] Running at ${currentHour}:${currentMinute.toString().padStart(2, '0')} (minute ${minutesSinceMidnight} since midnight)`);
-      
-      // sendScheduledNotifications() will check intervals and quiet hours for each device individually
       await sendScheduledNotifications();
     } catch (error) {
       console.error('[SCHEDULER] Error in cron job:', error);
     }
   });
-  
+
+  // Every 15 minutes: generate activity posts for milestone crossings
+  cron.schedule('*/15 * * * *', async () => {
+    if (!supabase || !supabaseConnected) return;
+    try {
+      await generateActivityPosts();
+    } catch (error) {
+      console.error('[ACTIVITY_POSTS] Error in cron job:', error);
+    }
+  });
+
+  // Every minute: check if it's 10 PM local for any device and send bedtime brief
+  cron.schedule('* * * * *', async () => {
+    if (!supabase || !supabaseConnected) return;
+    try {
+      await sendBedtimeBriefs();
+    } catch (error) {
+      console.error('[BEDTIME] Error in cron job:', error);
+    }
+  });
+
   console.log('[SCHEDULER] Notification scheduler started (runs every minute)');
+  console.log('[ACTIVITY_POSTS] Activity-post cron started (runs every 15 minutes)');
+  console.log('[BEDTIME] Bedtime brief cron started (fires at 22:00 local per device)');
 }
 
 // Start server (with friendly error handling)

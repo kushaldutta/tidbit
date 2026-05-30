@@ -147,6 +147,31 @@ export default function MyDecksScreen({ navigation }) {
             <Text style={styles.subtitle}>
               Your custom decks and curated preset decks for your classes.
             </Text>
+            {/* AI generation entry point */}
+            <TouchableOpacity
+              style={styles.aiBtn}
+              onPress={() => navigation.navigate('AIGeneration')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.aiBtnEmoji}>🤖</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.aiBtnTitle}>Generate with AI</Text>
+                <Text style={styles.aiBtnSub}>Turn a topic or notes into a full deck instantly</Text>
+              </View>
+              <Text style={styles.aiBtnArrow}>›</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.aiBtn, { backgroundColor: '#1a0a2e', marginTop: 10 }]}
+              onPress={() => navigation.navigate('SnapPage')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.aiBtnEmoji}>📸</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.aiBtnTitle}>Snap-a-Page</Text>
+                <Text style={styles.aiBtnSub}>Photo your notes → instant flashcards</Text>
+              </View>
+              <Text style={styles.aiBtnArrow}>›</Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -160,7 +185,15 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 48 },
   header: { marginBottom: 8 },
   title: { fontSize: 28, fontWeight: '700', color: '#111827' },
-  subtitle: { fontSize: 14, color: '#6b7280', marginTop: 4 },
+  subtitle: { fontSize: 14, color: '#6b7280', marginTop: 4, marginBottom: 16 },
+  aiBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#0f0a2e', borderRadius: 16, padding: 16, marginTop: 4,
+  },
+  aiBtnEmoji: { fontSize: 28 },
+  aiBtnTitle: { fontSize: 15, fontWeight: '800', color: '#fff', marginBottom: 2 },
+  aiBtnSub: { fontSize: 12, color: '#a5b4fc' },
+  aiBtnArrow: { fontSize: 24, color: '#a5b4fc', fontWeight: '700' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

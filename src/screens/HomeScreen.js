@@ -14,9 +14,11 @@ import { StudyPlanService } from '../services/StudyPlanService';
 import StudyPlanCard from '../components/StudyPlanCard';
 import CategoryProgressPreview from '../components/CategoryProgressPreview';
 import { CategoryProgressService } from '../services/CategoryProgressService';
+import { GroupService } from '../services/GroupService';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+  const [groups, setGroups] = useState([]);
   const [stats, setStats] = useState({
     tidbitsSeen: 0,
     dailyTidbits: 0,
@@ -83,6 +85,9 @@ export default function HomeScreen({ navigation }) {
   };
 
   const loadData = async () => {
+    // Load groups in background — don't block the rest of the screen
+    GroupService.getMyGroups().then(setGroups).catch(() => {});
+
     const tidbitsSeen = await StorageService.getTidbitsSeen();
     const dailyTidbits = await StorageService.getDailyTidbitCount();
     const selected = await StorageService.getSelectedCategories();
@@ -228,6 +233,51 @@ export default function HomeScreen({ navigation }) {
         <Text style={styles.myDecksChevron}>›</Text>
       </TouchableOpacity>
 
+      {groups.length > 0 && (
+        <View style={styles.groupsSection}>
+          <Text style={styles.sectionTitle}>My Groups</Text>
+          {groups.map((g) => (
+            <TouchableOpacity
+              key={g.groupId}
+              style={styles.groupCard}
+              onPress={() => navigation.navigate('Group', g)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.groupLeft}>
+                <View style={styles.groupIconCircle}>
+                  <Text style={styles.groupIconText}>
+                    {g.code.split(' ')[0].charAt(0)}
+                  </Text>
+                </View>
+                <View style={styles.groupInfo}>
+                  <Text style={styles.groupCode}>{g.code}</Text>
+                  <Text style={styles.groupTitle} numberOfLines={1}>{g.title}</Text>
+                </View>
+              </View>
+              <View style={styles.groupRight}>
+                <Text style={styles.groupCount}>
+                  👥 {g.memberCount}
+                </Text>
+                <Text style={styles.groupChevron}>›</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={styles.feedEntryBtn}
+            onPress={() => navigation.navigate('Feed')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.feedEntryEmoji}>📰</Text>
+            <View style={styles.feedEntryInfo}>
+              <Text style={styles.feedEntryTitle}>Class Feed</Text>
+              <Text style={styles.feedEntrySubtitle}>Posts, shared decks & activity from your groups</Text>
+            </View>
+            <Text style={styles.feedEntryChevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>How it works</Text>
         <Text style={styles.infoText}>
@@ -310,6 +360,54 @@ const styles = StyleSheet.create({
   myDecksTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
   myDecksSubtitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   myDecksChevron: { fontSize: 28, color: '#9ca3af', marginLeft: 8 },
+
+  groupsSection: { marginTop: 20 },
+  feedEntryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eef2ff',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 10,
+    borderWidth: 1.5,
+    borderColor: '#c7d2fe',
+  },
+  feedEntryEmoji: { fontSize: 22, marginRight: 12 },
+  feedEntryInfo: { flex: 1 },
+  feedEntryTitle: { fontSize: 15, fontWeight: '700', color: '#3730a3' },
+  feedEntrySubtitle: { fontSize: 12, color: '#6366f1', marginTop: 2 },
+  feedEntryChevron: { fontSize: 20, color: '#6366f1', marginLeft: 8 },
+  groupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  groupLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  groupIconCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#eef2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  groupIconText: { fontSize: 18, fontWeight: '700', color: '#6366f1' },
+  groupInfo: { flex: 1 },
+  groupCode: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  groupTitle: { fontSize: 12, color: '#6b7280', marginTop: 1 },
+  groupRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  groupCount: { fontSize: 13, color: '#6b7280' },
+  groupChevron: { fontSize: 20, color: '#9ca3af' },
   statCard: {
     flex: 1,
     backgroundColor: '#ffffff',

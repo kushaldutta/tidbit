@@ -434,6 +434,48 @@ export default function SettingsScreen({ navigation }) {
         </View>
       )}
 
+      {/* Premium upgrade banner */}
+      <TouchableOpacity
+        style={styles.premiumBanner}
+        onPress={() => navigation.navigate('Paywall')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.premiumBannerEmoji}>✨</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.premiumBannerTitle}>Upgrade to Premium</Text>
+          <Text style={styles.premiumBannerSub}>AI generation, analytics, themes & more</Text>
+        </View>
+        <Text style={styles.premiumBannerArrow}>›</Text>
+      </TouchableOpacity>
+
+      {/* Advanced Analytics entry */}
+      <TouchableOpacity
+        style={styles.analyticsBtn}
+        onPress={() => navigation.navigate('AdvancedStats')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.analyticsBtnEmoji}>📊</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.analyticsBtnTitle}>Advanced Analytics</Text>
+          <Text style={styles.analyticsBtnSub}>Retention forecast, accuracy trends, study modes</Text>
+        </View>
+        <Text style={styles.premiumBannerArrow}>›</Text>
+      </TouchableOpacity>
+
+      {/* Theme picker entry */}
+      <TouchableOpacity
+        style={[styles.analyticsBtn, { marginTop: 8 }]}
+        onPress={() => navigation.navigate('ThemePicker')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.analyticsBtnEmoji}>🎨</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.analyticsBtnTitle}>App Theme</Text>
+          <Text style={styles.analyticsBtnSub}>Classic, Midnight, Forest, Sunset, Ocean</Text>
+        </View>
+        <Text style={styles.premiumBannerArrow}>›</Text>
+      </TouchableOpacity>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Categories</Text>
         <Text style={styles.sectionDescription}>
@@ -935,6 +977,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1f2937',
   },
+  premiumBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#0f0a2e', borderRadius: 16,
+    padding: 18, marginHorizontal: 16, marginBottom: 8,
+  },
+  premiumBannerEmoji: { fontSize: 26 },
+  premiumBannerTitle: { fontSize: 16, fontWeight: '800', color: '#fff', marginBottom: 2 },
+  premiumBannerSub: { fontSize: 13, color: '#a5b4fc' },
+  premiumBannerArrow: { fontSize: 24, color: '#a5b4fc', fontWeight: '700' },
+  analyticsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    marginHorizontal: 20, marginTop: 10,
+    borderWidth: 1.5, borderColor: '#e5e7eb',
+  },
+  analyticsBtnEmoji: { fontSize: 26 },
+  analyticsBtnTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 2 },
+  analyticsBtnSub: { fontSize: 12, color: '#6b7280' },
   actionButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',

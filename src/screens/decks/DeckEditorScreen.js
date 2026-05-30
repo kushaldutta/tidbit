@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { DeckService } from '../../services/DeckService';
+import { GroupService } from '../../services/GroupService';
 
 const EMOJI_OPTIONS = ['📚', '🧠', '🔬', '🧪', '🧮', '📐', '🎨', '🌍', '⚡️', '💡', '🎯', '🏛️'];
 
@@ -29,6 +30,9 @@ export default function DeckEditorScreen({ route, navigation }) {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [myGroups, setMyGroups] = useState([]);
+  const [sharedGroupIds, setSharedGroupIds] = useState([]);
+  const [sharingGroupId, setSharingGroupId] = useState(null);
 
   const load = useCallback(async () => {
     if (mode === 'create' || !deckId) {
@@ -44,6 +48,13 @@ export default function DeckEditorScreen({ route, navigation }) {
     setDescription(d?.description || '');
     setCoverEmoji(d?.cover_emoji || '📚');
     setCards(c);
+    // Load groups + current share state in parallel
+    const [groups, sharedIds] = await Promise.all([
+      GroupService.getMyGroups(),
+      DeckService.getSharedGroupIds(deckId),
+    ]);
+    setMyGroups(groups);
+    setSharedGroupIds(sharedIds);
     setLoading(false);
   }, [mode, deckId]);
 
@@ -112,6 +123,24 @@ export default function DeckEditorScreen({ route, navigation }) {
         },
       ]
     );
+  };
+
+  const handleToggleShare = async (group) => {
+    const isShared = sharedGroupIds.includes(group.groupId);
+    setSharingGroupId(group.groupId);
+    try {
+      if (isShared) {
+        await DeckService.unshareDeckFromGroup(deckId, group.groupId);
+        setSharedGroupIds((prev) => prev.filter((id) => id !== group.groupId));
+      } else {
+        await DeckService.shareDeckToGroup(deckId, group.groupId);
+        setSharedGroupIds((prev) => [...prev, group.groupId]);
+      }
+    } catch (err) {
+      Alert.alert('Could not update share', err.message || 'Try again.');
+    } finally {
+      setSharingGroupId(null);
+    }
   };
 
   const handleAddCard = () => {
@@ -253,12 +282,68 @@ export default function DeckEditorScreen({ route, navigation }) {
           }
           ListFooterComponent={
             mode === 'edit' && deckId ? (
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={handleDeleteDeck}
-              >
-                <Text style={styles.deleteButtonText}>Delete deck</Text>
-              </TouchableOpacity>
+              <View>
+                {myGroups.length > 0 && (
+                  <View style={styles.shareSection}>
+                    <Text style={styles.shareSectionTitle}>Share with class groups</Text>
+                    {myGroups.map((group) => {
+                      const isShared = sharedGroupIds.includes(group.groupId);
+                      const isBusy = sharingGroupId === group.groupId;
+                      return (
+                        <TouchableOpacity
+                          key={group.groupId}
+                          style={styles.shareRow}
+                          onPress={() => handleToggleShare(group)}
+                          disabled={isBusy}
+                          activeOpacity={0.75}
+                        >
+                          <View style={styles.shareRowLeft}>
+                            <Text style={styles.shareGroupEmoji}>👥</Text>
+                            <View>
+                              <Text style={styles.shareGroupName}>{group.title}</Text>
+                              <Text style={styles.shareGroupMeta}>
+                                {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
+                              </Text>
+                            </View>
+                          </View>
+                          {isBusy ? (
+                            <ActivityIndicator size="small" color="#6366f1" />
+                          ) : (
+                            <View
+                              style={[
+                                styles.shareToggle,
+                                isShared && styles.shareToggleActive,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.shareToggleText,
+                                  isShared && styles.shareToggleTextActive,
+                                ]}
+                              >
+                                {isShared ? 'Shared ✓' : 'Share'}
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={styles.learnBtn}
+                  onPress={() => navigation.navigate('LearnModePicker', { deckId, deckTitle: title })}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.learnBtnText}>🎯 Learn this deck</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={handleDeleteDeck}
+                >
+                  <Text style={styles.deleteButtonText}>Delete deck</Text>
+                </TouchableOpacity>
+              </View>
             ) : null
           }
         />
@@ -347,8 +432,57 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 8,
   },
-  deleteButton: {
+  shareSection: {
     marginTop: 32,
+    marginBottom: 8,
+  },
+  shareSectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  shareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  shareRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  shareGroupEmoji: { fontSize: 22 },
+  shareGroupName: { fontSize: 15, fontWeight: '600', color: '#111827' },
+  shareGroupMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  shareToggle: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#6366f1',
+    backgroundColor: '#fff',
+  },
+  shareToggleActive: { backgroundColor: '#6366f1', borderColor: '#6366f1' },
+  shareToggleText: { fontSize: 13, fontWeight: '600', color: '#6366f1' },
+  shareToggleTextActive: { color: '#fff' },
+  learnBtn: {
+    marginTop: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#eef2ff',
+    borderWidth: 1.5,
+    borderColor: '#c7d2fe',
+  },
+  learnBtnText: { color: '#4338ca', fontWeight: '700', fontSize: 15 },
+  deleteButton: {
+    marginTop: 10,
     paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 12,
