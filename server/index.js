@@ -92,7 +92,7 @@ function getLanIPv4() {
 
 // Enable CORS for React Native app
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '12mb' }));
 
 // Path to tidbits.json (fallback)
 const TIDBITS_PATH = path.join(__dirname, '../content/tidbits.json');

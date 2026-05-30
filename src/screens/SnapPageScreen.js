@@ -32,8 +32,7 @@ function SnapPageInner({ navigation }) {
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      base64: false,
+      quality: 0.3,
     });
     if (!result.canceled && result.assets?.[0]) {
       setImageUri(result.assets[0].uri);
@@ -49,8 +48,7 @@ function SnapPageInner({ navigation }) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      base64: false,
+      quality: 0.3,
     });
     if (!result.canceled && result.assets?.[0]) {
       setImageUri(result.assets[0].uri);
@@ -69,9 +67,14 @@ function SnapPageInner({ navigation }) {
       });
 
       const userId = AuthService.getUserId();
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
       const res = await fetch(`${API_CONFIG.BASE_URL}/api/ai/generate-deck`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           userId,
           mode: 'snap_page',
@@ -79,6 +82,7 @@ function SnapPageInner({ navigation }) {
           imageBase64: base64,
         }),
       });
+      clearTimeout(timeout);
 
       const data = await res.json();
 
@@ -95,7 +99,11 @@ function SnapPageInner({ navigation }) {
       setGeneratedDeckId(data.deckId);
       setGeneratedTitle(data.title);
     } catch (err) {
-      Alert.alert('Error', 'Could not reach the server. Check your connection and try again.');
+      if (err.name === 'AbortError') {
+        Alert.alert('Took too long', 'The request timed out. Try a clearer, well-lit photo and try again.');
+      } else {
+        Alert.alert('Error', 'Could not reach the server. Check your connection and try again.');
+      }
     } finally {
       setGenerating(false);
     }
