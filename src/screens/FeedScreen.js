@@ -252,9 +252,9 @@ function ComposeModal({ visible, groups, onClose, onPost }) {
             {/* Anonymous toggle */}
             <View style={styles.anonRow}>
               <View style={styles.anonInfo}>
-                <Text style={styles.anonLabel}>Post anonymously 🎭</Text>
+                <Text style={styles.anonLabel}>🃏 Dumb Question Mode</Text>
                 <Text style={styles.anonSubtitle}>
-                  Your name won't be shown. No dumb questions.
+                  Post anonymously — your name won't be shown. No dumb questions.
                 </Text>
               </View>
               <Switch

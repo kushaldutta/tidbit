@@ -4,7 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppState, Text, Platform } from 'react-native';
+import { AppState, Text, Platform, DeviceEventEmitter } from 'react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
@@ -40,7 +40,7 @@ import PaywallScreen from './src/screens/PaywallScreen';
 import AIGenerationScreen from './src/screens/AIGenerationScreen';
 import SnapPageScreen from './src/screens/SnapPageScreen';
 import AdvancedStatsScreen from './src/screens/AdvancedStatsScreen';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import ThemePickerScreen from './src/screens/ThemePickerScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
@@ -60,16 +60,17 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
+  const { theme } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#6366f1',
+        tabBarActiveTintColor: theme.tabBarActive,
         tabBarInactiveTintColor: '#9ca3af',
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: theme.tabBar,
           borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
+          borderTopColor: theme.primaryLight,
         },
       }}
     >
@@ -554,6 +555,15 @@ export default function App() {
     } catch (error) {
       console.error('Error getting next tidbit:', error);
     }
+  }, []);
+
+  // Listen for DeviceEventEmitter 'showTidbitNow' from HomeScreen's "Get Tidbit Now" button
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('showTidbitNow', (tidbit) => {
+      setCurrentTidbit(tidbit);
+      setShowTidbit(true);
+    });
+    return () => sub.remove();
   }, []);
 
   // Listen for navigation to Tidbit route and show modal

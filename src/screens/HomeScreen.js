@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  DeviceEventEmitter,
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
@@ -15,6 +16,7 @@ import StudyPlanCard from '../components/StudyPlanCard';
 import CategoryProgressPreview from '../components/CategoryProgressPreview';
 import { CategoryProgressService } from '../services/CategoryProgressService';
 import { GroupService } from '../services/GroupService';
+import { AuthService } from '../services/AuthService';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -149,30 +151,43 @@ export default function HomeScreen({ navigation }) {
       }
     }
     
-    setStats({ tidbitsSeen, dailyTidbits, learningStreak });
+    // Today's quiz accuracy from card_attempts in AsyncStorage/Supabase
+    let todayAccuracy = null;
+    try {
+      const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
+      if (SUPABASE_CONFIGURED && AuthService) {
+        const userId = AuthService.getUserId();
+        if (userId) {
+          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+          const { data: attempts } = await supabase
+            .from('card_attempts')
+            .select('was_correct')
+            .eq('user_id', userId)
+            .gte('attempted_at', todayStart.toISOString());
+          if (attempts && attempts.length > 0) {
+            const correct = attempts.filter(a => a.was_correct).length;
+            todayAccuracy = Math.round((correct / attempts.length) * 100);
+          }
+        }
+      }
+    } catch {}
+
+    setStats({ tidbitsSeen, dailyTidbits, learningStreak, todayAccuracy });
     setSelectedCategories(validCategories);
   };
 
   const handleGetTidbitNow = async () => {
     try {
-      // Get a smart tidbit (prioritizes due tidbits for spaced repetition)
       const tidbit = await ContentService.getSmartTidbit();
       if (tidbit) {
-        // Mark tidbit as shown (will mark as "shown as due" if it was due)
         const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
         if (tidbitWithId.id) {
           await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
         }
-        
-        // Trigger the tidbit modal by navigating with tidbit data
-        // App.js will listen for this and show the modal
-        navigation.navigate('Tidbit', { tidbit: tidbitWithId });
-        
-        // Count this as a tidbit seen (total + today)
+        // Fire event — App.js listens and shows TidbitModal directly
+        DeviceEventEmitter.emit('showTidbitNow', tidbitWithId);
         await StorageService.incrementTidbitsSeen();
         await StorageService.incrementDailyTidbitCount();
-
-        // Update UI immediately (avoid waiting for navigation focus reload)
         setStats(prev => ({
           ...prev,
           tidbitsSeen: (prev.tidbitsSeen || 0) + 1,
@@ -201,8 +216,16 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.statLabel}>Today</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.learningStreak}</Text>
-          <Text style={styles.statLabel}>Day Streak</Text>
+          <Text style={styles.statNumber}>
+            {stats.todayAccuracy !== null && stats.todayAccuracy !== undefined
+              ? `${stats.todayAccuracy}%`
+              : `${stats.learningStreak}d`}
+          </Text>
+          <Text style={styles.statLabel}>
+            {stats.todayAccuracy !== null && stats.todayAccuracy !== undefined
+              ? 'Accuracy'
+              : 'Streak'}
+          </Text>
         </View>
       </View>
 

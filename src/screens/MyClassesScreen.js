@@ -202,7 +202,8 @@ const styles = StyleSheet.create({
 
   enrolledSection: {
     paddingHorizontal: 20,
-    paddingBottom: 8,
+    paddingTop: 10,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
   },
