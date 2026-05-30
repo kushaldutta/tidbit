@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { AuthService } from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import PremiumGate from '../components/PremiumGate';
@@ -62,22 +63,29 @@ function SnapPageInner({ navigation }) {
     try {
       const userId = AuthService.getUserId();
 
-      const formData = new FormData();
-      formData.append('userId', userId);
-      if (deckTitle?.trim()) formData.append('deckTitle', deckTitle.trim());
-      formData.append('image', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: 'snap.jpg',
-      });
+      // Resize to max 900px and compress — keeps payload well under 200KB
+      const manipulated = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [{ resize: { width: 900 } }],
+        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+
+      const base64 = manipulated.base64;
+      console.log(`[SnapPage] Compressed image base64 length: ${base64?.length}`);
 
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 45000); // 45s for vision AI
+      const timeout = setTimeout(() => controller.abort(), 45000);
 
-      const res = await fetch(`${API_CONFIG.BASE_URL}/api/ai/snap-page`, {
+      const res = await fetch(`${API_CONFIG.BASE_URL}/api/ai/generate-deck`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: formData,
+        body: JSON.stringify({
+          userId,
+          mode: 'snap_page',
+          prompt: 'Generate flashcards from this page.',
+          imageBase64: base64,
+        }),
       });
       clearTimeout(timeout);
 
