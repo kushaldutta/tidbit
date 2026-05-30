@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tidbit",
     "slug": "tidbit",
-    "version": "1.0.3",
+    "version": "2.0.1",
     "scheme": "tidbit",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cinnamiddles.tidbit",
-      "buildNumber": "3",
+      "buildNumber": "1",
       "icon": "./assets/tidbit.png",
       "usesAppleSignIn": true,
       "infoPlist": {
