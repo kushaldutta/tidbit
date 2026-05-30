@@ -71,6 +71,15 @@ function ThemePickerInner({ navigation }) {
             </View>
           </View>
         </View>
+
+        {/* Save button */}
+        <TouchableOpacity
+          style={[styles.saveBtn, { backgroundColor: theme.primary }]}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.saveBtnText}>Save & Apply Theme →</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -121,4 +130,11 @@ const styles = StyleSheet.create({
   previewSub: { fontSize: 13, lineHeight: 20, marginBottom: 16 },
   previewBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   previewBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  saveBtn: {
+    borderRadius: 16, paddingVertical: 17,
+    alignItems: 'center', marginTop: 24, marginBottom: 8,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+  },
+  saveBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 });

@@ -57,6 +57,28 @@ import { supabase, SUPABASE_CONFIGURED } from './src/config/supabase';
 import * as Notifications from 'expo-notifications';
 
 const Stack = createStackNavigator();
+// ─── Themed navigation container ─────────────────────────────────────────────
+// Must live inside ThemeProvider to read context.
+function ThemedNavigationContainer({ children, navRef }) {
+  const { theme } = useTheme();
+  const navTheme = {
+    dark: theme.id === 'midnight',
+    colors: {
+      primary: theme.primary,
+      background: theme.background,
+      card: theme.card,
+      text: theme.text,
+      border: theme.primaryLight,
+      notification: theme.primary,
+    },
+  };
+  return (
+    <NavigationContainer ref={navRef} theme={navTheme}>
+      {children}
+    </NavigationContainer>
+  );
+}
+
 const Tab = createBottomTabNavigator();
 
 function MainTabs() {
@@ -640,7 +662,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef}>
+      <ThemedNavigationContainer navRef={navigationRef}>
         {activeStack}
         {showTidbit && currentTidbit && (
           <TidbitModal
@@ -649,7 +671,7 @@ export default function App() {
             onNextTidbit={handleNextTidbit}
           />
         )}
-      </NavigationContainer>
+      </ThemedNavigationContainer>
       <StatusBar style="auto" />
     </SafeAreaProvider>
     </ThemeProvider>
