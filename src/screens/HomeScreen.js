@@ -329,7 +329,7 @@ export default function HomeScreen({ navigation }) {
           style={styles.button}
           onPress={() => navigation.navigate('Categories')}
         >
-          <Text style={styles.buttonText}>Manage Categories</Text>
+          <Text style={styles.buttonText}>Manage Classes</Text>
         </TouchableOpacity>
       </View>
 
