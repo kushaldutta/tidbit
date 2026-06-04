@@ -840,7 +840,6 @@ app.post('/api/ai/generate-deck', express.json({ limit: '10mb' }), async (req, r
         class_id: classId || null,
         cover_emoji: '🤖',
         source: 'ai_generated',
-        card_count: cards.length,
         is_public: false,
       })
       .select()
@@ -932,7 +931,7 @@ app.post('/api/ai/snap-page', snapUpload.single('image'), async (req, res) => {
 
     const { data: deck, error: deckErr } = await supabase
       .from('decks')
-      .insert({ owner_id: userId, title, cover_emoji: '📸', source: 'ai_generated', card_count: cards.length, is_public: false })
+      .insert({ owner_id: userId, title, cover_emoji: '📸', source: 'ai_generated', is_public: false })
       .select().single();
     if (deckErr) throw deckErr;
 
