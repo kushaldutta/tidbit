@@ -13,8 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClassService } from '../services/ClassService';
 import { ProfileService } from '../services/ProfileService';
+import { useTheme } from '../context/ThemeContext';
 
 export default function MyClassesScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [allClasses, setAllClasses] = useState([]);
   const [enrolledIds, setEnrolledIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -191,14 +194,14 @@ export default function MyClassesScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
 
   header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8 },
   backBtn: { marginBottom: 8 },
   backText: { fontSize: 15, color: '#6366f1', fontWeight: '500' },
-  title: { fontSize: 26, fontWeight: '700', color: '#111827' },
-  subtitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  title: { fontSize: 26, fontWeight: '700', color: theme.text },
+  subtitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
 
   enrolledSection: {
     paddingHorizontal: 20,
@@ -231,12 +234,12 @@ const styles = StyleSheet.create({
 
   searchWrapper: { paddingHorizontal: 16, paddingVertical: 8 },
   searchInput: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.card,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 15,
-    color: '#111827',
+    color: theme.text,
   },
 
   listContent: { paddingHorizontal: 16, paddingBottom: 24 },
@@ -254,7 +257,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -264,9 +267,9 @@ const styles = StyleSheet.create({
   },
   rowEnrolled: { backgroundColor: '#eef2ff', borderColor: '#6366f1' },
   rowInfo: { flex: 1, marginRight: 12 },
-  rowCode: { fontSize: 15, fontWeight: '600', color: '#111827' },
+  rowCode: { fontSize: 15, fontWeight: '600', color: theme.text },
   rowCodeEnrolled: { color: '#4338ca' },
-  rowTitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  rowTitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
 
   checkbox: {
     width: 24, height: 24, borderRadius: 6,

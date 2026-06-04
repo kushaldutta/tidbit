@@ -5,7 +5,7 @@ import { StorageService } from './StorageService';
 // Maps class IDs → content category IDs in ContentService.
 // Only includes classes that have matching preset content.
 const CLASS_TO_CATEGORY = {
-  // UC Berkeley
+  // UC Berkeley — only classes with dedicated tidbit content
   'uc-berkeley:math53:fa26':   'math53',
   'uc-berkeley:math54:fa26':   'math-54',
   'uc-berkeley:math51:fa26':   'math51',
@@ -22,19 +22,12 @@ const CLASS_TO_CATEGORY = {
   'uc-berkeley:econ1:fa26':    'econ-1',
   'uc-berkeley:econ100a:fa26': 'econ100a',
   'uc-berkeley:econ100b:fa26': 'econ100b',
-  'uc-berkeley:bio1a:fa26':    'science',
-  'uc-berkeley:bio1b:fa26':    'science',
-  // High School AP
-  'hs-ap:ap_ush:ap26':         'history',
-  'hs-ap:ap_wh:ap26':          'history',
-  'hs-ap:ap_euro:ap26':        'history',
-  'hs-ap:ap_bio:ap26':         'science',
-  'hs-ap:ap_chem:ap26':        'science',
-  'hs-ap:ap_phys1:ap26':       'science',
-  'hs-ap:ap_phys2:ap26':       'science',
-  'hs-ap:ap_phys_cm:ap26':     'science',
-  'hs-ap:ap_phys_ce:ap26':     'science',
-  'hs-ap:ap_enviro:ap26':      'science',
+  'uc-berkeley:psych1:fa26':      'psych1',
+  'uc-berkeley:physics137a:fa26': 'physics137a',
+  'uc-berkeley:nuc150:fa26':      'nuc150',
+  'uc-berkeley:nuc155:fa26':      'nuc155',
+  'uc-berkeley:agrs28:fa26':      'agrs28',
+  // Bio, Chem, Physics intro/AP classes intentionally omitted — no dedicated content yet
 };
 
 // Fallback class list used when the DB isn't seeded yet or network is unavailable.
@@ -45,10 +38,15 @@ const FALLBACK_CLASSES = {
     { id: 'uc-berkeley:math53:fa26',   code: 'MATH 53',    title: 'Multivariable Calculus',                            subject: 'Mathematics' },
     { id: 'uc-berkeley:math54:fa26',   code: 'MATH 54',    title: 'Linear Algebra and Differential Equations',         subject: 'Mathematics' },
     { id: 'uc-berkeley:math55:fa26',   code: 'MATH 55',    title: 'Discrete Mathematics',                              subject: 'Mathematics' },
+    { id: 'uc-berkeley:math51:fa26',   code: 'MATH 51',    title: 'Linear Algebra and Differential Equations',         subject: 'Mathematics' },
+    { id: 'uc-berkeley:math52:fa26',   code: 'MATH 52',    title: 'Integral Calculus of Several Variables',            subject: 'Mathematics' },
+    { id: 'uc-berkeley:math128a:fa26', code: 'MATH 128A',  title: 'Numerical Analysis',                                subject: 'Mathematics' },
     { id: 'uc-berkeley:cs61a:fa26',    code: 'CS 61A',     title: 'Structure and Interpretation of Computer Programs', subject: 'Computer Science' },
     { id: 'uc-berkeley:cs61b:fa26',    code: 'CS 61B',     title: 'Data Structures and Algorithms',                    subject: 'Computer Science' },
     { id: 'uc-berkeley:cs61c:fa26',    code: 'CS 61C',     title: 'Great Ideas in Computer Architecture',              subject: 'Computer Science' },
     { id: 'uc-berkeley:cs70:fa26',     code: 'CS 70',      title: 'Discrete Mathematics and Probability Theory',       subject: 'Computer Science' },
+    { id: 'uc-berkeley:cs188:fa26',    code: 'CS 188',     title: 'Introduction to Artificial Intelligence',           subject: 'Computer Science' },
+    { id: 'uc-berkeley:cs161:fa26',    code: 'CS 161',     title: 'Computer Security',                                 subject: 'Computer Science' },
     { id: 'uc-berkeley:eecs16a:fa26',  code: 'EECS 16A',   title: 'Designing Information Devices and Systems I',       subject: 'EECS' },
     { id: 'uc-berkeley:eecs16b:fa26',  code: 'EECS 16B',   title: 'Designing Information Devices and Systems II',      subject: 'EECS' },
     { id: 'uc-berkeley:data8:fa26',    code: 'DATA 8',     title: 'Foundations of Data Science',                       subject: 'Data Science' },
@@ -56,6 +54,10 @@ const FALLBACK_CLASSES = {
     { id: 'uc-berkeley:stat134:fa26',  code: 'STAT 134',   title: 'Concepts of Probability',                           subject: 'Statistics' },
     { id: 'uc-berkeley:phys7a:fa26',   code: 'PHYS 7A',    title: 'Physics for Scientists and Engineers I',            subject: 'Physics' },
     { id: 'uc-berkeley:phys7b:fa26',   code: 'PHYS 7B',    title: 'Physics for Scientists and Engineers II',           subject: 'Physics' },
+    { id: 'uc-berkeley:physics137a:fa26', code: 'PHYSICS 137A', title: 'Quantum Mechanics',                            subject: 'Physics' },
+    { id: 'uc-berkeley:nuc150:fa26',    code: 'NUCENG 150', title: 'Introduction to Nuclear Reactor Theory',            subject: 'Nuclear Engineering' },
+    { id: 'uc-berkeley:nuc155:fa26',    code: 'NUCENG 155', title: 'Introduction to Numerical Simulations in Radiation Transport', subject: 'Nuclear Engineering' },
+    { id: 'uc-berkeley:agrs28:fa26',    code: 'AGRS 28',    title: 'Greek and Roman Myths',                             subject: 'Classics' },
     { id: 'uc-berkeley:chem1a:fa26',   code: 'CHEM 1A',    title: 'General Chemistry',                                 subject: 'Chemistry' },
     { id: 'uc-berkeley:chem1b:fa26',   code: 'CHEM 1B',    title: 'General Chemistry',                                 subject: 'Chemistry' },
     { id: 'uc-berkeley:bio1a:fa26',    code: 'BIO 1A',     title: 'General Biology',                                   subject: 'Biology' },
@@ -180,6 +182,16 @@ class ClassService {
     const existing = (await StorageService.getSelectedCategories()) || [];
     const merged = Array.from(new Set([...existing, ...newCats]));
     await StorageService.setSelectedCategories(merged);
+  }
+
+  /**
+   * Replaces the selectedCategories in AsyncStorage to exactly match the current
+   * class enrollment. Used by CategoriesScreen so that removing a class is
+   * immediately reflected in the Home screen and notification system.
+   */
+  static async replaceCategoriesToEnrollment(enrolledClassIds) {
+    const cats = this.categoryIdsForClasses(enrolledClassIds);
+    await StorageService.setSelectedCategories(cats);
   }
 
   /**

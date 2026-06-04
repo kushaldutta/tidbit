@@ -18,6 +18,7 @@ import { GroupService } from '../services/GroupService';
 import { FeedService } from '../services/FeedService';
 import { SameBoatService } from '../services/SameBoatService';
 import { AuthService } from '../services/AuthService';
+import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,11 @@ const REACTION_EMOJIS = ['👍', '❤️', '🔥'];
 
 // ─── sub-components ─────────────────────────────────────────────────────────
 
+const avatarStyles = StyleSheet.create({
+  avatar: { alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontWeight: '700' },
+});
+
 function Avatar({ name, size = 40 }) {
   const initials = name
     ? name.trim().split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
@@ -50,13 +56,15 @@ function Avatar({ name, size = 40 }) {
   const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
   const bg = colors[initials.charCodeAt(0) % colors.length];
   return (
-    <View style={[styles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
-      <Text style={[styles.avatarText, { fontSize: size * 0.38 }]}>{initials}</Text>
+    <View style={[avatarStyles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: bg }]}>
+      <Text style={[avatarStyles.avatarText, { fontSize: size * 0.38 }]}>{initials}</Text>
     </View>
   );
 }
 
 function PostCard({ post, myUserId, onReact }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const body = postBodyText(post);
   const isActivity = post.postType === 'activity';
 
@@ -113,6 +121,8 @@ function PostCard({ post, myUserId, onReact }) {
 // ─── main screen ────────────────────────────────────────────────────────────
 
 export default function GroupScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const { groupId, classId, code, title, memberCount } = route.params;
   const myUserId = AuthService.getUserId();
 
@@ -371,12 +381,12 @@ export default function GroupScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
 
   // ── header ──────────────────────────────────────────────────────────────
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 14,
@@ -385,8 +395,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { marginBottom: 8 },
   backText: { fontSize: 15, color: '#6366f1', fontWeight: '500' },
-  code: { fontSize: 22, fontWeight: '800', color: '#111827' },
-  title: { fontSize: 14, color: '#6b7280', marginTop: 2, marginBottom: 8 },
+  code: { fontSize: 22, fontWeight: '800', color: theme.text },
+  title: { fontSize: 14, color: theme.textSecondary, marginTop: 2, marginBottom: 8 },
   metaRow: { flexDirection: 'row', gap: 8 },
   badge: {
     backgroundColor: '#eef2ff',
@@ -419,7 +429,7 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 8 },
 
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 16,
@@ -434,52 +444,50 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#374151',
+    color: theme.text,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
     marginBottom: 4,
   },
-  sectionSubtitle: { fontSize: 12, color: '#9ca3af', marginBottom: 4 },
+  sectionSubtitle: { fontSize: 12, color: theme.textSecondary, marginBottom: 4 },
 
   // ── classmates ─────────────────────────────────────────────────────────
   classmateGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   classmateCard: { alignItems: 'center', width: 68 },
-  avatar: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '700' },
   classmateName: {
     fontSize: 11,
-    color: '#374151',
+    color: theme.text,
     fontWeight: '500',
     marginTop: 4,
     textAlign: 'center',
     width: 68,
   },
-  classmateYear: { fontSize: 10, color: '#9ca3af', marginTop: 1 },
+  classmateYear: { fontSize: 10, color: theme.textSecondary, marginTop: 1 },
 
   // ── empty states ────────────────────────────────────────────────────────
   emptyBox: { alignItems: 'center', paddingVertical: 16 },
   emptyEmoji: { fontSize: 28, marginBottom: 6 },
-  emptyText: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 4 },
-  emptySubtext: { fontSize: 13, color: '#9ca3af', textAlign: 'center', lineHeight: 18 },
+  emptyText: { fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: 4 },
+  emptySubtext: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 18 },
 
   feedEmpty: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 32 },
   feedEmptyEmoji: { fontSize: 36, marginBottom: 8 },
-  feedEmptyText: { fontSize: 15, fontWeight: '600', color: '#374151', marginBottom: 4 },
-  feedEmptySubtext: { fontSize: 13, color: '#9ca3af', textAlign: 'center', lineHeight: 18 },
+  feedEmptyText: { fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 4 },
+  feedEmptySubtext: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 18 },
 
   // ── shared decks ────────────────────────────────────────────────────────
   deckCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
     borderRadius: 12,
     padding: 14,
     marginTop: 8,
   },
   deckInfo: { flex: 1 },
-  deckTitle: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  deckMeta: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  deckChevron: { fontSize: 20, color: '#9ca3af' },
+  deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
+  deckMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  deckChevron: { fontSize: 20, color: theme.textSecondary },
   studyBtn: {
     backgroundColor: '#6366f1',
     borderRadius: 10,
@@ -490,7 +498,7 @@ const styles = StyleSheet.create({
 
   // ── post card ───────────────────────────────────────────────────────────
   postCard: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     marginHorizontal: 16,
     marginTop: 10,
     borderRadius: 14,
@@ -512,8 +520,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   postMeta: { flex: 1, marginLeft: 10 },
-  postAuthor: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  postTime: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+  postAuthor: { fontSize: 14, fontWeight: '700', color: theme.text },
+  postTime: { fontSize: 11, color: theme.textSecondary, marginTop: 1 },
   activityBadge: {
     backgroundColor: '#fef9c3',
     borderRadius: 10,
@@ -525,7 +533,7 @@ const styles = StyleSheet.create({
   activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '600' },
   postBody: {
     fontSize: 15,
-    color: '#1f2937',
+    color: theme.text,
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -539,18 +547,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: '#e5e7eb',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   reactionBtnActive: {
     borderColor: '#6366f1',
     backgroundColor: '#eef2ff',
   },
   reactionEmoji: { fontSize: 14 },
-  reactionCount: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
+  reactionCount: { fontSize: 12, fontWeight: '600', color: theme.textSecondary },
   reactionCountActive: { color: '#4338ca' },
 
   // ── composer ────────────────────────────────────────────────────────────
-  composerWrapper: { backgroundColor: '#fff' },
+  composerWrapper: { backgroundColor: theme.card },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -562,12 +570,12 @@ const styles = StyleSheet.create({
   },
   composerInput: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.background,
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#111827',
+    color: theme.text,
     maxHeight: 100,
   },
   postBtn: {

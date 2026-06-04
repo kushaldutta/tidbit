@@ -635,6 +635,18 @@ app.post('/api/revenuecat-webhook', express.json(), async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AI_MONTHLY_QUOTA = 30;
+const SNAP_CARDS_PER_PAGE = 30;
+const SNAP_MAX_TOKENS_PER_PAGE = 4096;
+
+/** Notification copy: title always "Tidbit"; body is "term: definition" when term exists. */
+function formatTidbitNotificationTitle({ bedtime = false } = {}) {
+  return bedtime ? '🌙 Tidbit' : '📚 Tidbit';
+}
+
+function formatTidbitNotificationBody(text, term) {
+  if (term) return `${term}: ${text}`;
+  return text;
+}
 
 async function getMonthlyUsage(userId) {
   const startOfMonth = new Date();
@@ -649,7 +661,7 @@ async function getMonthlyUsage(userId) {
   return count ?? 0;
 }
 
-function buildSystemPrompt(mode) {
+function buildSystemPrompt(mode, { pageCount = 1, targetPerPage = null } = {}) {
   const base = `You are an expert flashcard creator for college and AP-level students.
 Your job is to produce high-quality study flashcards from the user's input.
 
@@ -658,20 +670,82 @@ Rules:
 - Each card's BACK is a clear, self-contained answer (max 40 words). One concept only.
 - Do not include card numbers or labels.
 - Be academically rigorous and precise. Do not make things up.
-- Produce between 10 and 20 cards depending on how much material is provided.
-- Return ONLY a valid JSON array. No markdown, no explanation, no extra text.
+- Return ONLY a valid JSON object with a "cards" array. No markdown, no explanation, no extra text.
 
 Format:
-[{"front": "...", "back": "..."}, ...]`;
+{"cards": [{"front": "...", "back": "..."}, ...]}`;
 
   if (mode === 'paste_notes') {
     return base + '\n\nThe user will paste raw notes or text. Extract the key concepts and turn each into a flashcard.';
   }
   if (mode === 'snap_page') {
-    return base + '\n\nThe user photographed a page of notes or a textbook. Extract every distinct concept visible and turn each into a flashcard.';
+    const perPage = targetPerPage || SNAP_CARDS_PER_PAGE;
+    const pageLabel = pageCount === 1 ? '1 page' : `${pageCount} pages`;
+    return base + `\n\nThe user photographed ${pageLabel} of notes or a textbook. Extract EVERY distinct concept, term, definition, bullet, and formula visible on the page. Turn each into its own flashcard — do not merge unrelated ideas. Aim for ${perPage} cards (typically 25–35). Cover the full page thoroughly; do not stop early.`;
   }
   // text_prompt
-  return base + '\n\nThe user will describe a topic. Generate flashcards covering the most important concepts for that topic.';
+  return base + '\n\nThe user will describe a topic. Generate flashcards covering the most important concepts for that topic. Produce between 10 and 20 cards depending on how much material is provided.';
+}
+
+function parseCardsFromAiContent(rawText) {
+  const parsed = JSON.parse(rawText.trim());
+  const cards = Array.isArray(parsed)
+    ? parsed
+    : (parsed.cards || parsed.flashcards || Object.values(parsed).find(Array.isArray));
+  if (!Array.isArray(cards)) {
+    throw new Error('invalid_json');
+  }
+  return cards
+    .filter((c) => c.front?.trim() && c.back?.trim())
+    .map((c) => ({ front: String(c.front).trim(), back: String(c.back).trim() }));
+}
+
+/** One OpenAI call per page so each gets a full token budget (~30 cards/page). */
+async function generateSnapPageCards(snapImages, userPrompt) {
+  const pageCount = snapImages.length;
+  const basePrompt = userPrompt?.trim() || 'Generate flashcards from this page of notes.';
+
+  const pageResults = await Promise.all(
+    snapImages.map(async (img, index) => {
+      const textPrompt = pageCount > 1
+        ? `${basePrompt} (page ${index + 1} of ${pageCount})`
+        : basePrompt;
+
+      const completion = await openaiClient.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: buildSystemPrompt('snap_page', { pageCount: 1, targetPerPage: SNAP_CARDS_PER_PAGE }) },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: textPrompt },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${img}`, detail: 'high' } },
+            ],
+          },
+        ],
+        temperature: 0.4,
+        max_tokens: SNAP_MAX_TOKENS_PER_PAGE,
+        response_format: { type: 'json_object' },
+      });
+
+      if (completion.choices[0].finish_reason === 'length') {
+        console.warn(`[AI] Page ${index + 1}/${pageCount} hit max_tokens — output may be truncated`);
+      }
+
+      try {
+        const cards = parseCardsFromAiContent(completion.choices[0].message.content);
+        console.log(`[AI] Page ${index + 1}/${pageCount}: ${cards.length} cards parsed`);
+        return cards.slice(0, SNAP_CARDS_PER_PAGE);
+      } catch (err) {
+        console.error(`[AI] Failed to parse page ${index + 1}/${pageCount}:`, err.message);
+        return [];
+      }
+    })
+  );
+
+  const merged = pageResults.flat();
+  if (merged.length === 0) return null;
+  return merged.slice(0, pageCount * SNAP_CARDS_PER_PAGE);
 }
 
 app.post('/api/ai/generate-deck', express.json({ limit: '10mb' }), async (req, res) => {
@@ -682,10 +756,19 @@ app.post('/api/ai/generate-deck', express.json({ limit: '10mb' }), async (req, r
     return res.status(503).json({ error: 'Database unavailable.' });
   }
 
-  const { userId, mode = 'text_prompt', prompt, imageBase64, deckTitle, classId } = req.body;
+  const { userId, mode = 'text_prompt', prompt, imageBase64, imagesBase64, deckTitle, classId } = req.body;
 
   if (!userId || !prompt?.trim()) {
     return res.status(400).json({ error: 'userId and prompt are required.' });
+  }
+
+  const snapImages = (Array.isArray(imagesBase64) && imagesBase64.length > 0)
+    ? imagesBase64.slice(0, 6)
+    : (imageBase64 ? [imageBase64] : []);
+  const pageCount = mode === 'snap_page' ? Math.max(1, snapImages.length) : 1;
+
+  if (mode === 'snap_page' && snapImages.length === 0) {
+    return res.status(400).json({ error: 'No image received. Please try again or update the app.' });
   }
 
   // Quota check
@@ -708,52 +791,42 @@ app.post('/api/ai/generate-deck', express.json({ limit: '10mb' }), async (req, r
   }
 
   try {
-    // Build messages for OpenAI
-    const messages = [{ role: 'system', content: buildSystemPrompt(mode) }];
-
-    if (mode === 'snap_page' && imageBase64) {
-      messages.push({
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt || 'Generate flashcards from this page.' },
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${imageBase64}`, detail: 'high' } },
-        ],
-      });
-    } else {
-      messages.push({ role: 'user', content: prompt });
-    }
-
-    console.log(`[AI] Generating deck for user ${userId}, mode: ${mode}, prompt length: ${prompt.length}`);
-
-    const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages,
-      temperature: 0.4,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' },
-    });
-
-    // Parse response — model returns JSON object with array inside
-    let rawText = completion.choices[0].message.content.trim();
-
-    // gpt-4o-mini with json_object sometimes wraps in {"cards": [...]}
     let cards;
-    try {
-      const parsed = JSON.parse(rawText);
-      cards = Array.isArray(parsed) ? parsed : (parsed.cards || parsed.flashcards || Object.values(parsed)[0]);
-    } catch {
-      return res.status(500).json({ error: 'AI returned invalid JSON. Please try again.' });
-    }
 
-    if (!Array.isArray(cards) || cards.length === 0) {
-      return res.status(500).json({ error: 'AI returned no cards. Try a more specific prompt.' });
-    }
+    if (mode === 'snap_page' && snapImages.length > 0) {
+      console.log(`[AI] Snap-a-Page for user ${userId}, pages: ${pageCount} (one API call per page)`);
+      cards = await generateSnapPageCards(snapImages, prompt);
+      if (!cards?.length) {
+        return res.status(500).json({ error: 'AI returned no cards. Try a more specific prompt.' });
+      }
+    } else {
+      const messages = [
+        { role: 'system', content: buildSystemPrompt(mode, { pageCount }) },
+        { role: 'user', content: prompt },
+      ];
 
-    // Sanitise cards
-    cards = cards
-      .filter(c => c.front?.trim() && c.back?.trim())
-      .map(c => ({ front: String(c.front).trim(), back: String(c.back).trim() }))
-      .slice(0, 25); // hard cap
+      console.log(`[AI] Generating deck for user ${userId}, mode: ${mode}, prompt length: ${prompt.length}`);
+
+      const completion = await openaiClient.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages,
+        temperature: 0.4,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' },
+      });
+
+      try {
+        cards = parseCardsFromAiContent(completion.choices[0].message.content);
+      } catch {
+        return res.status(500).json({ error: 'AI returned invalid JSON. Please try again.' });
+      }
+
+      if (!cards.length) {
+        return res.status(500).json({ error: 'AI returned no cards. Try a more specific prompt.' });
+      }
+
+      cards = cards.slice(0, 25);
+    }
 
     // Auto-generate deck title if not provided
     const title = deckTitle?.trim() || await generateDeckTitle(prompt, mode);
@@ -850,39 +923,10 @@ app.post('/api/ai/snap-page', snapUpload.single('image'), async (req, res) => {
 
     console.log(`[AI/SNAP] user=${userId} size=${req.file.size} bytes`);
 
-    const completion = await openaiClient.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: buildSystemPrompt('snap_page') },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'Generate flashcards from this page.' },
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${imageBase64}`, detail: 'high' } },
-          ],
-        },
-      ],
-      temperature: 0.4,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' },
-    });
-
-    let cards;
-    try {
-      const parsed = JSON.parse(completion.choices[0].message.content.trim());
-      cards = Array.isArray(parsed) ? parsed : (parsed.cards || parsed.flashcards || Object.values(parsed)[0]);
-    } catch {
-      return res.status(500).json({ error: 'AI returned invalid JSON. Please try again.' });
-    }
-
-    if (!Array.isArray(cards) || cards.length === 0) {
+    const cards = await generateSnapPageCards([imageBase64], 'Generate flashcards from this page.');
+    if (!cards?.length) {
       return res.status(500).json({ error: 'AI returned no cards. Try a clearer photo.' });
     }
-
-    cards = cards
-      .filter(c => c.front?.trim() && c.back?.trim())
-      .map(c => ({ front: String(c.front).trim(), back: String(c.back).trim() }))
-      .slice(0, 25);
 
     const title = deckTitle?.trim() || await generateDeckTitle('Snap-a-Page notes', 'snap_page');
 
@@ -1083,8 +1127,8 @@ async function sendScheduledNotifications() {
       const message = {
         to: device.token,
         sound: 'default',
-        title: randomTidbit.term ? randomTidbit.term : '📚 Tidbit',
-        body: randomTidbit.text,
+        title: formatTidbitNotificationTitle(),
+        body: formatTidbitNotificationBody(randomTidbit.text, randomTidbit.term),
         data: {
           tidbit: JSON.stringify({
             text: randomTidbit.text,
@@ -1265,8 +1309,8 @@ async function sendBedtimeBriefs() {
       messages.push({
         to: device.token,
         sound: 'default',
-        title: tidbit.term ? tidbit.term : '🌙 Bedtime Tidbit',
-        body: tidbit.text,
+        title: formatTidbitNotificationTitle({ bedtime: true }),
+        body: formatTidbitNotificationBody(tidbit.text, tidbit.term),
         data: {
           tidbit: JSON.stringify({ text: tidbit.text, term: tidbit.term || null, category: tidbit.category, id: tidbitId }),
           tidbitId,

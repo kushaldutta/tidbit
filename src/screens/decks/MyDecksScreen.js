@@ -15,6 +15,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 export default function MyDecksScreen({ navigation }) {
   const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [myDecks, setMyDecks] = useState([]);
   const [presetDecks, setPresetDecks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +131,7 @@ export default function MyDecksScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={styles.container}>
       <FlatList
         data={data}
         renderItem={renderItem}
@@ -181,13 +182,13 @@ export default function MyDecksScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
   list: { padding: 16, paddingBottom: 48 },
   header: { marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: '700', color: '#111827' },
-  subtitle: { fontSize: 14, color: '#6b7280', marginTop: 4, marginBottom: 16 },
+  title: { fontSize: 28, fontWeight: '700', color: theme.text },
+  subtitle: { fontSize: 14, color: theme.textSecondary, marginTop: 4, marginBottom: 16 },
   aiBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#0f0a2e', borderRadius: 16, padding: 16, marginTop: 4,
@@ -206,15 +207,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#374151',
+    color: theme.text,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  sectionCount: { fontSize: 13, color: '#9ca3af', fontWeight: '600' },
+  sectionCount: { fontSize: 13, color: theme.textSecondary, fontWeight: '600' },
   deckCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     padding: 14,
     borderRadius: 12,
     marginBottom: 10,
@@ -222,9 +223,9 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
   },
   deckEmoji: { fontSize: 32, marginRight: 14 },
-  deckTitle: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  deckDescription: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  deckMeta: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
+  deckTitle: { fontSize: 16, fontWeight: '600', color: theme.text },
+  deckDescription: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+  deckMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 4 },
   createCard: {
     flexDirection: 'row',
     alignItems: 'center',

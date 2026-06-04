@@ -6,6 +6,7 @@ import {
   DeviceEventEmitter,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
@@ -69,9 +70,15 @@ export default function HomeScreen({ navigation }) {
 
   const handleStartStudySession = async () => {
     if (!studyPlan || studyPlan.completed) return;
-    
+    if (!studyPlan.tidbits?.length) {
+      Alert.alert(
+        'No tidbits available',
+        'Select classes with tidbit content and refresh in Settings, then try again.'
+      );
+      return;
+    }
+
     try {
-      // Navigate to study session with plan tidbits
       navigation.navigate('StudySession', { tidbits: studyPlan.tidbits });
     } catch (error) {
       console.error('Error starting study session:', error);

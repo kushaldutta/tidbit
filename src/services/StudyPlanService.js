@@ -160,11 +160,11 @@ class StudyPlanService {
       const allTidbits = [];
       for (const category of categories) {
         const categoryTidbits = ContentService.getTidbitsByCategory(category);
-        for (const tidbitText of categoryTidbits) {
-          const tidbit = ContentService.ensureTidbitHasId({
-            text: tidbitText,
-            category,
-          });
+        for (const item of categoryTidbits) {
+          const text = typeof item === 'string' ? item : item?.text;
+          const term = typeof item === 'string' ? null : (item?.term || null);
+          if (!text) continue;
+          const tidbit = ContentService.ensureTidbitHasId({ text, term, category });
           allTidbits.push(tidbit);
         }
       }

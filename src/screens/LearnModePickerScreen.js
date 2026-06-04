@@ -2,8 +2,7 @@
  * LearnModePickerScreen
  *
  * Entry point for interactive study modes (W7).
- * If a deckId is passed as a param, skip the deck picker and jump straight
- * to mode selection. Otherwise, show the user's decks first.
+ * Shows the user's decks plus preset class decks for enrolled classes.
  */
 import React, { useState, useEffect } from 'react';
 import {
@@ -17,6 +16,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeckService } from '../services/DeckService';
+import { ClassService } from '../services/ClassService';
+import { ContentService } from '../services/ContentService';
+import { StorageService } from '../services/StorageService';
+import { useTheme } from '../context/ThemeContext';
 
 const MODES = [
   {
@@ -48,7 +51,7 @@ const MODES = [
   },
 ];
 
-function ModeCard({ mode, onPress, disabled }) {
+function ModeCard({ mode, onPress, disabled, styles }) {
   return (
     <TouchableOpacity
       style={[styles.modeCard, { backgroundColor: mode.bg, opacity: disabled ? 0.45 : 1 }]}
@@ -68,7 +71,7 @@ function ModeCard({ mode, onPress, disabled }) {
   );
 }
 
-function DeckRow({ deck, selected, onPress }) {
+function DeckRow({ deck, selected, onPress, styles }) {
   return (
     <TouchableOpacity
       style={[styles.deckRow, selected && styles.deckRowSelected]}
@@ -86,25 +89,45 @@ function DeckRow({ deck, selected, onPress }) {
 }
 
 export default function LearnModePickerScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const preselectedDeckId = route.params?.deckId;
   const preselectedTitle = route.params?.deckTitle;
 
-  const [decks, setDecks] = useState([]);
+  const [myDecks, setMyDecks] = useState([]);
+  const [classDecks, setClassDecks] = useState([]);
   const [loading, setLoading] = useState(!preselectedDeckId);
   const [selectedDeck, setSelectedDeck] = useState(
     preselectedDeckId
       ? { id: preselectedDeckId, title: preselectedTitle, card_count: null }
       : null
   );
-  const [phase, setPhase] = useState(preselectedDeckId ? 'mode' : 'deck'); // 'deck' | 'mode'
+  const [phase, setPhase] = useState(preselectedDeckId ? 'mode' : 'deck');
 
   useEffect(() => {
     if (preselectedDeckId) return;
-    DeckService.listMyDecks().then((d) => {
-      setDecks(d);
+    (async () => {
+      const [mine, presets, classIds, selectedCats] = await Promise.all([
+        DeckService.listMyDecks(),
+        DeckService.listPresetDecks(),
+        ClassService.getMyClassIds(),
+        StorageService.getSelectedCategories(),
+      ]);
+      const categoryIds = new Set([
+        ...ClassService.categoryIdsForClasses(classIds),
+        ...selectedCats,
+      ]);
+      const enrolled = new Set(classIds);
+      const matchedPresets = presets.filter(
+        (p) =>
+          (p.slug && categoryIds.has(p.slug)) ||
+          (p.class_id && enrolled.has(p.class_id))
+      );
+      setMyDecks(mine);
+      setClassDecks(ContentService.buildClassStudyDecks(categoryIds, matchedPresets));
       setLoading(false);
-    });
-  }, []);
+    })();
+  }, [preselectedDeckId]);
 
   const handleDeckSelect = (deck) => {
     setSelectedDeck(deck);
@@ -119,9 +142,17 @@ export default function LearnModePickerScreen({ route, navigation }) {
     });
   };
 
+  const deckListData = [
+    ...(myDecks.length > 0
+      ? [{ type: 'section', title: 'My decks' }, ...myDecks.map((d) => ({ type: 'deck', deck: d }))]
+      : []),
+    ...(classDecks.length > 0
+      ? [{ type: 'section', title: 'Class decks' }, ...classDecks.map((d) => ({ type: 'deck', deck: d }))]
+      : []),
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => {
           if (phase === 'mode' && !preselectedDeckId) {
@@ -140,33 +171,45 @@ export default function LearnModePickerScreen({ route, navigation }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.sectionTitle}>Pick a deck</Text>
           {loading ? (
-            <ActivityIndicator color="#6366f1" style={{ marginTop: 40 }} />
-          ) : decks.length === 0 ? (
+            <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
+          ) : deckListData.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyEmoji}>📭</Text>
-              <Text style={styles.emptyText}>You don't have any decks yet.</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Decks')}>
-                <Text style={styles.emptyLink}>Create a deck →</Text>
+              <Text style={styles.emptyText}>No decks available yet.</Text>
+              <Text style={styles.emptySubtext}>
+                Enroll in classes on the Categories tab or create your own deck.
+              </Text>
+              <TouchableOpacity onPress={() => navigation.navigate('MyDecks')}>
+                <Text style={styles.emptyLink}>Go to My Decks →</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <FlatList
-              data={decks}
-              keyExtractor={(d) => d.id}
+              data={deckListData}
+              keyExtractor={(item, idx) =>
+                item.type === 'section' ? `s-${item.title}` : item.deck.id
+              }
               contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-              renderItem={({ item }) => (
-                <DeckRow
-                  deck={item}
-                  selected={selectedDeck?.id === item.id}
-                  onPress={() => handleDeckSelect(item)}
-                />
-              )}
+              renderItem={({ item }) => {
+                if (item.type === 'section') {
+                  return (
+                    <Text style={styles.listSectionTitle}>{item.title}</Text>
+                  );
+                }
+                return (
+                  <DeckRow
+                    deck={item.deck}
+                    selected={selectedDeck?.id === item.deck.id}
+                    onPress={() => handleDeckSelect(item.deck)}
+                    styles={styles}
+                  />
+                );
+              }}
             />
           )}
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.modeScroll}>
-          {/* Selected deck badge */}
           <View style={styles.selectedDeckBadge}>
             <Text style={styles.selectedDeckEmoji}>{selectedDeck?.cover_emoji || '📚'}</Text>
             <View style={{ flex: 1 }}>
@@ -186,6 +229,7 @@ export default function LearnModePickerScreen({ route, navigation }) {
             <ModeCard
               key={m.id}
               mode={m}
+              styles={styles}
               onPress={() => handleModeSelect(m)}
               disabled={selectedDeck?.card_count !== null && selectedDeck?.card_count < m.minCards}
             />
@@ -203,45 +247,51 @@ export default function LearnModePickerScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+    backgroundColor: theme.card,
   },
-  backText: { fontSize: 15, color: '#6366f1', fontWeight: '600', width: 48 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  backText: { fontSize: 15, color: theme.primary, fontWeight: '600', width: 48 },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: theme.text },
 
   sectionTitle: {
-    fontSize: 13, fontWeight: '800', color: '#9ca3af',
+    fontSize: 13, fontWeight: '800', color: theme.textSecondary,
     textTransform: 'uppercase', letterSpacing: 1,
     marginHorizontal: 20, marginTop: 20, marginBottom: 12,
+  },
+  listSectionTitle: {
+    fontSize: 12, fontWeight: '800', color: theme.textSecondary,
+    textTransform: 'uppercase', letterSpacing: 0.8,
+    marginTop: 16, marginBottom: 8, marginLeft: 4,
   },
 
   deckRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    backgroundColor: theme.card, borderRadius: 16, padding: 16,
     marginBottom: 10, borderWidth: 2, borderColor: '#f3f4f6',
   },
-  deckRowSelected: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
+  deckRowSelected: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
   deckEmoji: { fontSize: 24 },
-  deckTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 2 },
-  deckSub: { fontSize: 12, color: '#9ca3af' },
-  deckCheck: { fontSize: 18, color: '#6366f1', fontWeight: '800' },
+  deckTitle: { fontSize: 15, fontWeight: '700', color: theme.text, marginBottom: 2 },
+  deckSub: { fontSize: 12, color: theme.textSecondary },
+  deckCheck: { fontSize: 18, color: theme.primary, fontWeight: '800' },
 
   modeScroll: { padding: 20, paddingBottom: 48 },
 
   selectedDeckBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#fff', borderRadius: 16, padding: 16,
+    backgroundColor: theme.card, borderRadius: 16, padding: 16,
     marginBottom: 8, borderWidth: 2, borderColor: '#e5e7eb',
   },
   selectedDeckEmoji: { fontSize: 24 },
-  selectedDeckLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
-  selectedDeckTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  changeDeckText: { fontSize: 13, color: '#6366f1', fontWeight: '600' },
+  selectedDeckLabel: { fontSize: 11, color: theme.textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
+  selectedDeckTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+  changeDeckText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
 
   modeCard: {
     flexDirection: 'row', alignItems: 'center',
@@ -250,17 +300,18 @@ const styles = StyleSheet.create({
   modeCardLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
   modeEmoji: { fontSize: 32 },
   modeTitle: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
-  modeSub: { fontSize: 13, color: '#6b7280', lineHeight: 18 },
+  modeSub: { fontSize: 13, color: theme.textSecondary, lineHeight: 18 },
   modeArrow: { fontSize: 28, fontWeight: '700' },
 
   tipsBox: {
-    backgroundColor: '#f0f9ff', borderRadius: 16, padding: 16, marginTop: 8,
+    backgroundColor: theme.primaryLight, borderRadius: 16, padding: 16, marginTop: 8,
   },
-  tipsTitle: { fontSize: 14, fontWeight: '700', color: '#0369a1', marginBottom: 8 },
-  tipText: { fontSize: 13, color: '#374151', lineHeight: 22 },
+  tipsTitle: { fontSize: 14, fontWeight: '700', color: theme.primary, marginBottom: 8 },
+  tipText: { fontSize: 13, color: theme.text, lineHeight: 22 },
 
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 32 },
   emptyEmoji: { fontSize: 40, marginBottom: 12 },
-  emptyText: { fontSize: 16, color: '#6b7280', marginBottom: 12 },
-  emptyLink: { fontSize: 15, color: '#6366f1', fontWeight: '600' },
+  emptyText: { fontSize: 16, color: theme.text, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
+  emptySubtext: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', marginBottom: 16, lineHeight: 20 },
+  emptyLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },
 });

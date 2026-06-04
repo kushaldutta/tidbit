@@ -7,17 +7,28 @@ import {
   Animated,
   Dimensions,
   ScrollView,
+  Alert,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { StudySessionService } from '../services/StudySessionService';
 import { StudyPlanService } from '../services/StudyPlanService';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
-import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
+import { useTheme } from '../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
+function formatCategoryName(category) {
+  if (!category) return 'Tidbit';
+  return category
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 export default function StudySessionScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const { tidbits: initialTidbits } = route.params || {};
   const [currentTidbit, setCurrentTidbit] = useState(null);
   const [sessionStats, setSessionStats] = useState(null);
@@ -41,6 +52,14 @@ export default function StudySessionScreen({ route, navigation }) {
     try {
       // Start session with provided tidbits
       const session = await StudySessionService.startSession(initialTidbits);
+      if (!session || !initialTidbits?.length) {
+        Alert.alert(
+          'No tidbits to study',
+          'Select classes with tidbit content and try again.'
+        );
+        navigation.goBack();
+        return;
+      }
       if (session) {
         setSessionStats(session.stats);
         // Load first tidbit
@@ -240,6 +259,7 @@ export default function StudySessionScreen({ route, navigation }) {
               flipAnim={flipAnim}
               onFlip={handleFlip}
               onAction={handleTidbitAction}
+              styles={styles}
             />
           ) : (
             <View style={styles.loadingContainer}>
@@ -253,11 +273,8 @@ export default function StudySessionScreen({ route, navigation }) {
 }
 
 // Study Tidbit Card Component
-function StudyTidbitCard({ tidbit, isFlipped, flipAnim, onFlip, onAction }) {
-  const categoryName = tidbit.category
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+function StudyTidbitCard({ tidbit, isFlipped, flipAnim, onFlip, onAction, styles }) {
+  const categoryName = formatCategoryName(tidbit.category);
 
   const frontOpacity = flipAnim.interpolate({
     inputRange: [0, 1],
@@ -284,10 +301,21 @@ function StudyTidbitCard({ tidbit, isFlipped, flipAnim, onFlip, onAction }) {
           activeOpacity={0.9}
           onPress={onFlip}
         >
-          <Text style={styles.tidbitText}>{tidbit.text}</Text>
-          <View style={styles.flipHint}>
-            <Text style={styles.flipHintText}>Tap to flip</Text>
-          </View>
+          {tidbit.term ? (
+            <>
+              <Text style={styles.termText}>{tidbit.term}</Text>
+              <View style={styles.flipHint}>
+                <Text style={styles.flipHintText}>Tap to reveal definition</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.tidbitText}>{tidbit.text}</Text>
+              <View style={styles.flipHint}>
+                <Text style={styles.flipHintText}>Tap to flip</Text>
+              </View>
+            </>
+          )}
         </TouchableOpacity>
       </Animated.View>
 
@@ -299,9 +327,18 @@ function StudyTidbitCard({ tidbit, isFlipped, flipAnim, onFlip, onAction }) {
         <View style={styles.cardHeader}>
           <Text style={styles.categoryLabel}>{categoryName}</Text>
         </View>
-        <View style={styles.actionsContainer}>
-          <Text style={styles.actionsTitle}>What did you think?</Text>
-          
+        <ScrollView
+          style={styles.actionsScroll}
+          contentContainerStyle={styles.actionsContainer}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+        >
+          {tidbit.term ? (
+            <View style={styles.definitionBox}>
+              <Text style={styles.definitionText}>{tidbit.text}</Text>
+            </View>
+          ) : null}
+
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonKnew]}
             onPress={() => onAction('knew')}
@@ -322,16 +359,16 @@ function StudyTidbitCard({ tidbit, isFlipped, flipAnim, onFlip, onAction }) {
           >
             <Text style={styles.flipBackText}>← Flip back</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </Animated.View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   content: {
     flex: 1,
@@ -340,7 +377,7 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
@@ -366,7 +403,7 @@ const styles = StyleSheet.create({
   },
   progressText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
     marginBottom: 8,
     textAlign: 'center',
     fontWeight: '500',
@@ -394,14 +431,14 @@ const styles = StyleSheet.create({
   cardContainer: {
     width: width - 40,
     maxWidth: 400,
-    height: 400,
+    height: 420,
   },
   card: {
     position: 'absolute',
     width: '100%',
     height: '100%',
     backfaceVisibility: 'hidden',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 20,
     padding: 24,
     shadowColor: '#000',
@@ -411,10 +448,10 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   cardFront: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
   },
   cardBack: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   cardHeader: {
     marginBottom: 16,
@@ -433,10 +470,40 @@ const styles = StyleSheet.create({
   tidbitText: {
     fontSize: 20,
     lineHeight: 32,
-    color: '#1f2937',
+    color: theme.text,
     fontWeight: '500',
     textAlign: 'center',
     marginBottom: 16,
+  },
+  termText: {
+    fontSize: 26,
+    lineHeight: 34,
+    color: theme.text,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 'auto',
+    marginTop: 'auto',
+    paddingVertical: 12,
+  },
+  definitionBox: {
+    backgroundColor: theme.primaryLight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.primary,
+  },
+  definitionText: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: theme.text,
+    fontWeight: '500',
+  },
+  actionsScroll: { flex: 1 },
+  actionsContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingVertical: 4,
   },
   flipHint: {
     marginTop: 'auto',
@@ -450,20 +517,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
-  actionsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  actionsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
   actionButton: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -485,7 +540,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     textAlign: 'center',
   },
   flipBackButton: {
@@ -503,18 +558,19 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   summaryContainer: {
     flex: 1,
     padding: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.background,
   },
   summaryTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 32,
   },
   summaryStats: {
@@ -525,7 +581,7 @@ const styles = StyleSheet.create({
   },
   summaryStatCard: {
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     minWidth: 100,
@@ -543,11 +599,11 @@ const styles = StyleSheet.create({
   },
   summaryStatLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
   },
   accuracyContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 24,
     width: '100%',
@@ -561,7 +617,7 @@ const styles = StyleSheet.create({
   },
   accuracyLabel: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
     marginBottom: 8,
   },
   accuracyValue: {
@@ -570,7 +626,7 @@ const styles = StyleSheet.create({
     color: '#10b981',
   },
   closeButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 12,
     padding: 16,
     width: '100%',

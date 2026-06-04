@@ -14,8 +14,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
 import { DeckService } from '../services/DeckService';
+import { ContentService } from '../services/ContentService';
 import { RecallService } from '../services/RecallService';
 import { SameBoatService } from '../services/SameBoatService';
+import { useTheme } from '../context/ThemeContext';
 
 // ─── Same-Boat banner ─────────────────────────────────────────────────────────
 
@@ -70,6 +72,7 @@ function DiffDisplay({ diff }) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function RecallScreen({ route, navigation }) {
+  const { theme } = useTheme();
   const { deckId, deckTitle } = route.params;
 
   const [cards, setCards] = useState([]);
@@ -86,8 +89,11 @@ export default function RecallScreen({ route, navigation }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    DeckService.listCards(deckId).then((c) => {
-      // Shuffle cards
+    const categoryId = ContentService.parseCategoryDeckId(deckId);
+    const load = categoryId
+      ? Promise.resolve(ContentService.getStudyCardsForCategory(categoryId))
+      : DeckService.listCards(deckId);
+    load.then((c) => {
       const shuffled = [...c].sort(() => Math.random() - 0.5);
       setCards(shuffled);
       setLoading(false);
@@ -223,7 +229,7 @@ export default function RecallScreen({ route, navigation }) {
   const answered = !!gradeResult;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => { Speech.stop(); navigation.goBack(); }}>

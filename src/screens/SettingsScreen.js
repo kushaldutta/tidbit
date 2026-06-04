@@ -488,7 +488,7 @@ export default function SettingsScreen({ navigation }) {
           style={styles.actionButton}
           onPress={() => navigation.navigate('Categories')}
         >
-          <Text style={styles.actionButtonText}>Manage Categories</Text>
+          <Text style={styles.actionButtonText}>Manage Classes & Categories</Text>
           <Text style={styles.chevron}>›</Text>
         </TouchableOpacity>
       </View>
@@ -706,10 +706,10 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.sectionTitle}>My Classes</Text>
         <TouchableOpacity
           style={styles.classesButton}
-          onPress={() => navigation.navigate('MyClasses')}
+          onPress={() => navigation.navigate('Categories')}
           activeOpacity={0.7}
         >
-          <Text style={styles.classesButtonText}>View &amp; Edit My Classes</Text>
+          <Text style={styles.classesButtonText}>View & Edit My Classes</Text>
           <Text style={styles.classesChevron}>›</Text>
         </TouchableOpacity>
       </View>

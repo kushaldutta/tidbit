@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeckService } from '../services/DeckService';
+import { ContentService } from '../services/ContentService';
 import { QuizService } from '../services/QuizService';
 import { SameBoatService } from '../services/SameBoatService';
+import { useTheme } from '../context/ThemeContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
@@ -83,6 +85,7 @@ function ConfidenceSlider({ value, onChange }) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function QuizScreen({ route, navigation }) {
+  const { theme } = useTheme();
   const { deckId, deckTitle } = route.params;
 
   const [questions, setQuestions] = useState([]);
@@ -97,7 +100,11 @@ export default function QuizScreen({ route, navigation }) {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    DeckService.listCards(deckId).then((cards) => {
+    const categoryId = ContentService.parseCategoryDeckId(deckId);
+    const load = categoryId
+      ? Promise.resolve(ContentService.getStudyCardsForCategory(categoryId))
+      : DeckService.listCards(deckId);
+    load.then((cards) => {
       setQuestions(QuizService.buildQuestions(cards));
       setLoading(false);
     });
@@ -172,7 +179,7 @@ export default function QuizScreen({ route, navigation }) {
   const answered = result !== null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>

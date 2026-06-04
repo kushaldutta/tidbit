@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
   Alert,
+  ScrollView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
@@ -333,14 +334,17 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
                     <Text style={styles.closeButtonText}>×</Text>
                   </TouchableOpacity>
                 </View>
-                <View style={styles.actionsContainer}>
+                <ScrollView
+                  style={styles.actionsScroll}
+                  contentContainerStyle={styles.actionsContainer}
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                >
                   {tidbit.term && (
                     <View style={styles.definitionBox}>
                       <Text style={styles.definitionText}>{tidbit.text}</Text>
                     </View>
                   )}
-                  <Text style={styles.actionsTitle}>What did you think?</Text>
-                  
                   <TouchableOpacity
                     style={[styles.actionButton, styles.actionButtonKnew]}
                     onPress={() => handleAction('knew')}
@@ -365,19 +369,12 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.actionButtonNext]}
-                    onPress={handleNextTidbit}
-                  >
-                    <Text style={styles.actionButtonText}>➡️ Reveal Next Tidbit Now</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
                     style={styles.flipBackButton}
                     onPress={handleFlip}
                   >
                     <Text style={styles.flipBackText}>← Flip back</Text>
                   </TouchableOpacity>
-                </View>
+                </ScrollView>
               </View>
             </Animated.View>
           </TouchableOpacity>
@@ -401,7 +398,8 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     width: '100%',
-    height: 400,
+    minHeight: 400,
+    maxHeight: '85%',
   },
   card: {
     position: 'absolute',
@@ -544,17 +542,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
+  actionsScroll: { flex: 1 },
   actionsContainer: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: 'center',
-    paddingVertical: 8,
-  },
-  actionsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937',
-    textAlign: 'center',
-    marginBottom: 24,
+    paddingVertical: 4,
   },
   actionButton: {
     backgroundColor: '#ffffff',
@@ -582,11 +574,6 @@ const styles = StyleSheet.create({
   actionButtonSave: {
     borderColor: '#6366f1',
     backgroundColor: '#eef2ff',
-  },
-  actionButtonNext: {
-    borderColor: '#8b5cf6',
-    backgroundColor: '#f5f3ff',
-    marginTop: 8,
   },
   actionButtonText: {
     fontSize: 16,

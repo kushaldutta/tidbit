@@ -363,11 +363,12 @@ export default function FeedScreen({ navigation }) {
 
       {/* Filter chips */}
       {groups.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-        >
+        <View style={styles.filterRowWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
           <TouchableOpacity
             style={[styles.filterChip, filterGroupId === null && styles.filterChipActive]}
             onPress={() => setFilterGroupId(null)}
@@ -388,6 +389,7 @@ export default function FeedScreen({ navigation }) {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        </View>
       )}
 
       {/* Feed */}
@@ -489,13 +491,15 @@ const makeStyles = (theme) => StyleSheet.create({
   composeBtnText: { color: '#fff', fontSize: 22, fontWeight: '300', lineHeight: 28 },
 
   // ── filter chips ──────────────────────────────────────────────────────────
+  filterRowWrapper: {
+    backgroundColor: theme.card,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
   filterRow: {
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
-    backgroundColor: theme.card,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
   },
   filterChip: {
     paddingHorizontal: 14,

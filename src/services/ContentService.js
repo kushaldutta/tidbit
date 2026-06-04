@@ -38,6 +38,7 @@ const FALLBACK_TIDBITS = {
   'data100': [],
   'econ100a': [],
   'econ100b': [],
+  'psych1': [],
   'agrs28': [],
   'math128a': [],
   'physics137a': [],
@@ -337,6 +338,52 @@ class ContentService {
     return TIDBITS[category] || [];
   }
 
+  static CATEGORY_DECK_PREFIX = 'category:';
+
+  static categoryDeckId(categoryId) {
+    return `${this.CATEGORY_DECK_PREFIX}${categoryId}`;
+  }
+
+  static parseCategoryDeckId(deckId) {
+    if (!deckId || !String(deckId).startsWith(this.CATEGORY_DECK_PREFIX)) return null;
+    return String(deckId).slice(this.CATEGORY_DECK_PREFIX.length);
+  }
+
+  /** Flashcard rows for Quiz / Recall / Match from bundled tidbit content. */
+  static getStudyCardsForCategory(categoryId) {
+    const items = this.getTidbitsByCategory(categoryId);
+    return items.map((item) => {
+      const text = typeof item === 'string' ? item : item?.text;
+      const term = typeof item === 'string' ? null : (item?.term || null);
+      if (!text?.trim()) return null;
+      const id = this.generateTidbitId(text, categoryId);
+      const deckId = this.categoryDeckId(categoryId);
+      if (term?.trim()) {
+        return { id, front: term.trim(), back: text.trim(), deck_id: deckId };
+      }
+      const trimmed = text.trim();
+      return { id, front: trimmed, back: trimmed, deck_id: deckId };
+    }).filter(Boolean);
+  }
+
+  /** Preset DB decks plus virtual decks when tidbits exist but no preset row. */
+  static buildClassStudyDecks(categoryIds, matchedPresets = []) {
+    const presetSlugs = new Set(matchedPresets.map((p) => p.slug).filter(Boolean));
+    const decks = [...matchedPresets];
+    for (const catId of categoryIds) {
+      if (presetSlugs.has(catId)) continue;
+      const count = this.getTidbitsByCategory(catId).length;
+      if (count === 0) continue;
+      decks.push({
+        id: this.categoryDeckId(catId),
+        title: this.formatCategoryName(catId),
+        card_count: count,
+        cover_emoji: '📚',
+      });
+    }
+    return decks.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+  }
+
   static async getRandomTidbit() {
     const selectedCategories = await StorageService.getSelectedCategories();
     
@@ -516,6 +563,7 @@ class ContentService {
       'econ-1': 'ECON 1',
       'econ100a': 'ECON 100A',
       'econ100b': 'ECON 100B',
+      'psych1': 'PSYCH 1',
       'agrs28': 'AGRS 28',
       'math128a': 'MATH 128A',
       'physics137a': 'PHYSICS 137A',
@@ -611,6 +659,7 @@ class ContentService {
       'econ-1': 'Introduction to Economics',
       'econ100a': 'Microeconomics',
       'econ100b': 'Macroeconomics',
+      'psych1': 'General Psychology',
       'agrs28': 'Greek and Roman Myths',
       'math128a': 'Numerical Analysis',
       'physics137a': 'Quantum Mechanics',

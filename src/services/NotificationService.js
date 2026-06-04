@@ -278,7 +278,7 @@ class NotificationService {
           body: JSON.stringify({
             token: pushToken,
             title: '📚 Tidbit',
-            body: tidbit.text,
+            body: tidbit.term ? `${tidbit.term}: ${tidbit.text}` : tidbit.text,
             data: {
               tidbit: JSON.stringify(tidbit),
               tidbitId: tidbit.id || null,

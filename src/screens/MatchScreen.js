@@ -27,6 +27,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeckService } from '../services/DeckService';
+import { ContentService } from '../services/ContentService';
+import { useTheme } from '../context/ThemeContext';
 
 const MAX_PAIRS = 8;
 
@@ -97,6 +99,7 @@ function Tile({ label, state, onPress }) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function MatchScreen({ route, navigation }) {
+  const { theme } = useTheme();
   const { deckId, deckTitle } = route.params;
 
   const [loading, setLoading] = useState(true);
@@ -115,7 +118,11 @@ export default function MatchScreen({ route, navigation }) {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    DeckService.listCards(deckId).then((cards) => {
+    const categoryId = ContentService.parseCategoryDeckId(deckId);
+    const load = categoryId
+      ? Promise.resolve(ContentService.getStudyCardsForCategory(categoryId))
+      : DeckService.listCards(deckId);
+    load.then((cards) => {
       setAllCards(cards);
       setLoading(false);
     });
@@ -223,7 +230,7 @@ export default function MatchScreen({ route, navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
