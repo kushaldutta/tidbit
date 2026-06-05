@@ -28,8 +28,9 @@ const CATEGORY_EMOJI = {
   'cs-61a': '💻', 'cs61b': '💻', 'cs61c': '⚙️', 'cs70': '🎲',
   'cs161': '🔐', 'cs188': '🤖', 'data100': '📊',
   econ100a: '📈', econ100b: '📈', 'physics137a': '⚛️',
-  'math128a': '🧮', 'math51': '🧮', 'math52': '🧮', 'math53': '🧮',
-  'nuc150': '☢️', 'nuc155': '☢️', 'agrs28': '📜',
+  'math128a': '🧮', 'math51': '🧮', 'math52': '🧮', 'math53': '🧮', 'math55': '🧮',
+  'nuc150': '☢️', 'nuc155': '☢️', 'agrs28': '📜', 'mcb102': '🔬',
+  'phys7a': '⚛️', 'phys7b': '⚛️', 'stat134': '📊',
 };
 
 async function main() {

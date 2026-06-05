@@ -14,7 +14,7 @@ import { EntitlementService } from '../services/EntitlementService';
 const FEATURES = [
   { emoji: '🤖', title: 'AI Deck Generation', desc: 'Describe a topic and get a full deck instantly' },
   { emoji: '📸', title: 'Snap-a-Page', desc: 'Photo your notes or textbook → instant flashcards' },
-  { emoji: '📊', title: 'Advanced Analytics', desc: 'Mastery curves, retention forecasting, weekly trends' },
+  { emoji: '📊', title: 'Analytics', desc: 'Mastery curves, retention forecasting, weekly trends' },
   { emoji: '🎨', title: 'Custom Themes', desc: 'Dark mode, warm, cool, and high-contrast themes' },
   { emoji: '♾️', title: 'Unlimited AI Generations', desc: 'No monthly cap on AI-powered deck creation' },
 ];

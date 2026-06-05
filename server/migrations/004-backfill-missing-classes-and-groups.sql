@@ -4,8 +4,8 @@
 
 -- ── Insert missing UC Berkeley classes ───────────────────────────────────────
 INSERT INTO public.classes (id, school_id, code, title, term, subject) VALUES
-  ('uc-berkeley:math51:fa26',  'uc-berkeley', 'MATH 51',  'Linear Algebra and Differential Equations',        'fa26', 'Mathematics'),
-  ('uc-berkeley:math52:fa26',  'uc-berkeley', 'MATH 52',  'Integral Calculus of Several Variables',           'fa26', 'Mathematics'),
+  ('uc-berkeley:math51:fa26',  'uc-berkeley', 'MATH 51',  'Calculus I',                                       'fa26', 'Mathematics'),
+  ('uc-berkeley:math52:fa26',  'uc-berkeley', 'MATH 52',  'Calculus II',                                      'fa26', 'Mathematics'),
   ('uc-berkeley:math128a:fa26','uc-berkeley', 'MATH 128A','Numerical Analysis',                               'fa26', 'Mathematics'),
   ('uc-berkeley:cs188:fa26',   'uc-berkeley', 'CS 188',   'Introduction to Artificial Intelligence',          'fa26', 'Computer Science'),
   ('uc-berkeley:cs161:fa26',   'uc-berkeley', 'CS 161',   'Computer Security',                                'fa26', 'Computer Science')

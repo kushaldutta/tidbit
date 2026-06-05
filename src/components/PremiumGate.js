@@ -74,7 +74,7 @@ export default function PremiumGate({ children, navigation, feature = 'This feat
         <Text style={styles.lockEmoji}>🔒</Text>
         <Text style={styles.lockedTitle}>Premium Feature</Text>
         <Text style={styles.lockedDesc}>
-          {feature} is part of Tidbit Premium. Upgrade to unlock AI generation, advanced analytics, custom themes, and more.
+          {feature} is part of Tidbit Premium. Upgrade to unlock AI generation, analytics, custom themes, and more.
         </Text>
         <TouchableOpacity
           style={styles.upgradeBtn}

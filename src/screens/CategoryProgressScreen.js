@@ -1,14 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { CategoryProgressService } from '../services/CategoryProgressService';
+import { useTheme } from '../context/ThemeContext';
 
-function ProgressCard({ item, onPress }) {
+function ProgressCard({ item, onPress, styles }) {
   const progress = item.total > 0 ? item.mastered / item.total : 0;
   const progressWidth = `${Math.min(100, Math.max(0, progress * 100))}%`;
 
   return (
-    <TouchableOpacity 
-      style={styles.card} 
+    <TouchableOpacity
+      style={styles.card}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -30,6 +31,9 @@ function ProgressCard({ item, onPress }) {
 }
 
 export default function CategoryProgressScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -73,9 +77,10 @@ export default function CategoryProgressScreen({ navigation }) {
         <Text style={styles.emptyText}>Select some categories to start tracking progress.</Text>
       ) : (
         items.map((item) => (
-          <ProgressCard 
-            key={item.categoryId} 
-            item={item} 
+          <ProgressCard
+            key={item.categoryId}
+            item={item}
+            styles={styles}
             onPress={() => navigation.navigate('CategoryDetail', { categoryId: item.categoryId })}
           />
         ))
@@ -84,8 +89,8 @@ export default function CategoryProgressScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   content: { padding: 20 },
   header: { marginTop: 36, marginBottom: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
@@ -93,23 +98,23 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   backText: {
     fontSize: 18,
-    color: '#374151',
+    color: theme.text,
     fontWeight: '600',
   },
   headerText: { flex: 1 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#1f2937', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#6b7280' },
-  loadingText: { marginTop: 16, color: '#6b7280', fontStyle: 'italic' },
-  emptyText: { marginTop: 16, color: '#6b7280' },
+  title: { fontSize: 28, fontWeight: 'bold', color: theme.text, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: theme.textSecondary },
+  loadingText: { marginTop: 16, color: theme.textSecondary, fontStyle: 'italic' },
+  emptyText: { marginTop: 16, color: theme.textSecondary },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -120,18 +125,16 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  cardTitle: { fontSize: 16, fontWeight: '600', color: '#1f2937' },
-  cardPercent: { fontSize: 16, fontWeight: '700', color: '#6366f1' },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: theme.text },
+  cardPercent: { fontSize: 16, fontWeight: '700', color: theme.primary },
   progressBar: {
     height: 8,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.primaryLight,
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 10,
   },
-  progressFill: { height: '100%', backgroundColor: '#6366f1' },
+  progressFill: { height: '100%', backgroundColor: theme.primary },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  metaText: { fontSize: 12, color: '#6b7280' },
+  metaText: { fontSize: 12, color: theme.textSecondary },
 });
-
-

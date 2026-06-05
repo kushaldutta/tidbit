@@ -451,15 +451,15 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.premiumBannerArrow}>›</Text>
       </TouchableOpacity>
 
-      {/* Advanced Analytics entry */}
+      {/* Analytics shortcut */}
       <TouchableOpacity
         style={styles.analyticsBtn}
-        onPress={() => navigation.navigate('AdvancedStats')}
+        onPress={() => navigation.navigate('Stats')}
         activeOpacity={0.85}
       >
         <Text style={styles.analyticsBtnEmoji}>📊</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.analyticsBtnTitle}>Advanced Analytics</Text>
+          <Text style={styles.analyticsBtnTitle}>Analytics</Text>
           <Text style={styles.analyticsBtnSub}>Retention forecast, accuracy trends, study modes</Text>
         </View>
         <Text style={styles.premiumBannerArrow}>›</Text>

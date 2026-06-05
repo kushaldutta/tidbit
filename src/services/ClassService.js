@@ -8,6 +8,7 @@ const CLASS_TO_CATEGORY = {
   // UC Berkeley — only classes with dedicated tidbit content
   'uc-berkeley:math53:fa26':   'math53',
   'uc-berkeley:math54:fa26':   'math-54',
+  'uc-berkeley:math55:fa26':   'math55',
   'uc-berkeley:math51:fa26':   'math51',
   'uc-berkeley:math52:fa26':   'math52',
   'uc-berkeley:math128a:fa26': 'math128a',
@@ -23,23 +24,59 @@ const CLASS_TO_CATEGORY = {
   'uc-berkeley:econ100a:fa26': 'econ100a',
   'uc-berkeley:econ100b:fa26': 'econ100b',
   'uc-berkeley:psych1:fa26':      'psych1',
+  'uc-berkeley:mcb102:fa26':      'mcb102',
+  'uc-berkeley:phys7a:fa26':      'phys7a',
+  'uc-berkeley:phys7b:fa26':      'phys7b',
   'uc-berkeley:physics137a:fa26': 'physics137a',
   'uc-berkeley:nuc150:fa26':      'nuc150',
   'uc-berkeley:nuc155:fa26':      'nuc155',
+  'uc-berkeley:stat134:fa26':     'stat134',
   'uc-berkeley:agrs28:fa26':      'agrs28',
-  // Bio, Chem, Physics intro/AP classes intentionally omitted — no dedicated content yet
+  'uc-berkeley:bio1a:fa26':       'bio1a',
+  'uc-berkeley:bio1b:fa26':       'bio1b',
+  'uc-berkeley:chem1a:fa26':      'chem1a',
+  'uc-berkeley:chem1b:fa26':      'chem1b',
+  'uc-berkeley:eecs16a:fa26':     'eecs16a',
+  'uc-berkeley:eecs16b:fa26':     'eecs16b',
+  // Other intro/AP classes omitted until dedicated content exists
 };
+
+/** Parse trailing course number (and letter suffix) for numeric sort, e.g. MATH 128A → 128. */
+function courseNumberSortKey(code) {
+  const match = String(code).match(/(\d+)\s*([A-Za-z]*)$/);
+  if (!match) return { num: Number.MAX_SAFE_INTEGER, suffix: code, code };
+  return { num: parseInt(match[1], 10), suffix: (match[2] || '').toUpperCase(), code };
+}
+
+function compareClassesByCourseCode(a, b) {
+  const ka = courseNumberSortKey(a.code);
+  const kb = courseNumberSortKey(b.code);
+  if (ka.num !== kb.num) return ka.num - kb.num;
+  if (ka.suffix !== kb.suffix) return ka.suffix.localeCompare(kb.suffix);
+  return ka.code.localeCompare(kb.code);
+}
+
+/** Sort by subject (A–Z), then course number ascending within each subject. */
+function sortClassesForDisplay(classes) {
+  const bySubject = {};
+  classes.forEach((c) => {
+    const subject = c.subject || 'Other';
+    if (!bySubject[subject]) bySubject[subject] = [];
+    bySubject[subject].push(c);
+  });
+  return Object.keys(bySubject)
+    .sort((a, b) => a.localeCompare(b))
+    .flatMap((subject) => bySubject[subject].sort(compareClassesByCourseCode));
+}
 
 // Fallback class list used when the DB isn't seeded yet or network is unavailable.
 const FALLBACK_CLASSES = {
-  'uc-berkeley': [
-    { id: 'uc-berkeley:math1a:fa26',   code: 'MATH 1A',    title: 'Calculus',                                          subject: 'Mathematics' },
-    { id: 'uc-berkeley:math1b:fa26',   code: 'MATH 1B',    title: 'Calculus',                                          subject: 'Mathematics' },
+  'uc-berkeley': sortClassesForDisplay([
+    { id: 'uc-berkeley:math51:fa26',   code: 'MATH 51',    title: 'Calculus I',                                        subject: 'Mathematics' },
+    { id: 'uc-berkeley:math52:fa26',   code: 'MATH 52',    title: 'Calculus II',                                       subject: 'Mathematics' },
     { id: 'uc-berkeley:math53:fa26',   code: 'MATH 53',    title: 'Multivariable Calculus',                            subject: 'Mathematics' },
     { id: 'uc-berkeley:math54:fa26',   code: 'MATH 54',    title: 'Linear Algebra and Differential Equations',         subject: 'Mathematics' },
     { id: 'uc-berkeley:math55:fa26',   code: 'MATH 55',    title: 'Discrete Mathematics',                              subject: 'Mathematics' },
-    { id: 'uc-berkeley:math51:fa26',   code: 'MATH 51',    title: 'Linear Algebra and Differential Equations',         subject: 'Mathematics' },
-    { id: 'uc-berkeley:math52:fa26',   code: 'MATH 52',    title: 'Integral Calculus of Several Variables',            subject: 'Mathematics' },
     { id: 'uc-berkeley:math128a:fa26', code: 'MATH 128A',  title: 'Numerical Analysis',                                subject: 'Mathematics' },
     { id: 'uc-berkeley:cs61a:fa26',    code: 'CS 61A',     title: 'Structure and Interpretation of Computer Programs', subject: 'Computer Science' },
     { id: 'uc-berkeley:cs61b:fa26',    code: 'CS 61B',     title: 'Data Structures and Algorithms',                    subject: 'Computer Science' },
@@ -67,7 +104,7 @@ const FALLBACK_CLASSES = {
     { id: 'uc-berkeley:econ100b:fa26', code: 'ECON 100B',  title: 'Macroeconomic Theory',                              subject: 'Economics' },
     { id: 'uc-berkeley:mcb102:fa26',   code: 'MCB 102',    title: 'Biochemistry and Molecular Biology',                subject: 'Molecular Biology' },
     { id: 'uc-berkeley:psych1:fa26',   code: 'PSYCH 1',    title: 'General Psychology',                                subject: 'Psychology' },
-  ],
+  ]),
   'high-school-ap': [
     { id: 'hs-ap:ap_calc_ab:ap26',  code: 'AP Calc AB',      title: 'AP Calculus AB',                        subject: 'Mathematics' },
     { id: 'hs-ap:ap_calc_bc:ap26',  code: 'AP Calc BC',      title: 'AP Calculus BC',                        subject: 'Mathematics' },
@@ -110,7 +147,7 @@ class ClassService {
           .eq('school_id', schoolId)
           .order('subject')
           .order('code');
-        if (!error && data && data.length > 0) return data;
+        if (!error && data && data.length > 0) return sortClassesForDisplay(data);
       } catch (e) {
         console.warn('[ClassService] DB fetch failed, using fallback:', e.message);
       }

@@ -3,8 +3,8 @@
 
 -- ── UC Berkeley (Fall 2026) ──────────────────────────────────────────────────
 INSERT INTO public.classes (id, school_id, code, title, term, subject) VALUES
-  ('uc-berkeley:math1a:fa26',   'uc-berkeley', 'MATH 1A',   'Calculus',                                        'fa26', 'Mathematics'),
-  ('uc-berkeley:math1b:fa26',   'uc-berkeley', 'MATH 1B',   'Calculus',                                        'fa26', 'Mathematics'),
+  ('uc-berkeley:math51:fa26',   'uc-berkeley', 'MATH 51',   'Calculus I',                                      'fa26', 'Mathematics'),
+  ('uc-berkeley:math52:fa26',   'uc-berkeley', 'MATH 52',   'Calculus II',                                     'fa26', 'Mathematics'),
   ('uc-berkeley:math53:fa26',   'uc-berkeley', 'MATH 53',   'Multivariable Calculus',                          'fa26', 'Mathematics'),
   ('uc-berkeley:math54:fa26',   'uc-berkeley', 'MATH 54',   'Linear Algebra and Differential Equations',       'fa26', 'Mathematics'),
   ('uc-berkeley:math55:fa26',   'uc-berkeley', 'MATH 55',   'Discrete Mathematics',                            'fa26', 'Mathematics'),

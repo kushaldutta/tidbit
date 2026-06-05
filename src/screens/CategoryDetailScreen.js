@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { CategoryProgressService } from '../services/CategoryProgressService';
-import { ContentService } from '../services/ContentService';
 import { StudyPlanService } from '../services/StudyPlanService';
+import { useTheme } from '../context/ThemeContext';
 
 export default function CategoryDetailScreen({ route, navigation }) {
   const { categoryId } = route.params || {};
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const [progress, setProgress] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,16 +32,12 @@ export default function CategoryDetailScreen({ route, navigation }) {
 
   const handleStudyCategory = async () => {
     if (!categoryId) return;
-    
+
     try {
-      // Generate a session filtered to this category
       const tidbits = await StudyPlanService.generateSessionTidbits(10, [categoryId]);
-      
       if (!tidbits || tidbits.length === 0) {
-        // Show error or fallback
         return;
       }
-
       navigation.navigate('StudySession', { tidbits });
     } catch (error) {
       console.error('[CATEGORY_DETAIL] Error starting study session:', error);
@@ -82,7 +81,6 @@ export default function CategoryDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* Mastery Card */}
       <View style={styles.statCard}>
         <Text style={styles.statNumber}>{masteryPercent}%</Text>
         <Text style={styles.statLabel}>Mastery</Text>
@@ -91,7 +89,6 @@ export default function CategoryDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <View style={styles.statBox}>
           <Text style={styles.statBoxNumber}>{progress.total}</Text>
@@ -111,7 +108,6 @@ export default function CategoryDetailScreen({ route, navigation }) {
         </View>
       </View>
 
-      {/* Due Section */}
       {progress.due > 0 && (
         <View style={styles.dueCard}>
           <Text style={styles.dueTitle}>📋 {progress.due} tidbits due for review</Text>
@@ -119,12 +115,10 @@ export default function CategoryDetailScreen({ route, navigation }) {
         </View>
       )}
 
-      {/* Study Button */}
       <TouchableOpacity style={styles.studyButton} onPress={handleStudyCategory}>
         <Text style={styles.studyButtonText}>📚 Study This Category</Text>
       </TouchableOpacity>
 
-      {/* Info Section */}
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>About This Category</Text>
         <Text style={styles.infoText}>
@@ -136,10 +130,10 @@ export default function CategoryDetailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
   },
   content: {
     padding: 20,
@@ -156,14 +150,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   backText: {
     fontSize: 18,
-    color: '#374151',
+    color: theme.text,
     fontWeight: '600',
   },
   headerText: {
@@ -172,20 +166,20 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
   },
   statCard: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#6366f1',
+    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -225,7 +219,7 @@ const styles = StyleSheet.create({
   },
   statBox: {
     width: '48%',
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -239,40 +233,40 @@ const styles = StyleSheet.create({
   statBoxNumber: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#6366f1',
+    color: theme.primary,
     marginBottom: 4,
   },
   statBoxLabel: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   dueCard: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: theme.primaryLight,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
+    borderLeftColor: theme.primary,
   },
   dueTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#92400e',
+    color: theme.text,
     marginBottom: 4,
   },
   dueSubtext: {
     fontSize: 14,
-    color: '#78350f',
+    color: theme.textSecondary,
   },
   studyButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#6366f1',
+    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -284,7 +278,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   infoCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
@@ -297,24 +291,23 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     marginBottom: 12,
   },
   infoText: {
     fontSize: 14,
     lineHeight: 22,
-    color: '#4b5563',
+    color: theme.textSecondary,
   },
   loadingText: {
     marginTop: 32,
-    color: '#6b7280',
+    color: theme.textSecondary,
     fontStyle: 'italic',
     textAlign: 'center',
   },
   emptyText: {
     marginTop: 32,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
   },
 });
-

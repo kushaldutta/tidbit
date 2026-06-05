@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
-function ProgressRow({ item, onPress }) {
+function ProgressRow({ item, onPress, styles }) {
   const progress = item.total > 0 ? item.mastered / item.total : 0;
   const progressWidth = `${Math.min(100, Math.max(0, progress * 100))}%`;
 
   return (
-    <TouchableOpacity 
-      style={styles.row} 
+    <TouchableOpacity
+      style={styles.row}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -26,6 +27,9 @@ function ProgressRow({ item, onPress }) {
 }
 
 export default function CategoryProgressPreview({ items, onViewAll, onCategoryPress }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -37,9 +41,10 @@ export default function CategoryProgressPreview({ items, onViewAll, onCategoryPr
 
       {items?.length ? (
         items.map((item) => (
-          <ProgressRow 
-            key={item.categoryId} 
-            item={item} 
+          <ProgressRow
+            key={item.categoryId}
+            item={item}
+            styles={styles}
             onPress={() => onCategoryPress?.(item.categoryId)}
           />
         ))
@@ -50,9 +55,9 @@ export default function CategoryProgressPreview({ items, onViewAll, onCategoryPr
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -68,20 +73,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  title: { fontSize: 18, fontWeight: '600', color: '#1f2937' },
-  viewAll: { fontSize: 14, fontWeight: '600', color: '#6366f1' },
+  title: { fontSize: 18, fontWeight: '600', color: theme.text },
+  viewAll: { fontSize: 14, fontWeight: '600', color: theme.primary },
   row: { marginTop: 10 },
   rowHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  rowTitle: { fontSize: 14, fontWeight: '600', color: '#1f2937' },
-  rowRight: { fontSize: 12, color: '#6b7280' },
+  rowTitle: { fontSize: 14, fontWeight: '600', color: theme.text },
+  rowRight: { fontSize: 12, color: theme.textSecondary },
   progressBar: {
     height: 6,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.primaryLight,
     borderRadius: 3,
     overflow: 'hidden',
   },
-  progressFill: { height: '100%', backgroundColor: '#6366f1' },
-  emptyText: { marginTop: 8, color: '#6b7280', fontStyle: 'italic' },
+  progressFill: { height: '100%', backgroundColor: theme.primary },
+  emptyText: { marginTop: 8, color: theme.textSecondary, fontStyle: 'italic' },
 });
-
-

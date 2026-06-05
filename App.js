@@ -39,7 +39,6 @@ import LearnSummaryScreen from './src/screens/LearnSummaryScreen';
 import PaywallScreen from './src/screens/PaywallScreen';
 import AIGenerationScreen from './src/screens/AIGenerationScreen';
 import SnapPageScreen from './src/screens/SnapPageScreen';
-import AdvancedStatsScreen from './src/screens/AdvancedStatsScreen';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import ThemePickerScreen from './src/screens/ThemePickerScreen';
 import TidbitModal from './src/components/TidbitModal';
@@ -653,7 +652,6 @@ export default function App() {
         <Stack.Screen name="Paywall" component={PaywallScreen} options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="AIGeneration" component={AIGenerationScreen} options={{ headerShown: false }} />
         <Stack.Screen name="SnapPage" component={SnapPageScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="AdvancedStats" component={AdvancedStatsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ThemePicker" component={ThemePickerScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     );

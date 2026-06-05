@@ -311,15 +311,6 @@ export default function HomeScreen({ navigation }) {
         </View>
       )}
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>How it works</Text>
-        <Text style={styles.infoText}>
-          Every time you unlock your phone, Tidbit shows you a quick, interesting fact
-          from your selected categories. Each tidbit takes less than 3 seconds to read
-          and can be dismissed instantly.
-        </Text>
-      </View>
-
       <View style={styles.categoriesPreview}>
         <Text style={styles.sectionTitle}>Your Categories</Text>
         {selectedCategories.length > 0 ? (
@@ -465,28 +456,6 @@ const makeStyles = (theme) => StyleSheet.create({
     color: theme.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  infoCard: {
-    backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  infoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.text,
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: theme.textSecondary,
   },
   categoriesPreview: {
     backgroundColor: theme.card,
