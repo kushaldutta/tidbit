@@ -721,7 +721,7 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.aboutLabel}>App Name:</Text> Tidbit
           </Text>
           <Text style={styles.aboutText}>
-            <Text style={styles.aboutLabel}>Version:</Text> 1.0.1
+            <Text style={styles.aboutLabel}>Version:</Text> 2.0.0
           </Text>
           <Text style={styles.aboutText}>
             <Text style={styles.aboutLabel}>Description:</Text> Learn tiny things daily through bite-sized notifications and interactive learning.
