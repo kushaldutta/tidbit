@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EntitlementService } from '../services/EntitlementService';
 
+const ENTITLEMENT_ID = 'Tidbit - Never Cram Again! Premium';
+
 const FEATURES = [
   { emoji: '🤖', title: 'AI Deck Generation', desc: 'Describe a topic and get a full deck instantly' },
   { emoji: '📸', title: 'Snap-a-Page', desc: 'Photo your notes or textbook → instant flashcards' },
@@ -19,13 +21,24 @@ const FEATURES = [
   { emoji: '♾️', title: 'Unlimited AI Generations', desc: 'No monthly cap on AI-powered deck creation' },
 ];
 
+function findPackage(offering, type, identifier) {
+  if (!offering) return null;
+  if (type === 'monthly' && offering.monthly) return offering.monthly;
+  if (type === 'yearly' && offering.annual) return offering.annual;
+  const packages = offering.availablePackages ?? [];
+  return packages.find(
+    (p) => p.packageType === (type === 'monthly' ? 'MONTHLY' : 'ANNUAL')
+      || p.identifier === identifier,
+  ) ?? null;
+}
+
 export default function PaywallScreen({ navigation, route }) {
   const [offering, setOffering] = useState(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('monthly');
 
-  // Optional: called after successful purchase
   const onSuccess = route?.params?.onSuccess;
 
   useEffect(() => {
@@ -35,18 +48,34 @@ export default function PaywallScreen({ navigation, route }) {
     });
   }, []);
 
-  const monthlyPackage = offering?.monthly ?? offering?.availablePackages?.[0] ?? null;
-  const priceString = monthlyPackage?.product?.priceString ?? '$2.99';
+  const monthlyPackage = useMemo(
+    () => findPackage(offering, 'monthly', '$rc_monthly'),
+    [offering],
+  );
+  const yearlyPackage = useMemo(
+    () => findPackage(offering, 'yearly', '$rc_annual'),
+    [offering],
+  );
+
+  useEffect(() => {
+    if (monthlyPackage) setSelectedPlan('monthly');
+    else if (yearlyPackage) setSelectedPlan('yearly');
+  }, [monthlyPackage, yearlyPackage]);
+
+  const selectedPackage = selectedPlan === 'yearly' ? yearlyPackage : monthlyPackage;
+
+  const monthlyPrice = monthlyPackage?.product?.priceString ?? '$2.99';
+  const yearlyPrice = yearlyPackage?.product?.priceString ?? null;
 
   const handlePurchase = async () => {
-    if (!monthlyPackage) {
+    if (!selectedPackage) {
       Alert.alert('Not available', 'Purchases are not available right now. Try again later.');
       return;
     }
     setPurchasing(true);
     try {
-      const info = await EntitlementService.purchasePackage(monthlyPackage);
-      const isActive = info.entitlements.active['Tidbit - Never Cram Again! Premium'] !== undefined;
+      const info = await EntitlementService.purchasePackage(selectedPackage);
+      const isActive = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
       if (isActive) {
         Alert.alert('Welcome to Premium! 🎉', 'Your subscription is now active.', [
           {
@@ -59,7 +88,7 @@ export default function PaywallScreen({ navigation, route }) {
         ]);
       }
     } catch (err) {
-      if (err?.userCancelled) return; // user dismissed sheet — don't show error
+      if (err?.userCancelled) return;
       Alert.alert('Purchase failed', err.message || 'Something went wrong. Please try again.');
     } finally {
       setPurchasing(false);
@@ -84,9 +113,44 @@ export default function PaywallScreen({ navigation, route }) {
     }
   };
 
+  const renderPlanOption = (plan, label, price, period, badge) => {
+    const available = plan === 'monthly' ? monthlyPackage : yearlyPackage;
+    if (!available && !loading) return null;
+
+    const isSelected = selectedPlan === plan;
+    const displayPrice = price ?? (plan === 'monthly' ? '$2.99' : '—');
+
+    return (
+      <TouchableOpacity
+        key={plan}
+        style={[styles.planCard, isSelected && styles.planCardSelected]}
+        onPress={() => setSelectedPlan(plan)}
+        activeOpacity={0.85}
+        disabled={!available}
+      >
+        <View style={styles.planHeader}>
+          <View style={[styles.planRadio, isSelected && styles.planRadioSelected]}>
+            {isSelected ? <View style={styles.planRadioDot} /> : null}
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={styles.planTitleRow}>
+              <Text style={styles.planLabel}>{label}</Text>
+              {badge ? (
+                <View style={styles.planBadge}>
+                  <Text style={styles.planBadgeText}>{badge}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.planPeriod}>{period}</Text>
+          </View>
+          <Text style={styles.planPrice}>{displayPrice}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.closeBtn}>
           <Text style={styles.closeText}>✕</Text>
@@ -94,7 +158,6 @@ export default function PaywallScreen({ navigation, route }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Hero */}
         <View style={styles.hero}>
           <Text style={styles.heroEmoji}>✨</Text>
           <Text style={styles.heroTitle}>Tidbit Premium</Text>
@@ -103,7 +166,6 @@ export default function PaywallScreen({ navigation, route }) {
           </Text>
         </View>
 
-        {/* Feature list */}
         <View style={styles.featureList}>
           {FEATURES.map((f) => (
             <View key={f.title} style={styles.featureRow}>
@@ -116,28 +178,30 @@ export default function PaywallScreen({ navigation, route }) {
           ))}
         </View>
 
-        {/* Price + CTA */}
         <View style={styles.ctaWrap}>
           {loading ? (
             <ActivityIndicator color="#6366f1" style={{ marginVertical: 24 }} />
           ) : (
             <>
-              <View style={styles.priceRow}>
-                <Text style={styles.price}>{priceString}</Text>
-                <Text style={styles.pricePer}> / month</Text>
+              <Text style={styles.plansHeading}>Choose a plan</Text>
+              <View style={styles.plansList}>
+                {renderPlanOption('monthly', 'Monthly', monthlyPrice, 'Billed every month')}
+                {renderPlanOption('yearly', 'Yearly', yearlyPrice, 'Billed once a year', 'Best value')}
               </View>
               <Text style={styles.priceNote}>Cancel anytime. No commitment.</Text>
 
               <TouchableOpacity
-                style={[styles.subscribeBtn, purchasing && styles.subscribeBtnDisabled]}
+                style={[styles.subscribeBtn, (purchasing || !selectedPackage) && styles.subscribeBtnDisabled]}
                 onPress={handlePurchase}
-                disabled={purchasing}
+                disabled={purchasing || !selectedPackage}
                 activeOpacity={0.85}
               >
                 {purchasing ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.subscribeBtnText}>Start Premium →</Text>
+                  <Text style={styles.subscribeBtnText}>
+                    Start Premium {selectedPlan === 'yearly' ? '(Yearly)' : '(Monthly)'} →
+                  </Text>
                 )}
               </TouchableOpacity>
             </>
@@ -194,20 +258,52 @@ const styles = StyleSheet.create({
   featureDesc: { fontSize: 13, color: '#a5b4fc', lineHeight: 18 },
 
   ctaWrap: { alignItems: 'center' },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 },
-  price: { fontSize: 40, fontWeight: '900', color: '#fff' },
-  pricePer: { fontSize: 18, color: '#a5b4fc', fontWeight: '500' },
+  plansHeading: {
+    alignSelf: 'stretch', fontSize: 14, fontWeight: '700',
+    color: '#a5b4fc', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  plansList: { alignSelf: 'stretch', gap: 12, marginBottom: 16 },
+  planCard: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  planCardSelected: {
+    borderColor: '#6366f1',
+    backgroundColor: 'rgba(99,102,241,0.15)',
+  },
+  planHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  planRadio: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: '#6b7280',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  planRadioSelected: { borderColor: '#6366f1' },
+  planRadioDot: {
+    width: 12, height: 12, borderRadius: 6, backgroundColor: '#6366f1',
+  },
+  planTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  planLabel: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  planBadge: {
+    backgroundColor: '#6366f1', borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  planBadgeText: { fontSize: 10, fontWeight: '800', color: '#fff', textTransform: 'uppercase' },
+  planPeriod: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  planPrice: { fontSize: 18, fontWeight: '800', color: '#fff' },
   priceNote: { fontSize: 13, color: '#6b7280', marginBottom: 24 },
 
   subscribeBtn: {
     backgroundColor: '#6366f1', borderRadius: 18,
-    paddingVertical: 18, paddingHorizontal: 48,
+    paddingVertical: 18, paddingHorizontal: 24,
     width: '100%', alignItems: 'center', marginBottom: 16,
     shadowColor: '#6366f1', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.5, shadowRadius: 16, elevation: 8,
   },
   subscribeBtnDisabled: { opacity: 0.6 },
-  subscribeBtnText: { color: '#fff', fontWeight: '800', fontSize: 18 },
+  subscribeBtnText: { color: '#fff', fontWeight: '800', fontSize: 17 },
 
   restoreBtn: { paddingVertical: 12, marginBottom: 20 },
   restoreText: { color: '#6b7280', fontSize: 14, fontWeight: '500' },
