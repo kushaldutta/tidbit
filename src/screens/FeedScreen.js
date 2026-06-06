@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -301,9 +301,9 @@ export default function FeedScreen({ navigation }) {
   const [filterGroupId, setFilterGroupId] = useState(null); // null = All
   const [composeVisible, setComposeVisible] = useState(false);
 
-  const load = useCallback(async (isRefresh = false) => {
+  const load = useCallback(async (isRefresh = false, silent = false) => {
     if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    else if (!silent) setLoading(true);
     try {
       const [feedPosts, myGroups] = await Promise.all([
         FeedService.getHomeFeed(),
@@ -320,6 +320,11 @@ export default function FeedScreen({ navigation }) {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useEffect(() => {
+    const unsubscribe = FeedService.subscribeToFeedUpdates(() => load(false, true));
+    return unsubscribe;
+  }, [load]);
 
   const handleReact = async (postId, kind, hasReacted) => {
     setPosts((prev) =>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -136,9 +136,9 @@ export default function GroupScreen({ route, navigation }) {
   const [posting, setPosting] = useState(false);
   const inputRef = useRef(null);
 
-  const load = useCallback(async (isRefresh = false) => {
+  const load = useCallback(async (isRefresh = false, silent = false) => {
     if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    else if (!silent) setLoading(true);
     try {
       const [cm, dk, ps, live] = await Promise.all([
         GroupService.getClassmates(classId),
@@ -159,6 +159,14 @@ export default function GroupScreen({ route, navigation }) {
   }, [classId, groupId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useEffect(() => {
+    const unsubscribe = FeedService.subscribeToFeedUpdates(
+      () => load(false, true),
+      { groupId },
+    );
+    return unsubscribe;
+  }, [groupId, load]);
 
   const handlePost = async () => {
     const text = draftText.trim();

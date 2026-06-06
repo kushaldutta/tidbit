@@ -1,7 +1,61 @@
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 
+function debounceCallback(fn, ms = 400) {
+  let timer = null;
+  return () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      fn();
+    }, ms);
+  };
+}
+
 class FeedService {
+  /**
+   * Subscribe to live feed updates (new posts, reactions). RLS limits events to
+   * groups the signed-in user can read. Returns an unsubscribe function.
+   * Pass groupId to scope post events to one class group (still listens for all reactions).
+   */
+  static subscribeToFeedUpdates(onUpdate, { groupId, pollIntervalMs = 15000 } = {}) {
+    if (!SUPABASE_CONFIGURED) return () => {};
+
+    const userId = AuthService.getUserId();
+    if (!userId) return () => {};
+
+    const notify = debounceCallback(onUpdate);
+    const channelName = groupId ? `feed:group:${groupId}` : `feed:home:${userId}`;
+    const channel = supabase.channel(channelName);
+
+    const postFilter = groupId ? { filter: `group_id=eq.${groupId}` } : {};
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'feed_posts', ...postFilter },
+      notify,
+    );
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'reactions' },
+      notify,
+    );
+
+    channel.subscribe((status, err) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[FeedService] realtime subscription error:', err?.message || status);
+      }
+    });
+
+    const pollTimer = pollIntervalMs > 0
+      ? setInterval(notify, pollIntervalMs)
+      : null;
+
+    return () => {
+      if (pollTimer) clearInterval(pollTimer);
+      supabase.removeChannel(channel);
+    };
+  }
+
   /**
    * Fetch the 30 most-recent posts for a group, newest first.
    * Each post is enriched with author display name and an array of reactions.
