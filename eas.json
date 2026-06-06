@@ -16,7 +16,11 @@
         "simulator": false
       }
     },
-    "production": {}
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_REVENUECAT_IOS_KEY": "appl_RzrijUtWTFDmRluOoLGhCjYgzQF"
+      }
+    }
   },
   "submit": {
     "production": {}
