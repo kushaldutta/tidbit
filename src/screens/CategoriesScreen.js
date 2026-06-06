@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { ClassService } from '../services/ClassService';
 import { ProfileService } from '../services/ProfileService';
 import { useTheme } from '../context/ThemeContext';
@@ -116,6 +117,7 @@ export default function CategoriesScreen() {
   const styles = makeStyles(theme);
 
   const [catalogSchoolId, setCatalogSchoolId] = useState(DEFAULT_SCHOOL_ID);
+  const [profileSchoolId, setProfileSchoolId] = useState(DEFAULT_SCHOOL_ID);
   const [catalogClasses, setCatalogClasses] = useState([]);
   const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [enrolledIds, setEnrolledIds] = useState(new Set());
@@ -151,6 +153,7 @@ export default function CategoriesScreen() {
     try {
       const profile = await ProfileService.getMyProfile();
       const defaultSchool = profile?.school_id || DEFAULT_SCHOOL_ID;
+      setProfileSchoolId(defaultSchool);
       setCatalogSchoolId(defaultSchool);
       await loadEnrollments();
       await loadCatalog(defaultSchool, { silent: true });
@@ -161,7 +164,11 @@ export default function CategoriesScreen() {
     }
   }, [loadCatalog, loadEnrollments]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const handleCatalogChange = useCallback((schoolId) => {
     setCatalogSchoolId(schoolId);
@@ -222,6 +229,7 @@ export default function CategoriesScreen() {
           value={catalogSchoolId}
           onChange={handleCatalogChange}
           theme={theme}
+          preferredSchoolId={profileSchoolId}
         />
       </View>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   SectionList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { ClassService } from '../services/ClassService';
 import { ProfileService } from '../services/ProfileService';
 import { useTheme } from '../context/ThemeContext';
@@ -20,6 +21,7 @@ export default function MyClassesScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const [catalogSchoolId, setCatalogSchoolId] = useState(DEFAULT_SCHOOL_ID);
+  const [profileSchoolId, setProfileSchoolId] = useState(DEFAULT_SCHOOL_ID);
   const [catalogClasses, setCatalogClasses] = useState([]);
   const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [enrolledIds, setEnrolledIds] = useState(new Set());
@@ -54,6 +56,7 @@ export default function MyClassesScreen({ navigation }) {
     try {
       const profile = await ProfileService.getMyProfile();
       const defaultSchool = profile?.school_id || DEFAULT_SCHOOL_ID;
+      setProfileSchoolId(defaultSchool);
       setCatalogSchoolId(defaultSchool);
       await Promise.all([loadEnrollments(), loadCatalog(defaultSchool)]);
     } catch (e) {
@@ -63,7 +66,11 @@ export default function MyClassesScreen({ navigation }) {
     }
   }, [loadCatalog, loadEnrollments]);
 
-  useEffect(() => { load(); }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const handleCatalogChange = useCallback((schoolId) => {
     setCatalogSchoolId(schoolId);
@@ -176,6 +183,7 @@ export default function MyClassesScreen({ navigation }) {
           value={catalogSchoolId}
           onChange={handleCatalogChange}
           theme={theme}
+          preferredSchoolId={profileSchoolId}
         />
       </View>
 

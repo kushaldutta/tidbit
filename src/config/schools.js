@@ -24,6 +24,13 @@ export function getSchool(schoolId) {
   return SCHOOLS.find((s) => s.id === schoolId) || SCHOOLS[0];
 }
 
+/** Profile school first in segmented catalog toggles. */
+export function schoolsForCatalog(preferredSchoolId) {
+  const preferred = SCHOOLS.find((s) => s.id === preferredSchoolId);
+  if (!preferred) return SCHOOLS;
+  return [preferred, ...SCHOOLS.filter((s) => s.id !== preferred.id)];
+}
+
 /** Infer catalog from a class id prefix when school_id is unavailable. */
 export function schoolIdForClassId(classId) {
   if (!classId) return DEFAULT_SCHOOL_ID;

@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { SCHOOLS } from '../config/schools';
+import { schoolsForCatalog, DEFAULT_SCHOOL_ID } from '../config/schools';
 
-export default function CatalogSegmentedControl({ value, onChange, theme }) {
+export default function CatalogSegmentedControl({ value, onChange, theme, preferredSchoolId }) {
   const styles = makeStyles(theme);
+  const schools = useMemo(
+    () => schoolsForCatalog(preferredSchoolId || DEFAULT_SCHOOL_ID),
+    [preferredSchoolId]
+  );
 
   return (
     <View style={styles.row}>
-      {SCHOOLS.map((school) => {
+      {schools.map((school) => {
         const active = value === school.id;
         return (
           <TouchableOpacity
