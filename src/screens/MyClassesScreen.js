@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  FlatList,
   ActivityIndicator,
   Alert,
   SectionList,
@@ -14,53 +13,74 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClassService } from '../services/ClassService';
 import { ProfileService } from '../services/ProfileService';
 import { useTheme } from '../context/ThemeContext';
+import CatalogSegmentedControl from '../components/CatalogSegmentedControl';
+import { DEFAULT_SCHOOL_ID, getSchool, schoolIdForClassId } from '../config/schools';
 
 export default function MyClassesScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const [allClasses, setAllClasses] = useState([]);
+  const [catalogSchoolId, setCatalogSchoolId] = useState(DEFAULT_SCHOOL_ID);
+  const [catalogClasses, setCatalogClasses] = useState([]);
+  const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [enrolledIds, setEnrolledIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(null); // classId being toggled
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [saving, setSaving] = useState(null);
   const [query, setQuery] = useState('');
-  const [schoolId, setSchoolId] = useState('uc-berkeley');
+
+  const catalogSchool = getSchool(catalogSchoolId);
+
+  const loadEnrollments = useCallback(async () => {
+    const ids = await ClassService.getMyClassIds();
+    setEnrolledIds(new Set(ids));
+    const enrolled = await ClassService.getClassesByIds(ids);
+    setEnrolledClasses(enrolled);
+  }, []);
+
+  const loadCatalog = useCallback(async (schoolId) => {
+    setCatalogLoading(true);
+    try {
+      const classes = await ClassService.listBySchool(schoolId);
+      setCatalogClasses(classes);
+    } catch (e) {
+      Alert.alert('Error loading classes', e.message);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const profile = await ProfileService.getMyProfile();
-      const sid = profile?.school_id || 'uc-berkeley';
-      setSchoolId(sid);
-      const [classes, ids] = await Promise.all([
-        ClassService.listBySchool(sid),
-        ClassService.getMyClassIds(),
-      ]);
-      setAllClasses(classes);
-      setEnrolledIds(new Set(ids));
+      const defaultSchool = profile?.school_id || DEFAULT_SCHOOL_ID;
+      setCatalogSchoolId(defaultSchool);
+      await Promise.all([loadEnrollments(), loadCatalog(defaultSchool)]);
     } catch (e) {
       Alert.alert('Error loading classes', e.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadCatalog, loadEnrollments]);
 
   useEffect(() => { load(); }, [load]);
 
+  const handleCatalogChange = useCallback((schoolId) => {
+    setCatalogSchoolId(schoolId);
+    setQuery('');
+    loadCatalog(schoolId);
+  }, [loadCatalog]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allClasses;
-    return allClasses.filter(
+    if (!q) return catalogClasses;
+    return catalogClasses.filter(
       (c) =>
         c.code.toLowerCase().includes(q) ||
         c.title.toLowerCase().includes(q) ||
         (c.subject || '').toLowerCase().includes(q)
     );
-  }, [allClasses, query]);
-
-  const enrolled = useMemo(
-    () => allClasses.filter((c) => enrolledIds.has(c.id)),
-    [allClasses, enrolledIds]
-  );
+  }, [catalogClasses, query]);
 
   const sections = useMemo(() => {
     const grouped = {};
@@ -81,16 +101,24 @@ export default function MyClassesScreen({ navigation }) {
     try {
       if (isEnrolled) {
         await ClassService.leaveClass(id);
-        setEnrolledIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+        const next = new Set(enrolledIds);
+        next.delete(id);
+        setEnrolledIds(next);
+        setEnrolledClasses((prev) => prev.filter((c) => c.id !== id));
+        await ClassService.replaceCategoriesToEnrollment([...next]);
       } else {
         await ClassService.joinClasses([id]);
         const next = new Set([...enrolledIds, id]);
         setEnrolledIds(next);
-        // Auto-select the matching content category if one exists
+        setEnrolledClasses((prev) => {
+          if (prev.some((c) => c.id === id)) return prev;
+          return [...prev, classItem];
+        });
         await ClassService.syncCategoriesToEnrollment([...next]);
       }
     } catch (e) {
       Alert.alert('Error', e.message || 'Could not update class.');
+      await loadEnrollments();
     } finally {
       setSaving(null);
     }
@@ -99,6 +127,7 @@ export default function MyClassesScreen({ navigation }) {
   const renderClassRow = ({ item }) => {
     const enrolled = enrolledIds.has(item.id);
     const isLoading = saving === item.id;
+    const hasContent = ClassService.hasTidbitContent(item.id);
     return (
       <TouchableOpacity
         style={[styles.row, enrolled && styles.rowEnrolled]}
@@ -107,9 +136,16 @@ export default function MyClassesScreen({ navigation }) {
         activeOpacity={0.7}
       >
         <View style={styles.rowInfo}>
-          <Text style={[styles.rowCode, enrolled && styles.rowCodeEnrolled]}>
-            {item.code}
-          </Text>
+          <View style={styles.rowTitleLine}>
+            <Text style={[styles.rowCode, enrolled && styles.rowCodeEnrolled]}>
+              {item.code}
+            </Text>
+            {!hasContent && (
+              <View style={styles.soonBadge}>
+                <Text style={styles.soonBadgeText}>Soon</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
         </View>
         {isLoading ? (
@@ -123,46 +159,55 @@ export default function MyClassesScreen({ navigation }) {
     );
   };
 
+  const showCatalogSpinner = loading || catalogLoading;
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>My Classes</Text>
-        <Text style={styles.subtitle}>
-          {schoolId === 'uc-berkeley' ? 'UC Berkeley' : 'High School (AP)'} · tap to add or remove
-        </Text>
+        <Text style={styles.subtitle}>{catalogSchool.browseSubtitle}</Text>
       </View>
 
-      {/* Enrolled summary chips */}
-      {!loading && enrolled.length > 0 && (
+      <View style={styles.segmentWrap}>
+        <CatalogSegmentedControl
+          value={catalogSchoolId}
+          onChange={handleCatalogChange}
+          theme={theme}
+        />
+      </View>
+
+      {!loading && enrolledClasses.length > 0 && (
         <View style={styles.enrolledSection}>
           <Text style={styles.enrolledLabel}>
-            Enrolled ({enrolled.length})
+            Enrolled ({enrolledClasses.length})
           </Text>
           <View style={styles.chipRow}>
-            {enrolled.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={styles.chip}
-                onPress={() => toggle(c)}
-                disabled={saving === c.id}
-              >
-                <Text style={styles.chipText}>{c.code}</Text>
-                <Text style={styles.chipX}> ×</Text>
-              </TouchableOpacity>
-            ))}
+            {enrolledClasses.map((c) => {
+              const school = getSchool(c.school_id || schoolIdForClassId(c.id));
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.chip}
+                  onPress={() => toggle(c)}
+                  disabled={saving === c.id}
+                >
+                  <Text style={styles.chipEmoji}>{school.emoji}</Text>
+                  <Text style={styles.chipText}>{c.code}</Text>
+                  <Text style={styles.chipX}> ×</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       )}
 
-      {/* Search */}
       <View style={styles.searchWrapper}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search classes…"
+          placeholder={catalogSchool.searchPlaceholder}
           placeholderTextColor="#9ca3af"
           value={query}
           onChangeText={setQuery}
@@ -171,8 +216,7 @@ export default function MyClassesScreen({ navigation }) {
         />
       </View>
 
-      {/* Class list */}
-      {loading ? (
+      {showCatalogSpinner ? (
         <ActivityIndicator style={{ flex: 1 }} color="#6366f1" />
       ) : (
         <SectionList
@@ -203,9 +247,11 @@ const makeStyles = (theme) => StyleSheet.create({
   title: { fontSize: 26, fontWeight: '700', color: theme.text },
   subtitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
 
+  segmentWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+
   enrolledSection: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 4,
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
@@ -229,6 +275,7 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#c7d2fe',
   },
+  chipEmoji: { fontSize: 12, marginRight: 4 },
   chipText: { fontSize: 13, color: '#4338ca', fontWeight: '600' },
   chipX: { fontSize: 14, color: '#818cf8', fontWeight: '700' },
 
@@ -267,9 +314,15 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   rowEnrolled: { backgroundColor: '#eef2ff', borderColor: '#6366f1' },
   rowInfo: { flex: 1, marginRight: 12 },
+  rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   rowCode: { fontSize: 15, fontWeight: '600', color: theme.text },
   rowCodeEnrolled: { color: '#4338ca' },
   rowTitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+  soonBadge: {
+    backgroundColor: '#fef3c7', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  soonBadgeText: { fontSize: 10, fontWeight: '700', color: '#b45309' },
 
   checkbox: {
     width: 24, height: 24, borderRadius: 6,

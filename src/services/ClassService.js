@@ -1,6 +1,7 @@
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 import { StorageService } from './StorageService';
+import { AP_CLASS_TO_CATEGORY, apCourseHasLiveContent } from '../config/courseCatalog';
 
 // Maps class IDs → content category IDs in ContentService.
 // Only includes classes that have matching preset content.
@@ -38,7 +39,7 @@ const CLASS_TO_CATEGORY = {
   'uc-berkeley:chem1b:fa26':      'chem1b',
   'uc-berkeley:eecs16a:fa26':     'eecs16a',
   'uc-berkeley:eecs16b:fa26':     'eecs16b',
-  // Other intro/AP classes omitted until dedicated content exists
+  ...AP_CLASS_TO_CATEGORY,
 };
 
 /** Parse trailing course number (and letter suffix) for numeric sort, e.g. MATH 128A → 128. */
@@ -143,7 +144,7 @@ class ClassService {
       try {
         const { data, error } = await supabase
           .from('classes')
-          .select('id, code, title, subject')
+          .select('id, code, title, subject, school_id')
           .eq('school_id', schoolId)
           .order('subject')
           .order('code');
@@ -153,6 +154,34 @@ class ClassService {
       }
     }
     return FALLBACK_CLASSES[schoolId] || [];
+  }
+
+  /** Fetch class metadata for specific ids (enrollments across catalogs). */
+  static async getClassesByIds(classIds) {
+    if (!classIds?.length) return [];
+    const unique = [...new Set(classIds)];
+
+    if (SUPABASE_CONFIGURED) {
+      try {
+        const { data, error } = await supabase
+          .from('classes')
+          .select('id, code, title, subject, school_id')
+          .in('id', unique);
+        if (!error && data?.length) return sortClassesForDisplay(data);
+      } catch (e) {
+        console.warn('[ClassService] getClassesByIds DB fetch failed:', e.message);
+      }
+    }
+
+    const fallback = Object.values(FALLBACK_CLASSES).flat();
+    return sortClassesForDisplay(fallback.filter((c) => unique.includes(c.id)));
+  }
+
+  /** Whether preset tidbit content is live for this class (enrollment works regardless). */
+  static hasTidbitContent(classId) {
+    if (!CLASS_TO_CATEGORY[classId]) return false;
+    if (AP_CLASS_TO_CATEGORY[classId]) return apCourseHasLiveContent(classId);
+    return true;
   }
 
   /** Get class IDs the current user has already joined. */

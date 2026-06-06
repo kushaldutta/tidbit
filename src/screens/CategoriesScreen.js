@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Animated,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -14,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClassService } from '../services/ClassService';
 import { ProfileService } from '../services/ProfileService';
 import { useTheme } from '../context/ThemeContext';
+import CatalogSegmentedControl from '../components/CatalogSegmentedControl';
+import { DEFAULT_SCHOOL_ID, getSchool, schoolIdForClassId } from '../config/schools';
 
 const SUBJECT_EMOJI = {
   'Computer Science':  '💻',
@@ -37,8 +38,6 @@ const SUBJECT_EMOJI = {
   'Science':           '🔬',
   'Art':               '🎨',
 };
-
-// ─── Collapsible subject section ──────────────────────────────────────────────
 
 function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle, query }) {
   const { theme } = useTheme();
@@ -76,6 +75,7 @@ function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle
           {filtered.map((cls) => {
             const active = enrolledIds.has(cls.id);
             const isLoading = saving === cls.id;
+            const hasContent = ClassService.hasTidbitContent(cls.id);
             return (
               <TouchableOpacity
                 key={cls.id}
@@ -85,7 +85,14 @@ function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle
                 activeOpacity={0.7}
               >
                 <View style={styles.catInfo}>
-                  <Text style={[styles.catName, active && styles.catNameActive]}>{cls.code}</Text>
+                  <View style={styles.catTitleRow}>
+                    <Text style={[styles.catName, active && styles.catNameActive]}>{cls.code}</Text>
+                    {!hasContent && (
+                      <View style={styles.soonBadge}>
+                        <Text style={styles.soonBadgeText}>Soon</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={styles.catDesc} numberOfLines={1}>{cls.title}</Text>
                 </View>
                 {isLoading ? (
@@ -104,37 +111,63 @@ function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle
   );
 }
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
-
-export default function CategoriesScreen({ navigation }) {
+export default function CategoriesScreen() {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
 
-  const [allClasses, setAllClasses] = useState([]);
+  const [catalogSchoolId, setCatalogSchoolId] = useState(DEFAULT_SCHOOL_ID);
+  const [catalogClasses, setCatalogClasses] = useState([]);
+  const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [enrolledIds, setEnrolledIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [saving, setSaving] = useState(null);
   const [query, setQuery] = useState('');
+
+  const catalogSchool = getSchool(catalogSchoolId);
+
+  const loadEnrollments = useCallback(async () => {
+    const myIds = await ClassService.getMyClassIds();
+    setEnrolledIds(new Set(myIds));
+    const enrolled = await ClassService.getClassesByIds(myIds);
+    setEnrolledClasses(enrolled);
+    return myIds;
+  }, []);
+
+  const loadCatalog = useCallback(async (schoolId, { silent = false } = {}) => {
+    if (!silent) setCatalogLoading(true);
+    try {
+      const classes = await ClassService.listBySchool(schoolId);
+      setCatalogClasses(classes);
+    } catch (e) {
+      Alert.alert('Error loading classes', e.message);
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const profile = await ProfileService.getMyProfile();
-      const schoolId = profile?.school_id || 'uc-berkeley';
-      const [classes, myIds] = await Promise.all([
-        ClassService.listBySchool(schoolId),
-        ClassService.getMyClassIds(),
-      ]);
-      setAllClasses(classes);
-      setEnrolledIds(new Set(myIds));
+      const defaultSchool = profile?.school_id || DEFAULT_SCHOOL_ID;
+      setCatalogSchoolId(defaultSchool);
+      await loadEnrollments();
+      await loadCatalog(defaultSchool, { silent: true });
     } catch (e) {
       Alert.alert('Error loading classes', e.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadCatalog, loadEnrollments]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleCatalogChange = useCallback((schoolId) => {
+    setCatalogSchoolId(schoolId);
+    setQuery('');
+    loadCatalog(schoolId);
+  }, [loadCatalog]);
 
   const toggle = useCallback(async (cls) => {
     const isEnrolled = enrolledIds.has(cls.id);
@@ -145,75 +178,85 @@ export default function CategoriesScreen({ navigation }) {
         const next = new Set(enrolledIds);
         next.delete(cls.id);
         setEnrolledIds(next);
+        setEnrolledClasses((prev) => prev.filter((c) => c.id !== cls.id));
         await ClassService.replaceCategoriesToEnrollment([...next]);
       } else {
         await ClassService.joinClasses([cls.id]);
         const next = new Set([...enrolledIds, cls.id]);
         setEnrolledIds(next);
+        setEnrolledClasses((prev) => {
+          if (prev.some((c) => c.id === cls.id)) return prev;
+          return [...prev, cls];
+        });
         await ClassService.replaceCategoriesToEnrollment([...next]);
       }
     } catch (e) {
       Alert.alert('Error', e.message || 'Could not update class.');
+      await loadEnrollments();
     } finally {
       setSaving(null);
     }
-  }, [enrolledIds]);
+  }, [enrolledIds, loadEnrollments]);
 
-  // Group by subject, sorted alphabetically
   const sections = useMemo(() => {
     const grouped = {};
-    allClasses.forEach((c) => {
+    catalogClasses.forEach((c) => {
       const s = c.subject || 'Other';
       if (!grouped[s]) grouped[s] = [];
       grouped[s].push(c);
     });
     return Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b));
-  }, [allClasses]);
+  }, [catalogClasses]);
 
-  const enrolledList = useMemo(
-    () => allClasses.filter((c) => enrolledIds.has(c.id)),
-    [allClasses, enrolledIds]
-  );
+  const showCatalogSpinner = loading || catalogLoading;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Classes</Text>
-        <Text style={styles.subtitle}>
-          Select classes to receive tidbits and join study groups.
-        </Text>
+        <Text style={styles.subtitle}>{catalogSchool.browseSubtitle}</Text>
       </View>
 
-      {/* Enrolled chips */}
-      {enrolledList.length > 0 && (
+      <View style={styles.segmentWrap}>
+        <CatalogSegmentedControl
+          value={catalogSchoolId}
+          onChange={handleCatalogChange}
+          theme={theme}
+        />
+      </View>
+
+      {enrolledClasses.length > 0 && (
         <View style={styles.selectedSection}>
-          <Text style={styles.selectedLabel}>Enrolled ({enrolledList.length})</Text>
+          <Text style={styles.selectedLabel}>Enrolled ({enrolledClasses.length})</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chipScroll}
           >
-            {enrolledList.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={styles.chip}
-                onPress={() => toggle(c)}
-                disabled={saving === c.id}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.chipText}>{c.code}</Text>
-                <Text style={styles.chipX}> ×</Text>
-              </TouchableOpacity>
-            ))}
+            {enrolledClasses.map((c) => {
+              const school = getSchool(c.school_id || schoolIdForClassId(c.id));
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  style={styles.chip}
+                  onPress={() => toggle(c)}
+                  disabled={saving === c.id}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.chipEmoji}>{school.emoji}</Text>
+                  <Text style={styles.chipText}>{c.code}</Text>
+                  <Text style={styles.chipX}> ×</Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
       )}
 
-      {/* Search */}
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search classes…"
+          placeholder={catalogSchool.searchPlaceholder}
           placeholderTextColor="#9ca3af"
           value={query}
           onChangeText={setQuery}
@@ -222,8 +265,7 @@ export default function CategoriesScreen({ navigation }) {
         />
       </View>
 
-      {/* Subject sections */}
-      {loading ? (
+      {showCatalogSpinner ? (
         <ActivityIndicator style={{ flex: 1 }} color="#6366f1" />
       ) : (
         <ScrollView
@@ -253,6 +295,10 @@ export default function CategoriesScreen({ navigation }) {
             />
           ))}
 
+          {sections.length === 0 && (
+            <Text style={styles.emptyCatalog}>No classes found.</Text>
+          )}
+
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
@@ -267,9 +313,11 @@ const makeStyles = (theme) => StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: theme.text },
   subtitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
 
+  segmentWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+
   selectedSection: {
     paddingHorizontal: 20,
-    paddingTop: 8,
+    paddingTop: 4,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f3f4f6',
@@ -285,6 +333,7 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingVertical: 6, paddingHorizontal: 13,
     borderWidth: 1, borderColor: '#c7d2fe',
   },
+  chipEmoji: { fontSize: 12, marginRight: 4 },
   chipText: { fontSize: 13, color: '#4338ca', fontWeight: '600' },
   chipX: { fontSize: 14, color: '#818cf8', fontWeight: '700' },
 
@@ -306,6 +355,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   emptyHintEmoji: { fontSize: 30, marginBottom: 8 },
   emptyHintText: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', paddingHorizontal: 20 },
+  emptyCatalog: { textAlign: 'center', color: theme.textSecondary, marginTop: 24, fontSize: 14 },
 
   deptSection: {
     backgroundColor: theme.card, borderRadius: 16,
@@ -334,9 +384,15 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   catRowActive: { backgroundColor: '#f5f3ff' },
   catInfo: { flex: 1, paddingRight: 12 },
+  catTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   catName: { fontSize: 14, fontWeight: '600', color: theme.text },
   catNameActive: { color: '#4338ca' },
   catDesc: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  soonBadge: {
+    backgroundColor: '#fef3c7', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  soonBadgeText: { fontSize: 10, fontWeight: '700', color: '#b45309' },
   check: {
     width: 24, height: 24, borderRadius: 12,
     borderWidth: 2, borderColor: '#d1d5db',

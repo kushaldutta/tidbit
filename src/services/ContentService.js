@@ -2,6 +2,7 @@ import { StorageService } from './StorageService';
 import { SpacedRepetitionService } from './SpacedRepetitionService';
 import API_CONFIG from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AP_CATEGORY_BY_ID, AP_CATEGORY_IDS } from '../config/courseCatalog';
 
 /**
  * Generate a stable hash-based ID for a tidbit
@@ -552,7 +553,8 @@ class ContentService {
   }
 
   static getAvailableCategories() {
-    return Object.keys(TIDBITS).map(key => ({
+    const ids = new Set([...Object.keys(TIDBITS), ...AP_CATEGORY_IDS]);
+    return [...ids].map((key) => ({
       id: key,
       name: this.formatCategoryName(key),
       description: this.getCategoryDescription(key),
@@ -560,6 +562,9 @@ class ContentService {
   }
 
   static formatCategoryName(categoryId) {
+    const apMeta = AP_CATEGORY_BY_ID[categoryId];
+    if (apMeta) return apMeta.name;
+
     const names = {
       'math-54': 'MATH 54',
       'cs-61a': 'CS 61A',
@@ -667,6 +672,9 @@ class ContentService {
   }
 
   static getCategoryDescription(categoryId) {
+    const apMeta = AP_CATEGORY_BY_ID[categoryId];
+    if (apMeta) return apMeta.description;
+
     const descriptions = {
       'math-54': 'Linear algebra and differential equations',
       'cs-61a': 'Structure and Interpretation of Computer Programs',

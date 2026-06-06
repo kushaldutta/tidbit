@@ -14,11 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../../services/AuthService';
 import { ProfileService } from '../../services/ProfileService';
-
-const SCHOOLS = [
-  { id: 'uc-berkeley', name: 'UC Berkeley', type: 'college' },
-  { id: 'high-school-ap', name: 'High School (AP)', type: 'highschool' },
-];
+import { SCHOOLS } from '../../config/schools';
 
 const currentYear = new Date().getFullYear();
 const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => String(currentYear + i));
@@ -114,7 +110,7 @@ export default function OnboardingProfileScreen({ navigation }) {
                     schoolId === s.id && styles.optionChipTextActive,
                   ]}
                 >
-                  {s.name}
+                  {s.label}
                 </Text>
               </TouchableOpacity>
             ))}
