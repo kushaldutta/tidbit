@@ -19,6 +19,8 @@ import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
 import { ContentService } from '../services/ContentService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
+import { ProfileService } from '../services/ProfileService';
+import { getSchool } from '../config/schools';
 import * as Notifications from 'expo-notifications';
 
 const INTERVAL_OPTIONS = [
@@ -47,18 +49,30 @@ export default function SettingsScreen({ navigation }) {
     savedTidbits: 0,
     masteredTidbits: 0,
   });
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     loadSettings();
     loadSpacedRepStats();
+    loadProfile();
     
     // Refresh stats when screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
       loadSpacedRepStats();
+      loadProfile();
     });
     
     return unsubscribe;
   }, [navigation]);
+
+  const loadProfile = async () => {
+    try {
+      const data = await ProfileService.getMyProfile();
+      setProfile(data);
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
 
   const loadSpacedRepStats = async () => {
     try {
@@ -271,12 +285,39 @@ export default function SettingsScreen({ navigation }) {
     );
   }
 
+  const profileInitial = (profile?.display_name || '?').trim().charAt(0).toUpperCase() || '?';
+  const schoolLabel = profile?.school_id ? getSchool(profile.school_id).label : null;
+  const profileSubtitle = [schoolLabel, profile?.grad_year ? `Class of ${profile.grad_year}` : null]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Manage your notification preferences</Text>
+        <Text style={styles.subtitle}>Manage your account and preferences</Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.profileCard}
+        onPress={() => navigation.navigate('EditProfile')}
+        activeOpacity={0.85}
+      >
+        <View style={styles.profileAvatar}>
+          <Text style={styles.profileAvatarText}>{profileInitial}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.profileName}>
+            {profile?.display_name?.trim() || 'Set up your profile'}
+          </Text>
+          {profileSubtitle ? (
+            <Text style={styles.profileSub}>{profileSubtitle}</Text>
+          ) : (
+            <Text style={styles.profileSub}>Add your name and school</Text>
+          )}
+        </View>
+        <Text style={styles.profileChevron}>›</Text>
+      </TouchableOpacity>
 
       <View style={styles.section}>
         <View style={styles.settingRow}>
@@ -833,6 +874,45 @@ const makeStyles = (theme) => StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: theme.textSecondary,
+  },
+  profileCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: theme.primaryLight,
+  },
+  profileAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profileAvatarText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.primary,
+  },
+  profileName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: theme.text,
+    marginBottom: 2,
+  },
+  profileSub: {
+    fontSize: 13,
+    color: theme.textSecondary,
+  },
+  profileChevron: {
+    fontSize: 24,
+    color: '#9ca3af',
+    fontWeight: '600',
   },
   section: {
     backgroundColor: theme.card,
