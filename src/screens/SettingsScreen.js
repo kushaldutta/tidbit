@@ -52,7 +52,7 @@ export default function SettingsScreen({ navigation }) {
     masteredTidbits: 0,
   });
   const [profile, setProfile] = useState(null);
-  const [notificationDecks, setNotificationDecks] = useState({ classDecks: [], myDecks: [] });
+  const [notificationDecks, setNotificationDecks] = useState({ classSources: [], myDecks: [] });
   const [decksLoading, setDecksLoading] = useState(false);
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function SettingsScreen({ navigation }) {
     try {
       await NotificationDeckService.ensureDefaultsFromEnrollment();
       const data = await NotificationDeckService.listAvailableDecks();
-      setNotificationDecks({ classDecks: data.classDecks, myDecks: data.myDecks });
+      setNotificationDecks({ classSources: data.classSources, myDecks: data.myDecks });
     } catch (error) {
       console.error('Error loading notification decks:', error);
     } finally {
@@ -96,6 +96,16 @@ export default function SettingsScreen({ navigation }) {
       loadNotificationDecks();
     }, [loadNotificationDecks])
   );
+
+  const handleClassNotificationToggle = async (classId, enabled) => {
+    await NotificationDeckService.toggleClassNotification(classId, enabled);
+    setNotificationDecks((prev) => ({
+      ...prev,
+      classSources: prev.classSources.map((s) =>
+        s.classId === classId ? { ...s, selected: enabled } : s
+      ),
+    }));
+  };
 
   const handleDeckToggle = async (deckId, enabled) => {
     await NotificationDeckService.toggleDeck(deckId, enabled);
@@ -514,27 +524,29 @@ export default function SettingsScreen({ navigation }) {
       )}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Notification decks</Text>
+        <Text style={styles.sectionTitle}>Notification sources</Text>
         <Text style={styles.sectionDescription}>
-          Choose which class and custom decks can appear in your tidbit notifications throughout the day.
+          Choose which enrolled classes and personal decks can appear in your tidbit notifications.
         </Text>
         {decksLoading ? (
-          <Text style={styles.deckEmptyText}>Loading decks…</Text>
+          <Text style={styles.deckEmptyText}>Loading…</Text>
         ) : (
           <>
-            {notificationDecks.classDecks.length > 0 && (
+            {notificationDecks.classSources.length > 0 && (
               <>
-                <Text style={styles.deckGroupLabel}>Class decks</Text>
-                {notificationDecks.classDecks.map((deck) => (
-                  <View key={deck.id} style={styles.deckRow}>
-                    <Text style={styles.deckEmoji}>{deck.emoji}</Text>
+                <Text style={styles.deckGroupLabel}>Class preset decks</Text>
+                {notificationDecks.classSources.map((source) => (
+                  <View key={source.classId} style={styles.deckRow}>
+                    <Text style={styles.deckEmoji}>{source.emoji}</Text>
                     <View style={styles.deckInfo}>
-                      <Text style={styles.deckTitle}>{deck.title}</Text>
-                      <Text style={styles.deckSub}>{deck.cardCount} cards</Text>
+                      <Text style={styles.deckTitle}>{source.title}</Text>
+                      <Text style={styles.deckSub} numberOfLines={1}>
+                        {source.subtitle} · {source.deckCards} card{source.deckCards === 1 ? '' : 's'}
+                      </Text>
                     </View>
                     <Switch
-                      value={deck.selected}
-                      onValueChange={(v) => handleDeckToggle(deck.id, v)}
+                      value={source.selected}
+                      onValueChange={(v) => handleClassNotificationToggle(source.classId, v)}
                       trackColor={{ false: '#e5e7eb', true: theme.primary }}
                       thumbColor="#ffffff"
                     />
@@ -544,7 +556,7 @@ export default function SettingsScreen({ navigation }) {
             )}
             {notificationDecks.myDecks.length > 0 && (
               <>
-                <Text style={[styles.deckGroupLabel, notificationDecks.classDecks.length > 0 && { marginTop: 16 }]}>
+                <Text style={[styles.deckGroupLabel, notificationDecks.classSources.length > 0 && { marginTop: 16 }]}>
                   My decks
                 </Text>
                 {notificationDecks.myDecks.map((deck) => (
@@ -564,10 +576,10 @@ export default function SettingsScreen({ navigation }) {
                 ))}
               </>
             )}
-            {notificationDecks.classDecks.length === 0 &&
+            {notificationDecks.classSources.length === 0 &&
               notificationDecks.myDecks.length === 0 && (
               <Text style={styles.deckEmptyText}>
-                Enroll in classes or create decks with cards to enable notification sources.
+                Enroll in classes on the Categories tab or create decks with cards to enable notification sources.
               </Text>
             )}
           </>

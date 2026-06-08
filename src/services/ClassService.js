@@ -237,6 +237,10 @@ class ClassService {
     return [...cats];
   }
 
+  static getCategoryForClass(classId) {
+    return CLASS_TO_CATEGORY[classId] || null;
+  }
+
   /**
    * After joining/leaving classes, sync the selectedCategories in AsyncStorage
    * so the Categories tab and notification system reflect the enrollment.
@@ -245,8 +249,10 @@ class ClassService {
   static async syncCategoriesToEnrollment(enrolledClassIds) {
     const newCats = this.categoryIdsForClasses(enrolledClassIds);
     if (newCats.length === 0) return;
+    const disabled = new Set(await StorageService.getNotificationDisabledCategories());
     const existing = (await StorageService.getSelectedCategories()) || [];
-    const merged = Array.from(new Set([...existing, ...newCats]));
+    const toAdd = newCats.filter((c) => !disabled.has(c));
+    const merged = Array.from(new Set([...existing, ...toAdd]));
     await StorageService.setSelectedCategories(merged);
     const { NotificationDeckService } = require('./NotificationDeckService');
     await NotificationDeckService.syncPresetsToEnrollment(enrolledClassIds);
@@ -260,8 +266,14 @@ class ClassService {
    * immediately reflected in the Home screen and notification system.
    */
   static async replaceCategoriesToEnrollment(enrolledClassIds) {
-    const cats = this.categoryIdsForClasses(enrolledClassIds);
-    await StorageService.setSelectedCategories(cats);
+    const enrolledCats = this.categoryIdsForClasses(enrolledClassIds);
+    const disabled = (await StorageService.getNotificationDisabledCategories()).filter((c) =>
+      enrolledCats.includes(c)
+    );
+    await StorageService.setNotificationDisabledCategories(disabled);
+    const disabledSet = new Set(disabled);
+    const next = enrolledCats.filter((c) => !disabledSet.has(c));
+    await StorageService.setSelectedCategories(next);
     const { NotificationDeckService } = require('./NotificationDeckService');
     await NotificationDeckService.syncPresetsToEnrollment(enrolledClassIds);
     const { NotificationService } = require('./NotificationService');

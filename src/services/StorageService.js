@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEYS = {
   SELECTED_CATEGORIES: 'selected_categories',
   SELECTED_DECK_IDS: 'selected_deck_ids',
+  NOTIFICATION_DISABLED_CATEGORIES: 'notification_disabled_categories',
   TIDBITS_SEEN: 'tidbits_seen',
   DAILY_UNLOCKS: 'daily_unlocks',
   LAST_UNLOCK_DATE: 'last_unlock_date',
@@ -61,6 +62,27 @@ class StorageService {
       await AsyncStorage.setItem(KEYS.SELECTED_DECK_IDS, JSON.stringify(deckIds));
     } catch (error) {
       console.error('Error setting selected deck ids:', error);
+    }
+  }
+
+  static async getNotificationDisabledCategories() {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.NOTIFICATION_DISABLED_CATEGORIES);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting notification disabled categories:', error);
+      return [];
+    }
+  }
+
+  static async setNotificationDisabledCategories(categoryIds) {
+    try {
+      await AsyncStorage.setItem(
+        KEYS.NOTIFICATION_DISABLED_CATEGORIES,
+        JSON.stringify(categoryIds)
+      );
+    } catch (error) {
+      console.error('Error setting notification disabled categories:', error);
     }
   }
 
