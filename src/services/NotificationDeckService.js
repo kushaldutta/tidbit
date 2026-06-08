@@ -28,15 +28,8 @@ class NotificationDeckService {
 
   /** Preset system decks for enrolled classes (slug = content category). */
   static presetDeckIdsForClasses(classIds, presets) {
-    const categoryIds = new Set(ClassService.categoryIdsForClasses(classIds));
-    const enrolled = new Set(classIds);
-    return (presets || [])
-      .filter(
-        (p) =>
-          (p.card_count || 0) > 0 &&
-          ((p.slug && categoryIds.has(p.slug)) ||
-            (p.class_id && enrolled.has(p.class_id)))
-      )
+    return DeckService.presetDecksForClassIds(presets, classIds)
+      .filter((p) => (p.card_count || 0) > 0)
       .map((p) => p.id);
   }
 
@@ -49,12 +42,8 @@ class NotificationDeckService {
     ]);
 
     const selected = new Set(selectedIds);
-    const classDecks = presets
-      .filter(
-        (p) =>
-          (p.card_count || 0) > 0 &&
-          NotificationDeckService.presetDeckIdsForClasses(classIds, [p]).length > 0
-      )
+    const classDecks = DeckService.presetDecksForClassIds(presets, classIds)
+      .filter((p) => (p.card_count || 0) > 0)
       .map((p) => ({
         id: p.id,
         title: p.title,

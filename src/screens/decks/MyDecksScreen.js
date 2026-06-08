@@ -24,7 +24,7 @@ export default function MyDecksScreen({ navigation }) {
   const load = useCallback(async () => {
     const [mine, preset] = await Promise.all([
       DeckService.listMyDecks(),
-      DeckService.listPresetDecks(),
+      DeckService.listEnrolledPresetDecks(),
     ]);
     setMyDecks(mine);
     setPresetDecks(preset);
@@ -62,12 +62,16 @@ export default function MyDecksScreen({ navigation }) {
     { type: 'section', title: 'My decks', countLabel: `${myDecks.length}` },
     ...myDecks.map((d) => ({ type: 'deck', deck: d, isMine: true })),
     { type: 'create' },
-    {
-      type: 'section',
-      title: 'Preset decks',
-      countLabel: `${presetDecks.length}`,
-    },
-    ...presetDecks.map((d) => ({ type: 'deck', deck: d, isMine: false })),
+    ...(presetDecks.length > 0
+      ? [
+          {
+            type: 'section',
+            title: 'Preset decks',
+            countLabel: `${presetDecks.length}`,
+          },
+          ...presetDecks.map((d) => ({ type: 'deck', deck: d, isMine: false })),
+        ]
+      : []),
   ];
 
   const renderItem = ({ item }) => {

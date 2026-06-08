@@ -1,5 +1,6 @@
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
+import { ClassService } from './ClassService';
 
 /**
  * CRUD over decks + cards. RLS in the database enforces ownership.
@@ -42,6 +43,25 @@ class DeckService {
       return [];
     }
     return data || [];
+  }
+
+  /** Preset decks matching the user's class enrollments (slug or class_id). */
+  static presetDecksForClassIds(presets, classIds) {
+    const categoryIds = new Set(ClassService.categoryIdsForClasses(classIds));
+    const enrolled = new Set(classIds);
+    return (presets || []).filter(
+      (p) =>
+        (p.slug && categoryIds.has(p.slug)) ||
+        (p.class_id && enrolled.has(p.class_id))
+    );
+  }
+
+  static async listEnrolledPresetDecks() {
+    const [presets, classIds] = await Promise.all([
+      this.listPresetDecks(),
+      ClassService.getMyClassIds(),
+    ]);
+    return this.presetDecksForClassIds(presets, classIds);
   }
 
   static async listClassDecks(classId) {
