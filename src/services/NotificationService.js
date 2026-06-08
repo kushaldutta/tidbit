@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { StorageService } from './StorageService';
 import { ContentService } from './ContentService';
 import { UnlockService } from './UnlockService';
+import { AuthService } from './AuthService';
 import API_CONFIG from '../config/api';
 import Constants from 'expo-constants';
 
@@ -79,6 +80,8 @@ class NotificationService {
           const quietHoursStart = await StorageService.getQuietHoursStart();
           const quietHoursEnd = await StorageService.getQuietHoursEnd();
           const selectedCategories = await StorageService.getSelectedCategories();
+          const selectedDeckIds = await StorageService.getSelectedDeckIds();
+          const userId = AuthService.getUserId();
           
           // Get timezone offset in minutes (e.g., PST is UTC-8 = -480 minutes)
           const timezoneOffset = new Date().getTimezoneOffset(); // Returns offset in minutes, negative for ahead of UTC
@@ -92,6 +95,8 @@ class NotificationService {
             quietHoursStart,
             quietHoursEnd,
             selectedCategories,
+            selectedDeckIds,
+            userId,
             timezoneOffsetMinutes,
           });
           
@@ -104,12 +109,14 @@ class NotificationService {
               token: pushToken,
               platform: Platform.OS,
               appVersion: Constants.expoConfig?.version || '1.0.0',
+              userId,
               notificationInterval,
               notificationsEnabled,
               quietHoursEnabled,
               quietHoursStart,
               quietHoursEnd,
               selectedCategories,
+              selectedDeckIds,
               timezoneOffsetMinutes, // Send timezone offset to server
             }),
           });
@@ -157,6 +164,8 @@ class NotificationService {
       const quietHoursStart = await StorageService.getQuietHoursStart();
       const quietHoursEnd = await StorageService.getQuietHoursEnd();
       const selectedCategories = await StorageService.getSelectedCategories();
+      const selectedDeckIds = await StorageService.getSelectedDeckIds();
+      const userId = AuthService.getUserId();
       
       // Get timezone offset
       const timezoneOffset = new Date().getTimezoneOffset();
@@ -173,12 +182,14 @@ class NotificationService {
             token: pushToken,
             platform: Platform.OS,
             appVersion: Constants.expoConfig?.version || '1.0.0',
+            userId,
             notificationInterval,
             notificationsEnabled,
             quietHoursEnabled,
             quietHoursStart,
             quietHoursEnd,
             selectedCategories,
+            selectedDeckIds,
             timezoneOffsetMinutes,
           }),
         });

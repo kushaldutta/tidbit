@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,13 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../config/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { AuthService } from '../services/AuthService';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
+import { NotificationDeckService } from '../services/NotificationDeckService';
 import { ContentService } from '../services/ContentService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import { ProfileService } from '../services/ProfileService';
@@ -50,6 +52,8 @@ export default function SettingsScreen({ navigation }) {
     masteredTidbits: 0,
   });
   const [profile, setProfile] = useState(null);
+  const [notificationDecks, setNotificationDecks] = useState({ classDecks: [], myDecks: [] });
+  const [decksLoading, setDecksLoading] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -72,6 +76,37 @@ export default function SettingsScreen({ navigation }) {
     } catch (error) {
       console.error('Error loading profile:', error);
     }
+  };
+
+  const loadNotificationDecks = useCallback(async () => {
+    setDecksLoading(true);
+    try {
+      await NotificationDeckService.ensureDefaultsFromEnrollment();
+      const data = await NotificationDeckService.listAvailableDecks();
+      setNotificationDecks({ classDecks: data.classDecks, myDecks: data.myDecks });
+    } catch (error) {
+      console.error('Error loading notification decks:', error);
+    } finally {
+      setDecksLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNotificationDecks();
+    }, [loadNotificationDecks])
+  );
+
+  const handleDeckToggle = async (deckId, enabled) => {
+    await NotificationDeckService.toggleDeck(deckId, enabled);
+    setNotificationDecks((prev) => ({
+      classDecks: prev.classDecks.map((d) =>
+        d.id === deckId ? { ...d, selected: enabled } : d
+      ),
+      myDecks: prev.myDecks.map((d) =>
+        d.id === deckId ? { ...d, selected: enabled } : d
+      ),
+    }));
   };
 
   const loadSpacedRepStats = async () => {
@@ -477,6 +512,67 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </View>
       )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Notification decks</Text>
+        <Text style={styles.sectionDescription}>
+          Choose which class and custom decks can appear in your tidbit notifications throughout the day.
+        </Text>
+        {decksLoading ? (
+          <Text style={styles.deckEmptyText}>Loading decks…</Text>
+        ) : (
+          <>
+            {notificationDecks.classDecks.length > 0 && (
+              <>
+                <Text style={styles.deckGroupLabel}>Class decks</Text>
+                {notificationDecks.classDecks.map((deck) => (
+                  <View key={deck.id} style={styles.deckRow}>
+                    <Text style={styles.deckEmoji}>{deck.emoji}</Text>
+                    <View style={styles.deckInfo}>
+                      <Text style={styles.deckTitle}>{deck.title}</Text>
+                      <Text style={styles.deckSub}>{deck.cardCount} cards</Text>
+                    </View>
+                    <Switch
+                      value={deck.selected}
+                      onValueChange={(v) => handleDeckToggle(deck.id, v)}
+                      trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                      thumbColor="#ffffff"
+                    />
+                  </View>
+                ))}
+              </>
+            )}
+            {notificationDecks.myDecks.length > 0 && (
+              <>
+                <Text style={[styles.deckGroupLabel, notificationDecks.classDecks.length > 0 && { marginTop: 16 }]}>
+                  My decks
+                </Text>
+                {notificationDecks.myDecks.map((deck) => (
+                  <View key={deck.id} style={styles.deckRow}>
+                    <Text style={styles.deckEmoji}>{deck.emoji}</Text>
+                    <View style={styles.deckInfo}>
+                      <Text style={styles.deckTitle}>{deck.title}</Text>
+                      <Text style={styles.deckSub}>{deck.subtitle}</Text>
+                    </View>
+                    <Switch
+                      value={deck.selected}
+                      onValueChange={(v) => handleDeckToggle(deck.id, v)}
+                      trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                      thumbColor="#ffffff"
+                    />
+                  </View>
+                ))}
+              </>
+            )}
+            {notificationDecks.classDecks.length === 0 &&
+              notificationDecks.myDecks.length === 0 && (
+              <Text style={styles.deckEmptyText}>
+                Enroll in classes or create decks with cards to enable notification sources.
+              </Text>
+            )}
+          </>
+        )}
+      </View>
 
       {/* Premium upgrade banner */}
       <TouchableOpacity
@@ -913,6 +1009,32 @@ const makeStyles = (theme) => StyleSheet.create({
     fontSize: 24,
     color: '#9ca3af',
     fontWeight: '600',
+  },
+  deckGroupLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  deckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.primaryLight || '#eef2ff',
+  },
+  deckEmoji: { fontSize: 22 },
+  deckInfo: { flex: 1 },
+  deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
+  deckSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  deckEmptyText: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    lineHeight: 20,
+    fontStyle: 'italic',
   },
   section: {
     backgroundColor: theme.card,

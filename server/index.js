@@ -331,6 +331,7 @@ app.post('/api/register-token', async (req, res) => {
       quietHoursStart,
       quietHoursEnd,
       selectedCategories,
+      selectedDeckIds,
       timezoneOffsetMinutes, // Timezone offset in minutes (e.g., PST = -480, EST = -300)
     } = req.body;
     
@@ -392,6 +393,10 @@ app.post('/api/register-token', async (req, res) => {
     if (selectedCategories !== undefined) {
       updateData.selected_categories = selectedCategories;
       console.log(`[SERVER] Updating selected_categories to: ${JSON.stringify(selectedCategories)}`);
+    }
+    if (selectedDeckIds !== undefined) {
+      updateData.selected_deck_ids = selectedDeckIds;
+      console.log(`[SERVER] Updating selected_deck_ids to: ${JSON.stringify(selectedDeckIds)}`);
     }
     // Always update timezone if provided (even if 0, to fix devices registered before timezone support)
     if (timezoneOffsetMinutes !== undefined) {
@@ -646,6 +651,100 @@ function formatTidbitNotificationTitle({ bedtime = false } = {}) {
 function formatTidbitNotificationBody(text, term) {
   if (term) return `${term}: ${text}`;
   return text;
+}
+
+function generateTidbitId(text, category) {
+  const content = `${text}|${category}`;
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return `tidbit_${Math.abs(hash).toString(16)}`;
+}
+
+/** Cards from selected preset + user-owned decks (scoped to device owner). */
+async function fetchCardsForDeckIds(deckIds, userId) {
+  if (!supabase || !deckIds?.length) return [];
+
+  const uniqueIds = [...new Set(deckIds.filter(Boolean))];
+  const { data: decks, error: deckErr } = await supabase
+    .from('decks')
+    .select('id, slug, owner_id')
+    .in('id', uniqueIds);
+
+  if (deckErr || !decks?.length) return [];
+
+  const allowedDeckIds = decks
+    .filter((d) => !d.owner_id || (userId && d.owner_id === userId))
+    .map((d) => d.id);
+  if (!allowedDeckIds.length) return [];
+
+  const slugByDeckId = Object.fromEntries(decks.map((d) => [d.id, d.slug || d.id]));
+
+  const { data: cards, error: cardErr } = await supabase
+    .from('cards')
+    .select('id, deck_id, front, back')
+    .in('deck_id', allowedDeckIds);
+
+  if (cardErr || !cards?.length) return [];
+
+  return cards
+    .filter((c) => c.back?.trim())
+    .map((c) => {
+      const front = (c.front || '').trim();
+      const back = c.back.trim();
+      const term = front && front !== back ? front : null;
+      return {
+        id: c.id,
+        text: back,
+        term,
+        category: slugByDeckId[c.deck_id] || c.deck_id,
+      };
+    });
+}
+
+function buildNotificationPool(tidbitsData, selectedCategories, deckCards) {
+  const pool = [];
+  const seenText = new Set();
+
+  const add = (item) => {
+    const text = (item.text || '').trim();
+    if (!text || seenText.has(text)) return;
+    seenText.add(text);
+    pool.push(item);
+  };
+
+  for (const categoryId of selectedCategories || []) {
+    const items = tidbitsData?.[categoryId] || [];
+    for (const tidbitItem of items) {
+      const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
+      const term = typeof tidbitItem === 'string' ? null : tidbitItem.term;
+      add({ text, term: term || null, category: categoryId, id: null });
+    }
+  }
+
+  for (const card of deckCards || []) {
+    add({
+      text: card.text,
+      term: card.term || null,
+      category: card.category,
+      id: card.id,
+    });
+  }
+
+  return pool;
+}
+
+function notificationPayloadFromPoolItem(item) {
+  const tidbitId = item.id || generateTidbitId(item.text, item.category);
+  return {
+    text: item.text,
+    term: item.term || null,
+    category: item.category,
+    id: tidbitId,
+  };
 }
 
 async function getMonthlyUsage(userId) {
@@ -999,14 +1098,21 @@ async function sendScheduledNotifications() {
     console.log(`[SCHEDULER] Starting notification check at UTC ${utcHour}:${utcMinute.toString().padStart(2, '0')}`);
     console.log(`[SCHEDULER] Found ${devices.length} active device(s)`);
     
-    // Get tidbits from Supabase
-    const tidbitsData = await fetchTidbitsFromSupabase();
-    if (!tidbitsData) {
-      console.error('[SCHEDULER] Could not fetch tidbits');
-      return;
-    }
+    // Get tidbits from Supabase (may be empty if only deck sources are selected)
+    const tidbitsData = (await fetchTidbitsFromSupabase()) || {};
     
     const messages = [];
+    const deckCardsCache = new Map();
+    
+    async function getDeckCardsForDevice(device) {
+      const deckIds = device.selected_deck_ids || [];
+      if (!deckIds.length) return [];
+      const key = `${device.user_id || 'anon'}:${[...deckIds].sort().join(',')}`;
+      if (deckCardsCache.has(key)) return deckCardsCache.get(key);
+      const cards = await fetchCardsForDeckIds(deckIds, device.user_id);
+      deckCardsCache.set(key, cards);
+      return cards;
+    }
     
     console.log(`[SCHEDULER] Processing ${devices.length} devices`);
     
@@ -1016,6 +1122,7 @@ async function sendScheduledNotifications() {
       console.log(`[SCHEDULER]   - Quiet hours enabled: ${device.quiet_hours_enabled}`);
       console.log(`[SCHEDULER]   - Quiet hours: ${device.quiet_hours_start || 23} - ${device.quiet_hours_end || 9}`);
       console.log(`[SCHEDULER]   - Selected categories: ${JSON.stringify(device.selected_categories || [])}`);
+      console.log(`[SCHEDULER]   - Selected decks: ${JSON.stringify(device.selected_deck_ids || [])}`);
       
       // TEMPORARY: Hardcode PST (UTC-8, -480 minutes) for all devices in California
       // TODO: Remove this hardcode once app build includes proper timezone support
@@ -1075,54 +1182,30 @@ async function sendScheduledNotifications() {
         }
       }
       
-      // Get selected categories for this device
       const selectedCategories = device.selected_categories || [];
-      console.log(`[SCHEDULER]   - Categories count: ${selectedCategories.length}`);
-      if (selectedCategories.length === 0) {
-        console.log(`[SCHEDULER]   - SKIPPING: No categories selected`);
-        continue; // No categories selected
+      const selectedDeckIds = device.selected_deck_ids || [];
+      console.log(`[SCHEDULER]   - Categories count: ${selectedCategories.length}, decks: ${selectedDeckIds.length}`);
+      if (selectedCategories.length === 0 && selectedDeckIds.length === 0) {
+        console.log(`[SCHEDULER]   - SKIPPING: No categories or decks selected`);
+        continue;
       }
+
+      const deckCards = await getDeckCardsForDevice(device);
+      const availableTidbits = buildNotificationPool(tidbitsData, selectedCategories, deckCards);
       
-      // Pick a random tidbit from selected categories
-      const availableTidbits = [];
-      for (const categoryId of selectedCategories) {
-        if (tidbitsData[categoryId] && tidbitsData[categoryId].length > 0) {
-          for (const tidbitItem of tidbitsData[categoryId]) {
-            const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
-            const term = typeof tidbitItem === 'string' ? null : tidbitItem.term;
-            availableTidbits.push({ text, term, category: categoryId });
-          }
-        }
-      }
-      
-      console.log(`[SCHEDULER]   - Available tidbits: ${availableTidbits.length}`);
+      console.log(`[SCHEDULER]   - Available tidbits: ${availableTidbits.length} (${deckCards.length} from decks)`);
       if (availableTidbits.length === 0) {
-        console.log(`[SCHEDULER]   - SKIPPING: No tidbits available for selected categories`);
-        continue; // No tidbits available for selected categories
+        console.log(`[SCHEDULER]   - SKIPPING: No tidbits available for selected sources`);
+        continue;
       }
       
-      // Pick random tidbit
-      const randomTidbit = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
-      console.log(`[SCHEDULER]   - Selected tidbit from category: ${randomTidbit.category}`);
+      const randomItem = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+      const randomTidbit = notificationPayloadFromPoolItem(randomItem);
+      console.log(`[SCHEDULER]   - Selected tidbit from: ${randomTidbit.category}`);
       
-      // Generate tidbit ID (same as ContentService)
-      function generateTidbitId(text, category) {
-        const content = `${text}|${category}`;
-        let hash = 0;
-        for (let i = 0; i < content.length; i++) {
-          const char = content.charCodeAt(i);
-          hash = ((hash << 5) - hash) + char;
-          hash = hash & hash;
-        }
-        const hashStr = Math.abs(hash).toString(16);
-        return `tidbit_${hashStr}`;
-      }
-      
-      const tidbitId = generateTidbitId(randomTidbit.text, randomTidbit.category);
+      const tidbitId = randomTidbit.id;
       
       // Create notification message
-      // IMPORTANT: Must match the exact format of test notifications
-      // For iOS action buttons, categoryId must be at the top level
       const message = {
         to: device.token,
         sound: 'default',
@@ -1258,8 +1341,18 @@ async function sendBedtimeBriefs() {
 
     if (error || !devices || devices.length === 0) return;
 
-    const tidbitsData = await fetchTidbitsFromSupabase();
-    if (!tidbitsData) return;
+    const tidbitsData = (await fetchTidbitsFromSupabase()) || {};
+    const deckCardsCache = new Map();
+
+    async function getDeckCardsForDevice(device) {
+      const deckIds = device.selected_deck_ids || [];
+      if (!deckIds.length) return [];
+      const key = `${device.user_id || 'anon'}:${[...deckIds].sort().join(',')}`;
+      if (deckCardsCache.has(key)) return deckCardsCache.get(key);
+      const cards = await fetchCardsForDeckIds(deckIds, device.user_id);
+      deckCardsCache.set(key, cards);
+      return cards;
+    }
 
     const messages = [];
     const todayUTC = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
@@ -1277,33 +1370,15 @@ async function sendBedtimeBriefs() {
       if (device.bedtime_sent_date === todayUTC) continue;
 
       const selectedCategories = device.selected_categories || [];
-      if (selectedCategories.length === 0) continue;
+      const selectedDeckIds = device.selected_deck_ids || [];
+      if (selectedCategories.length === 0 && selectedDeckIds.length === 0) continue;
 
-      const availableTidbits = [];
-      for (const categoryId of selectedCategories) {
-        if (tidbitsData[categoryId]?.length > 0) {
-          for (const tidbitItem of tidbitsData[categoryId]) {
-            const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
-            const term = typeof tidbitItem === 'string' ? null : tidbitItem.term;
-            availableTidbits.push({ text, term, category: categoryId });
-          }
-        }
-      }
+      const deckCards = await getDeckCardsForDevice(device);
+      const availableTidbits = buildNotificationPool(tidbitsData, selectedCategories, deckCards);
       if (availableTidbits.length === 0) continue;
 
-      const tidbit = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
-
-      function generateTidbitId(text, category) {
-        const content = `${text}|${category}`;
-        let hash = 0;
-        for (let i = 0; i < content.length; i++) {
-          hash = ((hash << 5) - hash) + content.charCodeAt(i);
-          hash = hash & hash;
-        }
-        return `tidbit_${Math.abs(hash).toString(16)}`;
-      }
-
-      const tidbitId = generateTidbitId(tidbit.text, tidbit.category);
+      const randomItem = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+      const tidbit = notificationPayloadFromPoolItem(randomItem);
 
       messages.push({
         to: device.token,
@@ -1311,8 +1386,8 @@ async function sendBedtimeBriefs() {
         title: formatTidbitNotificationTitle({ bedtime: true }),
         body: formatTidbitNotificationBody(tidbit.text, tidbit.term),
         data: {
-          tidbit: JSON.stringify({ text: tidbit.text, term: tidbit.term || null, category: tidbit.category, id: tidbitId }),
-          tidbitId,
+          tidbit: JSON.stringify({ text: tidbit.text, term: tidbit.term || null, category: tidbit.category, id: tidbit.id }),
+          tidbitId: tidbit.id,
           category: tidbit.category,
         },
         categoryId: 'tidbit_feedback',

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
   SELECTED_CATEGORIES: 'selected_categories',
+  SELECTED_DECK_IDS: 'selected_deck_ids',
   TIDBITS_SEEN: 'tidbits_seen',
   DAILY_UNLOCKS: 'daily_unlocks',
   LAST_UNLOCK_DATE: 'last_unlock_date',
@@ -42,6 +43,24 @@ class StorageService {
       await AsyncStorage.setItem(KEYS.SELECTED_CATEGORIES, JSON.stringify(categories));
     } catch (error) {
       console.error('Error setting categories:', error);
+    }
+  }
+
+  static async getSelectedDeckIds() {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.SELECTED_DECK_IDS);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting selected deck ids:', error);
+      return [];
+    }
+  }
+
+  static async setSelectedDeckIds(deckIds) {
+    try {
+      await AsyncStorage.setItem(KEYS.SELECTED_DECK_IDS, JSON.stringify(deckIds));
+    } catch (error) {
+      console.error('Error setting selected deck ids:', error);
     }
   }
 

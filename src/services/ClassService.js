@@ -248,6 +248,10 @@ class ClassService {
     const existing = (await StorageService.getSelectedCategories()) || [];
     const merged = Array.from(new Set([...existing, ...newCats]));
     await StorageService.setSelectedCategories(merged);
+    const { NotificationDeckService } = require('./NotificationDeckService');
+    await NotificationDeckService.syncPresetsToEnrollment(enrolledClassIds);
+    const { NotificationService } = require('./NotificationService');
+    await NotificationService.syncPreferences();
   }
 
   /**
@@ -258,6 +262,10 @@ class ClassService {
   static async replaceCategoriesToEnrollment(enrolledClassIds) {
     const cats = this.categoryIdsForClasses(enrolledClassIds);
     await StorageService.setSelectedCategories(cats);
+    const { NotificationDeckService } = require('./NotificationDeckService');
+    await NotificationDeckService.syncPresetsToEnrollment(enrolledClassIds);
+    const { NotificationService } = require('./NotificationService');
+    await NotificationService.syncPreferences();
   }
 
   /**
