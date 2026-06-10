@@ -121,7 +121,7 @@ export default function MyClassesScreen({ navigation }) {
           if (prev.some((c) => c.id === id)) return prev;
           return [...prev, classItem];
         });
-        await ClassService.syncCategoriesToEnrollment([...next]);
+        await ClassService.replaceCategoriesToEnrollment([...next]);
       }
     } catch (e) {
       Alert.alert('Error', e.message || 'Could not update class.');

@@ -281,6 +281,32 @@ class ClassService {
   }
 
   /**
+   * Keep legacy selectedCategories in AsyncStorage aligned with Supabase
+   * class enrollments. Fixes stale picks (e.g. Miscellaneous from old onboarding).
+   */
+  static async ensureCategoriesSyncedToEnrollments() {
+    const classIds = await this.getMyClassIds();
+    if (classIds.length === 0) return false;
+
+    const expected = this.categoryIdsForClasses(classIds);
+    const disabledSet = new Set(await StorageService.getNotificationDisabledCategories());
+    const expectedActive = expected.filter((c) => !disabledSet.has(c)).sort();
+    const currentActive = (await StorageService.getSelectedCategories())
+      .filter((c) => !disabledSet.has(c))
+      .sort();
+
+    const matches =
+      expectedActive.length === currentActive.length &&
+      expectedActive.every((c, i) => c === currentActive[i]);
+
+    if (!matches) {
+      await this.replaceCategoriesToEnrollment(classIds);
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * When the user deselects a category, leave the corresponding class so that
    * My Groups and the Feed stay in sync.
    * Only acts on categories that map 1:1 to a single class (unambiguous).

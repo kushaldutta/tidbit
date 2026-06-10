@@ -156,6 +156,7 @@ export default function CategoriesScreen() {
       setProfileSchoolId(defaultSchool);
       setCatalogSchoolId(defaultSchool);
       await loadEnrollments();
+      await ClassService.ensureCategoriesSyncedToEnrollments();
       await loadCatalog(defaultSchool, { silent: true });
     } catch (e) {
       Alert.alert('Error loading classes', e.message);

@@ -17,6 +17,7 @@ import StudyPlanCard from '../components/StudyPlanCard';
 import CategoryProgressPreview from '../components/CategoryProgressPreview';
 import { CategoryProgressService } from '../services/CategoryProgressService';
 import { GroupService } from '../services/GroupService';
+import { ClassService } from '../services/ClassService';
 import { AuthService } from '../services/AuthService';
 import { useTheme } from '../context/ThemeContext';
 
@@ -31,6 +32,7 @@ export default function HomeScreen({ navigation }) {
     learningStreak: 0,
   });
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [enrolledClasses, setEnrolledClasses] = useState([]);
   const [devModeEnabled, setDevModeEnabled] = useState(false);
   const [studyPlan, setStudyPlan] = useState(null);
   const [studyPlanLoading, setStudyPlanLoading] = useState(true);
@@ -87,6 +89,7 @@ export default function HomeScreen({ navigation }) {
 
   const loadCategoryProgress = async () => {
     try {
+      await ClassService.ensureCategoriesSyncedToEnrollments();
       const progress = await CategoryProgressService.getSelectedCategoriesProgress();
       const sorted = CategoryProgressService.sortForHome(progress);
       setCategoryProgress(sorted.slice(0, 3));
@@ -99,6 +102,14 @@ export default function HomeScreen({ navigation }) {
   const loadData = async () => {
     // Load groups in background — don't block the rest of the screen
     GroupService.getMyGroups().then(setGroups).catch(() => {});
+
+    const classIds = await ClassService.getMyClassIds();
+    await ClassService.ensureCategoriesSyncedToEnrollments();
+    if (classIds.length > 0) {
+      ClassService.getClassesByIds(classIds).then(setEnrolledClasses).catch(() => setEnrolledClasses([]));
+    } else {
+      setEnrolledClasses([]);
+    }
 
     const tidbitsSeen = await StorageService.getTidbitsSeen();
     const dailyTidbits = await StorageService.getDailyTidbitCount();
@@ -312,8 +323,18 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={styles.categoriesPreview}>
-        <Text style={styles.sectionTitle}>Your Categories</Text>
-        {selectedCategories.length > 0 ? (
+        <Text style={styles.sectionTitle}>
+          {enrolledClasses.length > 0 ? 'Your Classes' : 'Your Categories'}
+        </Text>
+        {enrolledClasses.length > 0 ? (
+          <View style={styles.categoryTags}>
+            {enrolledClasses.map((cls) => (
+              <View key={cls.id} style={styles.categoryTag}>
+                <Text style={styles.categoryTagText}>{cls.code}</Text>
+              </View>
+            ))}
+          </View>
+        ) : selectedCategories.length > 0 ? (
           <View style={styles.categoryTags}>
             {selectedCategories.map((cat) => (
               <View key={cat} style={styles.categoryTag}>
@@ -324,7 +345,7 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
         ) : (
-          <Text style={styles.emptyText}>No categories selected</Text>
+          <Text style={styles.emptyText}>No classes selected</Text>
         )}
         <TouchableOpacity
           style={styles.button}
