@@ -110,10 +110,8 @@ export default function SettingsScreen({ navigation }) {
   const handleDeckToggle = async (deckId, enabled) => {
     await NotificationDeckService.toggleDeck(deckId, enabled);
     setNotificationDecks((prev) => ({
-      classDecks: prev.classDecks.map((d) =>
-        d.id === deckId ? { ...d, selected: enabled } : d
-      ),
-      myDecks: prev.myDecks.map((d) =>
+      ...prev,
+      myDecks: (prev.myDecks || []).map((d) =>
         d.id === deckId ? { ...d, selected: enabled } : d
       ),
     }));

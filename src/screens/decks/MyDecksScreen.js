@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,10 @@ export default function MyDecksScreen({ navigation }) {
   const [presetDecks, setPresetDecks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const flatListRef = useRef(null);
+  const scrollOffsetRef = useRef(0);
+  const isFirstLoadRef = useRef(true);
+  const pendingScrollRestoreRef = useRef(false);
 
   const load = useCallback(async () => {
     const [mine, preset] = await Promise.all([
@@ -30,19 +34,40 @@ export default function MyDecksScreen({ navigation }) {
     setPresetDecks(preset);
   }, []);
 
+  const restoreScroll = useCallback(() => {
+    const offset = scrollOffsetRef.current;
+    if (offset <= 0) return;
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({ offset, animated: false });
+    });
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let alive = true;
       (async () => {
-        setLoading(true);
+        const isFirstLoad = isFirstLoadRef.current;
+        if (isFirstLoad) setLoading(true);
         await load();
-        if (alive) setLoading(false);
+        if (!alive) return;
+        if (isFirstLoad) {
+          isFirstLoadRef.current = false;
+          setLoading(false);
+        } else {
+          pendingScrollRestoreRef.current = true;
+        }
       })();
       return () => {
         alive = false;
       };
     }, [load])
   );
+
+  useEffect(() => {
+    if (!pendingScrollRestoreRef.current) return;
+    pendingScrollRestoreRef.current = false;
+    restoreScroll();
+  }, [myDecks, presetDecks, restoreScroll]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -137,8 +162,13 @@ export default function MyDecksScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
+        ref={flatListRef}
         data={data}
         renderItem={renderItem}
+        onScroll={(e) => {
+          scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
         keyExtractor={(item, idx) => {
           if (item.type === 'section') return `s-${item.title}`;
           if (item.type === 'create') return 'create';
