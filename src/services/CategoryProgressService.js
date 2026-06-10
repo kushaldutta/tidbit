@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StorageService } from './StorageService';
 import { ContentService } from './ContentService';
+import { ClassService } from './ClassService';
+import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 
 const STORAGE_PREFIX = 'spaced_repetition_';
 
@@ -16,8 +18,39 @@ function safePercent(numerator, denominator) {
  * - spaced repetition states stored in AsyncStorage
  */
 class CategoryProgressService {
+  /** Tidbit count from bundled/server cache, or preset deck cards when cache is stale. */
+  static async getCategoryContentCount(categoryId) {
+    const tidbitCount = ContentService.getTidbitsByCategory(categoryId).length;
+    if (tidbitCount > 0) return tidbitCount;
+
+    if (!SUPABASE_CONFIGURED) return 0;
+    try {
+      const { data } = await supabase
+        .from('decks')
+        .select('card_count')
+        .eq('slug', categoryId)
+        .is('owner_id', null)
+        .maybeSingle();
+      return data?.card_count || 0;
+    } catch {
+      return 0;
+    }
+  }
+
   /**
-   * Get progress for selected categories.
+   * Progress for enrolled classes (source of truth for the Home progress UI).
+   * Unlike selectedCategories, this is not affected by notification opt-outs.
+   */
+  static async getEnrollmentCategoriesProgress() {
+    const categories = await ClassService.getEnrollmentCategoryIds();
+    if (categories.length === 0) {
+      return this.getSelectedCategoriesProgress();
+    }
+    return this.getCategoriesProgress(categories);
+  }
+
+  /**
+   * Get progress for selected categories (notification-enabled subset).
    * @returns {Promise<Array>} array of category progress objects
    */
   static async getSelectedCategoriesProgress() {
@@ -38,7 +71,7 @@ class CategoryProgressService {
       // Initialize per-category buckets
       const statsByCategory = {};
       for (const categoryId of categoryIds) {
-        const total = ContentService.getTidbitsByCategory(categoryId).length;
+        const total = await this.getCategoryContentCount(categoryId);
         statsByCategory[categoryId] = {
           categoryId,
           name: ContentService.formatCategoryName(categoryId),

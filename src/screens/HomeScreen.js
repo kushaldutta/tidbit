@@ -90,7 +90,7 @@ export default function HomeScreen({ navigation }) {
   const loadCategoryProgress = async () => {
     try {
       await ClassService.ensureCategoriesSyncedToEnrollments();
-      const progress = await CategoryProgressService.getSelectedCategoriesProgress();
+      const progress = await CategoryProgressService.getEnrollmentCategoriesProgress();
       const sorted = CategoryProgressService.sortForHome(progress);
       setCategoryProgress(sorted.slice(0, 3));
     } catch (error) {

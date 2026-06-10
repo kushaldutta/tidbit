@@ -1,7 +1,7 @@
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 import { StorageService } from './StorageService';
-import { AP_CLASS_TO_CATEGORY, apCourseHasLiveContent } from '../config/courseCatalog';
+import { AP_CATEGORY_BY_ID, AP_CLASS_TO_CATEGORY, apCourseHasLiveContent } from '../config/courseCatalog';
 
 // Maps class IDs → content category IDs in ContentService.
 // Only includes classes that have matching preset content.
@@ -231,14 +231,43 @@ class ClassService {
    */
   static categoryIdsForClasses(classIds) {
     const cats = new Set();
-    classIds.forEach((id) => {
-      if (CLASS_TO_CATEGORY[id]) cats.add(CLASS_TO_CATEGORY[id]);
+    (classIds || []).forEach((id) => {
+      const cat = this.getCategoryForClass(id);
+      if (cat) cats.add(cat);
     });
     return [...cats];
   }
 
+  /**
+   * Map a class row id → content category slug (tidbits / preset deck slug).
+   * Falls back to parsing AP/Berkeley id patterns when the static map misses.
+   */
   static getCategoryForClass(classId) {
-    return CLASS_TO_CATEGORY[classId] || null;
+    if (!classId) return null;
+    if (CLASS_TO_CATEGORY[classId]) return CLASS_TO_CATEGORY[classId];
+
+    const id = String(classId);
+
+    const apMatch = id.match(/^hs-ap:([^:]+):/);
+    if (apMatch) {
+      const slug = apMatch[1].replace(/_/g, '-');
+      if (AP_CATEGORY_BY_ID[slug]) return slug;
+    }
+
+    const berkeleyMatch = id.match(/^uc-berkeley:([^:]+):/);
+    if (berkeleyMatch) {
+      const segment = berkeleyMatch[1];
+      const key = Object.keys(CLASS_TO_CATEGORY).find((k) => k.includes(`:${segment}:`));
+      if (key) return CLASS_TO_CATEGORY[key];
+    }
+
+    return null;
+  }
+
+  /** Category ids for progress/stats — all enrollments, ignoring notification opt-outs. */
+  static async getEnrollmentCategoryIds() {
+    const classIds = await this.getMyClassIds();
+    return this.categoryIdsForClasses(classIds);
   }
 
   /**

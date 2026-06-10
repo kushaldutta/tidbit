@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { CategoryProgressService } from '../services/CategoryProgressService';
+import { ClassService } from '../services/ClassService';
 import { useTheme } from '../context/ThemeContext';
 
 function ProgressCard({ item, onPress, styles }) {
@@ -41,7 +42,8 @@ export default function CategoryProgressScreen({ navigation }) {
     const load = async () => {
       try {
         setLoading(true);
-        const progress = await CategoryProgressService.getSelectedCategoriesProgress();
+        await ClassService.ensureCategoriesSyncedToEnrollments();
+        const progress = await CategoryProgressService.getEnrollmentCategoriesProgress();
         const sorted = CategoryProgressService.sortForHome(progress);
         setItems(sorted);
       } finally {
