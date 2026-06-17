@@ -18,6 +18,10 @@ import { GroupService } from '../services/GroupService';
 import { FeedService } from '../services/FeedService';
 import { SameBoatService } from '../services/SameBoatService';
 import { AuthService } from '../services/AuthService';
+import { ModerationService } from '../services/ModerationService';
+import ModerationReasonModal from '../components/ModerationReasonModal';
+import ReportContentModal from '../components/ReportContentModal';
+import { ReportService } from '../services/ReportService';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -62,12 +66,14 @@ function Avatar({ name, size = 40 }) {
   );
 }
 
-function PostCard({ post, myUserId, onReact, onDelete }) {
+function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRemove, onReport }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const body = postBodyText(post);
   const isActivity = post.postType === 'activity';
   const canDelete = FeedService.canUserDeletePost(post, myUserId);
+  const showModRemove = isModerator && !canDelete;
+  const showReport = ReportService.canReportPost(post, myUserId);
 
   const confirmDelete = () => {
     Alert.alert(
@@ -109,6 +115,26 @@ function PostCard({ post, myUserId, onReact, onDelete }) {
             activeOpacity={0.7}
           >
             <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+        )}
+        {showModRemove && (
+          <TouchableOpacity
+            style={styles.modRemoveBtn}
+            onPress={() => onModerateRemove(post)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.modRemoveBtnText}>Remove</Text>
+          </TouchableOpacity>
+        )}
+        {showReport && (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => onReport(post)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.reportBtnText}>Report</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -156,6 +182,9 @@ export default function GroupScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [draftText, setDraftText] = useState('');
   const [posting, setPosting] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const [modTarget, setModTarget] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
   const inputRef = useRef(null);
 
   const load = useCallback(async (isRefresh = false, silent = false) => {
@@ -181,6 +210,12 @@ export default function GroupScreen({ route, navigation }) {
   }, [classId, groupId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useFocusEffect(
+    useCallback(() => {
+      ModerationService.isModerator().then(setIsModerator);
+    }, [])
+  );
 
   useEffect(() => {
     const unsubscribe = FeedService.subscribeToFeedUpdates(
@@ -235,6 +270,109 @@ export default function GroupScreen({ route, navigation }) {
     }
   };
 
+  const openModPost = (post) => setModTarget({ type: 'post', post });
+
+  const openModDeck = (deck) => {
+    setModTarget({
+      type: 'deck',
+      deckId: deck.id,
+      deckTitle: deck.title,
+    });
+  };
+
+  const openReportPost = (post) => setReportTarget({ type: 'post', post });
+
+  const openReportDeck = (deck) => setReportTarget({ type: 'deck', deck });
+
+  const handleReportSubmit = async ({ category, details }) => {
+    try {
+      if (reportTarget.type === 'post') {
+        await ReportService.submitPostReport(reportTarget.post, { category, details });
+      } else {
+        await ReportService.submitDeckReport(reportTarget.deck, groupId, { category, details });
+      }
+      setReportTarget(null);
+      Alert.alert(
+        'Report submitted',
+        'Thanks for helping keep Tidbit safe. Our team will review this.'
+      );
+    } catch (e) {
+      Alert.alert('Could not submit report', e.message || 'Try again.');
+      throw e;
+    }
+  };
+
+  const handleModConfirm = async (reason) => {
+    try {
+      if (modTarget.type === 'post') {
+        await ModerationService.moderateFeedPost(modTarget.post, reason);
+        setPosts((prev) => prev.filter((p) => {
+          if (p.id === modTarget.post.id) return false;
+          if (
+            modTarget.post.postType === 'deck_share' &&
+            modTarget.post.payload?.deckId &&
+            p.postType === 'deck_share' &&
+            p.payload?.deckId === modTarget.post.payload.deckId
+          ) {
+            return false;
+          }
+          return true;
+        }));
+        if (
+          modTarget.post.postType === 'deck_share' &&
+          modTarget.post.payload?.deckId
+        ) {
+          setDecks((prev) =>
+            prev.filter((d) => d.id !== modTarget.post.payload.deckId)
+          );
+        }
+      } else {
+        await ModerationService.removeDeckFromGroup(
+          modTarget.deckId,
+          groupId,
+          reason
+        );
+        setDecks((prev) => prev.filter((d) => d.id !== modTarget.deckId));
+        setPosts((prev) =>
+          prev.filter(
+            (p) =>
+              !(
+                p.postType === 'deck_share' &&
+                p.payload?.deckId === modTarget.deckId
+              )
+          )
+        );
+      }
+    } catch (e) {
+      Alert.alert('Could not remove', e.message || 'Try again.');
+      load();
+      throw e;
+    }
+  };
+
+  const modModalCopy = (() => {
+    if (!modTarget) return null;
+    if (modTarget.type === 'deck') {
+      return {
+        title: 'Remove deck from class?',
+        description: `"${modTarget.deckTitle || 'This deck'}" will be hidden from this class. The owner keeps their copy.`,
+        confirmLabel: 'Remove deck',
+      };
+    }
+    if (modTarget.post?.postType === 'deck_share') {
+      return {
+        title: 'Remove deck from class?',
+        description: `"${modTarget.post.payload?.deckTitle || 'This deck'}" will be unshared and its feed post removed. The owner keeps their copy.`,
+        confirmLabel: 'Remove deck',
+      };
+    }
+    return {
+      title: 'Remove post from feed?',
+      description: 'This post will be removed for all classmates in this group.',
+      confirmLabel: 'Remove post',
+    };
+  })();
+
   // Header rendered inside FlatList so it scrolls with posts
   const ListHeader = (
     <View>
@@ -288,21 +426,41 @@ export default function GroupScreen({ route, navigation }) {
                       {d.cardCount} cards · by {d.ownerName}
                     </Text>
                   </View>
-                  {d.cardCount > 0 && (
-                    <TouchableOpacity
-                      style={styles.studyBtn}
-                      onPress={() =>
-                        navigation.navigate('GroupDeckStudy', {
-                          deckId: d.id,
-                          deckTitle: d.title,
-                          classId,
-                        })
-                      }
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.studyBtnText}>Study</Text>
-                    </TouchableOpacity>
-                  )}
+                  <View style={styles.deckActions}>
+                    {ReportService.canReportDeck(d, myUserId) && (
+                      <TouchableOpacity
+                        style={styles.reportDeckBtn}
+                        onPress={() => openReportDeck(d)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.reportBtnText}>Report</Text>
+                      </TouchableOpacity>
+                    )}
+                    {isModerator && (
+                      <TouchableOpacity
+                        style={styles.modRemoveDeckBtn}
+                        onPress={() => openModDeck(d)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.modRemoveBtnText}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
+                    {d.cardCount > 0 && (
+                      <TouchableOpacity
+                        style={styles.studyBtn}
+                        onPress={() =>
+                          navigation.navigate('GroupDeckStudy', {
+                            deckId: d.id,
+                            deckTitle: d.title,
+                            classId,
+                          })
+                        }
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.studyBtnText}>Study</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
               ))
         )}
@@ -368,8 +526,11 @@ export default function GroupScreen({ route, navigation }) {
               <PostCard
                 post={item}
                 myUserId={myUserId}
+                isModerator={isModerator}
                 onReact={handleReact}
                 onDelete={handleDelete}
+                onModerateRemove={openModPost}
+                onReport={openReportPost}
               />
             )}
             ListEmptyComponent={
@@ -418,6 +579,21 @@ export default function GroupScreen({ route, navigation }) {
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
+
+      <ModerationReasonModal
+        visible={Boolean(modTarget && modModalCopy)}
+        title={modModalCopy?.title}
+        description={modModalCopy?.description}
+        confirmLabel={modModalCopy?.confirmLabel}
+        onClose={() => setModTarget(null)}
+        onConfirm={handleModConfirm}
+      />
+
+      <ReportContentModal
+        visible={Boolean(reportTarget)}
+        onClose={() => setReportTarget(null)}
+        onSubmit={handleReportSubmit}
+      />
     </SafeAreaView>
   );
 }
@@ -528,6 +704,8 @@ const makeStyles = (theme) => StyleSheet.create({
   deckInfo: { flex: 1 },
   deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
   deckMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  deckActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  modRemoveDeckBtn: { paddingVertical: 6, paddingHorizontal: 8 },
   deckChevron: { fontSize: 20, color: theme.textSecondary },
   studyBtn: {
     backgroundColor: '#6366f1',
@@ -578,6 +756,19 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingHorizontal: 8,
   },
   deleteBtnText: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
+  modRemoveBtn: {
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  modRemoveBtnText: { fontSize: 12, fontWeight: '600', color: '#b45309' },
+  reportBtn: {
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  reportDeckBtn: { paddingVertical: 6, paddingHorizontal: 8 },
+  reportBtnText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
   postBody: {
     fontSize: 15,
     color: theme.text,

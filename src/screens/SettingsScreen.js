@@ -22,6 +22,7 @@ import { NotificationDeckService } from '../services/NotificationDeckService';
 import { ContentService } from '../services/ContentService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import { ProfileService } from '../services/ProfileService';
+import { ReportService } from '../services/ReportService';
 import { getSchool } from '../config/schools';
 import * as Notifications from 'expo-notifications';
 
@@ -55,6 +56,7 @@ export default function SettingsScreen({ navigation }) {
   const [notificationDecks, setNotificationDecks] = useState({ classSources: [], myDecks: [] });
   const [decksLoading, setDecksLoading] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
+  const [pendingReportCount, setPendingReportCount] = useState(0);
 
   useEffect(() => {
     loadSettings();
@@ -65,15 +67,30 @@ export default function SettingsScreen({ navigation }) {
     const unsubscribe = navigation.addListener('focus', () => {
       loadSpacedRepStats();
       loadProfile();
+      loadPendingReportCount();
     });
     
     return unsubscribe;
   }, [navigation]);
 
+  const loadPendingReportCount = async () => {
+    try {
+      const count = await ReportService.getPendingReportCount();
+      setPendingReportCount(count);
+    } catch {
+      setPendingReportCount(0);
+    }
+  };
+
   const loadProfile = async () => {
     try {
       const data = await ProfileService.getMyProfile();
       setProfile(data);
+      if (data?.is_moderator) {
+        loadPendingReportCount();
+      } else {
+        setPendingReportCount(0);
+      }
     } catch (error) {
       console.error('Error loading profile:', error);
     }
@@ -972,6 +989,29 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </View>
 
+      {profile?.is_moderator && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Moderation</Text>
+          <TouchableOpacity
+            style={styles.moderationQueueBtn}
+            onPress={() => navigation.navigate('ModerationReports')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.moderationQueueRow}>
+              <Text style={styles.moderationQueueText}>Review reports</Text>
+              {pendingReportCount > 0 && (
+                <View style={styles.reportBadge}>
+                  <Text style={styles.reportBadgeText}>{pendingReportCount}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.moderationQueueHint}>
+              User-submitted reports waiting for review
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         <TouchableOpacity
@@ -1433,6 +1473,42 @@ const makeStyles = (theme) => StyleSheet.create({
     color: '#dc2626',
     fontSize: 14,
     fontWeight: '600',
+  },
+  moderationQueueBtn: {
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  moderationQueueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  moderationQueueText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  moderationQueueHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 6,
+  },
+  reportBadge: {
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   signOutButton: {
     backgroundColor: theme.card,

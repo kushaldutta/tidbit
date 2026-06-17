@@ -65,7 +65,7 @@ class FeedService {
     const { data, error } = await supabase
       .from('feed_posts')
       .select(`
-        id, post_type, payload, created_at, author_id,
+        id, post_type, payload, created_at, author_id, group_id,
         profiles!author_id(display_name, grad_year),
         reactions(kind, user_id)
       `)
@@ -84,6 +84,7 @@ class FeedService {
       payload: p.payload || {},
       createdAt: p.created_at,
       authorId: p.author_id,
+      groupId: p.group_id,
       authorName: p.profiles?.display_name || 'Tidbit User',
       authorYear: p.profiles?.grad_year || null,
       reactions: p.reactions || [],

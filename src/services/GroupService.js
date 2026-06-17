@@ -88,7 +88,7 @@ class GroupService {
       .from('deck_shares')
       .select(`
         decks(
-          id, title,
+          id, title, owner_id,
           cards(count),
           profiles(display_name)
         )
@@ -102,6 +102,7 @@ class GroupService {
       .map((d) => ({
         id: d.id,
         title: d.title,
+        ownerId: d.owner_id,
         cardCount: d.cards?.[0]?.count ?? 0,
         ownerName: d.profiles?.display_name || 'Unknown',
       }));

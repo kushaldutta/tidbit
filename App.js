@@ -12,6 +12,7 @@ import FeedScreen from './src/screens/FeedScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
+import ModerationReportsScreen from './src/screens/ModerationReportsScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import FrequencySelectionScreen from './src/screens/FrequencySelectionScreen';
 import CategorySelectionScreen from './src/screens/CategorySelectionScreen';
@@ -758,6 +759,7 @@ export default function App() {
         <Stack.Screen name="SnapPage" component={SnapPageScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ThemePicker" component={ThemePickerScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ModerationReports" component={ModerationReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     );
   }

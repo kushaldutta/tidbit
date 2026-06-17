@@ -214,6 +214,7 @@ class AuthService {
     const { EntitlementService } = require('./EntitlementService');
     this._sessionValidatedAt = 0;
     SyncService.resetSyncCache();
+    require('./ModerationService').ModerationService.clearCache();
     await SyncService.clearLocalSessionState();
     await EntitlementService.reset().catch(() => {});
     if (SUPABASE_CONFIGURED) {

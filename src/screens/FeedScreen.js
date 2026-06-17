@@ -20,6 +20,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FeedService } from '../services/FeedService';
 import { GroupService } from '../services/GroupService';
 import { AuthService } from '../services/AuthService';
+import { ModerationService } from '../services/ModerationService';
+import ModerationReasonModal from '../components/ModerationReasonModal';
+import ReportContentModal from '../components/ReportContentModal';
+import { ReportService } from '../services/ReportService';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -70,7 +74,7 @@ function Avatar({ name, size = 36, anon = false }) {
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 
-function PostCard({ post, myUserId, onReact, onDelete }) {
+function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRemove, onReport }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const isAnon = post.postType === 'dumb_question';
@@ -78,6 +82,8 @@ function PostCard({ post, myUserId, onReact, onDelete }) {
   const isDeckShare = post.postType === 'deck_share';
   const body = postBodyText(post);
   const canDelete = FeedService.canUserDeletePost(post, myUserId);
+  const showModRemove = isModerator && !canDelete;
+  const showReport = ReportService.canReportPost(post, myUserId);
 
   const confirmDelete = () => {
     Alert.alert(
@@ -137,6 +143,26 @@ function PostCard({ post, myUserId, onReact, onDelete }) {
             activeOpacity={0.7}
           >
             <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+        )}
+        {showModRemove && (
+          <TouchableOpacity
+            style={styles.modRemoveBtn}
+            onPress={() => onModerateRemove(post)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.modRemoveBtnText}>Remove</Text>
+          </TouchableOpacity>
+        )}
+        {showReport && (
+          <TouchableOpacity
+            style={styles.reportBtn}
+            onPress={() => onReport(post)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.reportBtnText}>Report</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -322,6 +348,9 @@ export default function FeedScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [filterGroupId, setFilterGroupId] = useState(null); // null = All
   const [composeVisible, setComposeVisible] = useState(false);
+  const [isModerator, setIsModerator] = useState(false);
+  const [modTarget, setModTarget] = useState(null);
+  const [reportTarget, setReportTarget] = useState(null);
 
   const load = useCallback(async (isRefresh = false, silent = false) => {
     if (isRefresh) setRefreshing(true);
@@ -342,6 +371,12 @@ export default function FeedScreen({ navigation }) {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useFocusEffect(
+    useCallback(() => {
+      ModerationService.isModerator().then(setIsModerator);
+    }, [])
+  );
 
   useEffect(() => {
     const unsubscribe = FeedService.subscribeToFeedUpdates(() => load(false, true));
@@ -379,6 +414,61 @@ export default function FeedScreen({ navigation }) {
       load();
     }
   };
+
+  const openModPost = (post) => setModTarget({ type: 'post', post });
+
+  const openReportPost = (post) => setReportTarget({ type: 'post', post });
+
+  const handleReportSubmit = async ({ category, details }) => {
+    try {
+      await ReportService.submitPostReport(reportTarget.post, { category, details });
+      setReportTarget(null);
+      Alert.alert(
+        'Report submitted',
+        'Thanks for helping keep Tidbit safe. Our team will review this.'
+      );
+    } catch (e) {
+      Alert.alert('Could not submit report', e.message || 'Try again.');
+      throw e;
+    }
+  };
+
+  const handleModConfirm = async (reason) => {
+    try {
+      await ModerationService.moderateFeedPost(modTarget.post, reason);
+      const removedDeckId =
+        modTarget.post.postType === 'deck_share'
+          ? modTarget.post.payload?.deckId
+          : null;
+      setPosts((prev) =>
+        prev.filter((p) => {
+          if (p.id === modTarget.post.id) return false;
+          if (removedDeckId && p.payload?.deckId === removedDeckId) return false;
+          return true;
+        })
+      );
+    } catch (e) {
+      Alert.alert('Could not remove', e.message || 'Try again.');
+      load();
+      throw e;
+    }
+  };
+
+  const modModalCopy = (() => {
+    if (!modTarget) return null;
+    if (modTarget.post?.postType === 'deck_share') {
+      return {
+        title: 'Remove deck from class?',
+        description: `"${modTarget.post.payload?.deckTitle || 'This deck'}" will be unshared and its feed post removed. The owner keeps their copy.`,
+        confirmLabel: 'Remove deck',
+      };
+    }
+    return {
+      title: 'Remove post from feed?',
+      description: 'This post will be removed for all classmates in this group.',
+      confirmLabel: 'Remove post',
+    };
+  })();
 
   const filteredPosts = filterGroupId
     ? posts.filter((p) => p.groupId === filterGroupId)
@@ -448,8 +538,11 @@ export default function FeedScreen({ navigation }) {
             <PostCard
               post={item}
               myUserId={myUserId}
+              isModerator={isModerator}
               onReact={handleReact}
               onDelete={handleDelete}
+              onModerateRemove={openModPost}
+              onReport={openReportPost}
             />
           )}
           ListEmptyComponent={
@@ -496,6 +589,21 @@ export default function FeedScreen({ navigation }) {
         groups={groups}
         onClose={() => setComposeVisible(false)}
         onPost={handlePost}
+      />
+
+      <ModerationReasonModal
+        visible={Boolean(modTarget && modModalCopy)}
+        title={modModalCopy?.title}
+        description={modModalCopy?.description}
+        confirmLabel={modModalCopy?.confirmLabel}
+        onClose={() => setModTarget(null)}
+        onConfirm={handleModConfirm}
+      />
+
+      <ReportContentModal
+        visible={Boolean(reportTarget)}
+        onClose={() => setReportTarget(null)}
+        onSubmit={handleReportSubmit}
       />
     </SafeAreaView>
   );
@@ -617,6 +725,18 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingHorizontal: 8,
   },
   deleteBtnText: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
+  modRemoveBtn: {
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  modRemoveBtnText: { fontSize: 12, fontWeight: '600', color: '#b45309' },
+  reportBtn: {
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  reportBtnText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
   postBody: {
     fontSize: 15,
     color: theme.text,
