@@ -62,11 +62,23 @@ function Avatar({ name, size = 40 }) {
   );
 }
 
-function PostCard({ post, myUserId, onReact }) {
+function PostCard({ post, myUserId, onReact, onDelete }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const body = postBodyText(post);
   const isActivity = post.postType === 'activity';
+  const canDelete = FeedService.canUserDeletePost(post, myUserId);
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete post?',
+      'This will remove your message from the class feed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
+      ]
+    );
+  };
 
   // Build per-kind counts + my-reaction set
   const kindCount = {};
@@ -88,6 +100,16 @@ function PostCard({ post, myUserId, onReact }) {
           <View style={styles.activityBadge}>
             <Text style={styles.activityBadgeText}>⚡ activity</Text>
           </View>
+        )}
+        {canDelete && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={confirmDelete}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -199,6 +221,16 @@ export default function GroupScreen({ route, navigation }) {
       await FeedService.toggleReaction(postId, kind, hasReacted);
     } catch {
       // Revert on failure
+      load();
+    }
+  };
+
+  const handleDelete = async (postId) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    try {
+      await FeedService.deletePost(postId);
+    } catch (e) {
+      Alert.alert('Could not delete', e.message || 'Try again.');
       load();
     }
   };
@@ -337,6 +369,7 @@ export default function GroupScreen({ route, navigation }) {
                 post={item}
                 myUserId={myUserId}
                 onReact={handleReact}
+                onDelete={handleDelete}
               />
             )}
             ListEmptyComponent={
@@ -539,6 +572,12 @@ const makeStyles = (theme) => StyleSheet.create({
     borderColor: '#fde68a',
   },
   activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '600' },
+  deleteBtn: {
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  deleteBtnText: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
   postBody: {
     fontSize: 15,
     color: theme.text,

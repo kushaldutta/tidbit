@@ -65,7 +65,7 @@ class FeedService {
     const { data, error } = await supabase
       .from('feed_posts')
       .select(`
-        id, post_type, payload, created_at,
+        id, post_type, payload, created_at, author_id,
         profiles!author_id(display_name, grad_year),
         reactions(kind, user_id)
       `)
@@ -83,6 +83,7 @@ class FeedService {
       postType: p.post_type,
       payload: p.payload || {},
       createdAt: p.created_at,
+      authorId: p.author_id,
       authorName: p.profiles?.display_name || 'Tidbit User',
       authorYear: p.profiles?.grad_year || null,
       reactions: p.reactions || [],
@@ -146,7 +147,7 @@ class FeedService {
     const { data: posts, error: pErr } = await supabase
       .from('feed_posts')
       .select(`
-        id, post_type, payload, created_at, group_id,
+        id, post_type, payload, created_at, group_id, author_id,
         profiles!author_id(display_name, grad_year),
         reactions(kind, user_id)
       `)
@@ -166,6 +167,7 @@ class FeedService {
         postType: p.post_type,
         payload: p.payload || {},
         createdAt: p.created_at,
+        authorId: p.author_id,
         groupId: p.group_id,
         groupCode: groupInfo[p.group_id]?.code || '',
         groupTitle: groupInfo[p.group_id]?.title || '',
@@ -192,6 +194,33 @@ class FeedService {
       post_type: anonymous ? 'dumb_question' : 'note',
       payload: { text: text.trim() },
     });
+    if (error) throw error;
+  }
+
+  /** User-written feed messages the author may remove. */
+  static isUserComposedPost(postType) {
+    return postType === 'note' || postType === 'dumb_question';
+  }
+
+  static canUserDeletePost(post, myUserId) {
+    return Boolean(
+      myUserId &&
+      post?.authorId === myUserId &&
+      this.isUserComposedPost(post.postType)
+    );
+  }
+
+  /** Delete a feed post authored by the signed-in user (RLS enforced). */
+  static async deletePost(postId) {
+    if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const userId = AuthService.getUserId();
+    if (!userId) throw new Error('Not signed in');
+
+    const { error } = await supabase
+      .from('feed_posts')
+      .delete()
+      .eq('id', postId)
+      .eq('author_id', userId);
     if (error) throw error;
   }
 

@@ -70,13 +70,25 @@ function Avatar({ name, size = 36, anon = false }) {
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 
-function PostCard({ post, myUserId, onReact }) {
+function PostCard({ post, myUserId, onReact, onDelete }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const isAnon = post.postType === 'dumb_question';
   const isActivity = post.postType === 'activity';
   const isDeckShare = post.postType === 'deck_share';
   const body = postBodyText(post);
+  const canDelete = FeedService.canUserDeletePost(post, myUserId);
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete post?',
+      'This will remove your message from the feed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
+      ]
+    );
+  };
 
   const kindCount = {};
   const myKinds = new Set();
@@ -117,6 +129,16 @@ function PostCard({ post, myUserId, onReact }) {
             <Text style={styles.postTime}>{relativeTime(post.createdAt)}</Text>
           </View>
         </View>
+        {canDelete && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={confirmDelete}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Body */}
@@ -348,6 +370,16 @@ export default function FeedScreen({ navigation }) {
     await load();
   };
 
+  const handleDelete = async (postId) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    try {
+      await FeedService.deletePost(postId);
+    } catch (e) {
+      Alert.alert('Could not delete', e.message || 'Try again.');
+      load();
+    }
+  };
+
   const filteredPosts = filterGroupId
     ? posts.filter((p) => p.groupId === filterGroupId)
     : posts;
@@ -417,6 +449,7 @@ export default function FeedScreen({ navigation }) {
               post={item}
               myUserId={myUserId}
               onReact={handleReact}
+              onDelete={handleDelete}
             />
           )}
           ListEmptyComponent={
@@ -578,6 +611,12 @@ const makeStyles = (theme) => StyleSheet.create({
     borderColor: '#fde68a',
   },
   activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '700' },
+  deleteBtn: {
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  deleteBtnText: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
   postBody: {
     fontSize: 15,
     color: theme.text,
