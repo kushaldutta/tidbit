@@ -4,8 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
+import { SyncService } from '../services/SyncService';
 
-export default function PermissionRequestScreen({ navigation }) {
+export default function PermissionRequestScreen({ navigation, returningUser, onDismiss }) {
   const [permissionStatus, setPermissionStatus] = useState(null);
   const [isRequesting, setIsRequesting] = useState(false);
 
@@ -57,11 +58,23 @@ export default function PermissionRequestScreen({ navigation }) {
   };
 
   const handleFinish = async () => {
-    // Mark onboarding as complete
-    await StorageService.setOnboardingCompleted(true);
-    
-    // App.js will detect the change via the interval check and switch to main app
-    // No need to navigate - the conditional rendering in App.js will handle it
+    if (returningUser) {
+      try {
+        await SyncService.syncProfilePreferences();
+      } catch (e) {
+        console.warn('[PermissionRequest] Cloud sync on finish failed:', e.message);
+      }
+      await StorageService.setItem('notification_prompt_dismissed_v1', 'true');
+      onDismiss?.();
+      return;
+    }
+
+    try {
+      await SyncService.completeOnboarding();
+    } catch (e) {
+      console.warn('[PermissionRequest] Cloud sync on finish failed:', e.message);
+      await StorageService.setOnboardingCompleted(true);
+    }
   };
 
   const getPermissionMessage = () => {
@@ -96,7 +109,9 @@ export default function PermissionRequestScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Almost there!</Text>
+          <Text style={styles.title}>
+            {returningUser ? 'Stay in the loop' : 'Almost there!'}
+          </Text>
           <Text style={styles.subtitle}>
             {message.title}
           </Text>

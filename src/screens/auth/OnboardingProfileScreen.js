@@ -58,7 +58,19 @@ export default function OnboardingProfileScreen({ navigation }) {
       // App.js will re-check profile completion and route to class selection.
       navigation.replace('ClassSelection', { schoolId });
     } catch (err) {
-      Alert.alert('Could not save profile', err.message || 'Try again.');
+      const expired =
+        err.message?.includes('session expired') ||
+        AuthService.isStaleSessionError(err) ||
+        AuthService.isAuthMismatchError(err);
+      if (expired) {
+        Alert.alert(
+          'Session expired',
+          'Please sign in again to continue.',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Could not save profile', err.message || 'Try again.');
+      }
     } finally {
       setSaving(false);
     }

@@ -4,7 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { AppState, Text, Platform, DeviceEventEmitter } from 'react-native';
+import { AppState, Text, Platform, DeviceEventEmitter, Modal } from 'react-native';
 
 import HomeScreen from './src/screens/HomeScreen';
 import CategoriesScreen from './src/screens/CategoriesScreen';
@@ -176,12 +176,44 @@ function UnauthStack() {
   );
 }
 
-// Shown after auth when profile is incomplete: profile → classes → notifications.
-function FullSetupStack() {
+// Shown after auth when profile is incomplete or first-time setup remains.
+// startAt: 'profile' → name/school/year only; 'setup' → classes → frequency → permissions.
+function FullSetupStack({ startAt = 'profile' }) {
+  const [boot, setBoot] = useState({
+    ready: startAt === 'profile',
+    route: startAt === 'setup' ? 'ClassSelection' : 'OnboardingProfile',
+    params: {},
+  });
+
+  useEffect(() => {
+    if (startAt !== 'setup') return;
+
+    (async () => {
+      try {
+        const profile = await ProfileService.getMyProfile();
+        setBoot({
+          ready: true,
+          route: 'ClassSelection',
+          params: { schoolId: profile?.school_id || 'uc-berkeley' },
+        });
+      } catch {
+        setBoot({ ready: true, route: 'ClassSelection', params: {} });
+      }
+    })();
+  }, [startAt]);
+
+  if (!boot.ready) {
+    return <LoadingScreen />;
+  }
+
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="OnboardingProfile">
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={boot.route}>
       <Stack.Screen name="OnboardingProfile" component={OnboardingProfileScreen} />
-      <Stack.Screen name="ClassSelection" component={ClassSelectionScreen} />
+      <Stack.Screen
+        name="ClassSelection"
+        component={ClassSelectionScreen}
+        initialParams={boot.route === 'ClassSelection' ? boot.params : undefined}
+      />
       <Stack.Screen name="FrequencySelection" component={FrequencySelectionScreen} />
       <Stack.Screen name="PermissionRequest" component={PermissionRequestScreen} />
     </Stack.Navigator>
@@ -252,9 +284,12 @@ export default function App() {
   const [appState, setAppState] = useState(AppState.currentState);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(null); // null = checking, true/false = determined
   const [isLoading, setIsLoading] = useState(true); // Show loading screen initially
-  // Auth gate state. null while resolving, then 'unauthenticated' | 'needs_profile' | 'ready'.
+  // Auth gate: unauthenticated | needs_profile | needs_onboarding | ready
   const [authStatus, setAuthStatus] = useState(null);
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const authStatusRef = useRef(null);
+  const isOnboardingCompleteRef = useRef(null);
+  const resolveInFlightRef = useRef(null);
   const isInitializedRef = useRef(false);
   const navigationRef = useRef(null);
 
@@ -262,31 +297,60 @@ export default function App() {
     authStatusRef.current = authStatus;
   }, [authStatus]);
 
+  useEffect(() => {
+    isOnboardingCompleteRef.current = isOnboardingComplete;
+  }, [isOnboardingComplete]);
+
   // Resolve auth + profile to decide which stack to mount.
-  // 'ready' requires BOTH a complete profile AND completed onboarding so that
-  // the FullSetupStack stays mounted through all setup screens (profile →
-  // classes → notification frequency → permission) and only exits to MainTabs
-  // when PermissionRequestScreen sets the onboardingCompleted flag.
   const resolveAuthStatus = useCallback(async () => {
-    const session = AuthService.getSession();
-    if (!session?.user?.id) {
-      setAuthStatus('unauthenticated');
-      return;
+    if (resolveInFlightRef.current) {
+      return resolveInFlightRef.current;
     }
+
+    const task = (async () => {
+      const session = AuthService.getSession();
+      if (!session?.user?.id) {
+        setAuthStatus('unauthenticated');
+        return;
+      }
+      try {
+        await AuthService.ensureValidSession();
+        EntitlementService.init().catch(() => {});
+        const userId = AuthService.getUserId();
+        if (userId) EntitlementService.identifyUser(userId).catch(() => {});
+        await SyncService.onAuthenticated();
+        const [hasProfile, onboardingDone] = await Promise.all([
+          ProfileService.hasCompletedProfile(),
+          StorageService.getOnboardingCompleted(),
+        ]);
+        setIsOnboardingComplete(onboardingDone);
+
+        if (!hasProfile) {
+          setAuthStatus('needs_profile');
+        } else if (!onboardingDone) {
+          setAuthStatus('needs_onboarding');
+        } else {
+          setAuthStatus('ready');
+        }
+      } catch (err) {
+        console.warn('[APP] resolveAuthStatus profile check failed:', err);
+        if (
+          AuthService.isStaleSessionError(err) ||
+          AuthService.isAuthMismatchError(err)
+        ) {
+          await AuthService.clearLocalAuthSession();
+          setAuthStatus('unauthenticated');
+          return;
+        }
+        setAuthStatus('ready');
+      }
+    })();
+
+    resolveInFlightRef.current = task;
     try {
-      SyncService.syncIfNeeded().catch(() => {});
-      EntitlementService.init().catch(() => {});
-      const userId = session.user.id;
-      EntitlementService.identifyUser(userId).catch(() => {});
-      const [hasProfile, onboardingDone] = await Promise.all([
-        ProfileService.hasCompletedProfile(),
-        StorageService.getOnboardingCompleted(),
-      ]);
-      setAuthStatus(hasProfile && onboardingDone ? 'ready' : 'needs_profile');
-    } catch (err) {
-      console.warn('[APP] resolveAuthStatus profile check failed:', err);
-      // Fail open so a bad network doesn't lock the user out.
-      setAuthStatus('ready');
+      await task;
+    } finally {
+      resolveInFlightRef.current = null;
     }
   }, []);
 
@@ -339,16 +403,21 @@ export default function App() {
       resolveAuthStatus();
     });
 
-    // Re-check device-local onboarding flag periodically (legacy behavior).
-    // Also re-resolve auth status while we're waiting for the user to finish
-    // profile setup, so screens like OnboardingProfile / ClassSelection can
-    // advance the gate just by writing to Supabase / AsyncStorage.
-    const interval = setInterval(() => {
-      if (!isLoading) {
-        checkOnboardingStatus();
+    // Re-check local onboarding flag while in setup — only hit the server when
+    // onboarding actually completes (not every 500ms).
+    const interval = setInterval(async () => {
+      if (isLoading) return;
+
+      const prevOnboarding = isOnboardingCompleteRef.current;
+      const onboardingDone = await StorageService.getOnboardingCompleted();
+
+      if (onboardingDone !== prevOnboarding) {
+        setIsOnboardingComplete(onboardingDone);
+        isOnboardingCompleteRef.current = onboardingDone;
         if (
-          authStatusRef.current === 'needs_profile' ||
-          authStatusRef.current === null
+          onboardingDone &&
+          (authStatusRef.current === 'needs_profile' ||
+            authStatusRef.current === 'needs_onboarding')
         ) {
           resolveAuthStatus();
         }
@@ -360,6 +429,37 @@ export default function App() {
       unsubscribeAuth?.();
     };
   }, [checkOnboardingStatus, isLoading, resolveAuthStatus]);
+
+  // Returning users: optional notification prompt once per device if not granted.
+  useEffect(() => {
+    if (authStatus !== 'ready') {
+      setShowNotificationPrompt(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [{ status }, dismissed] = await Promise.all([
+          Notifications.getPermissionsAsync(),
+          StorageService.getItem('notification_prompt_dismissed_v1'),
+        ]);
+        if (
+          !cancelled &&
+          status !== 'granted' &&
+          dismissed !== 'true'
+        ) {
+          setShowNotificationPrompt(true);
+        }
+      } catch {
+        // Non-fatal
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus]);
 
   useEffect(() => {
     let mounted = true;
@@ -618,12 +718,15 @@ export default function App() {
   }
 
   // Pick the active stack based on auth + profile state.
-  // Order: unauthenticated → welcome+auth, needs_profile → full setup, else → main app.
+  // Order: unauthenticated → welcome+auth, needs_profile → profile only,
+  // needs_onboarding → classes/frequency/permissions, else → main app.
   let activeStack;
   if (authStatus === 'unauthenticated') {
     activeStack = <UnauthStack />;
   } else if (authStatus === 'needs_profile') {
-    activeStack = <FullSetupStack />;
+    activeStack = <FullSetupStack startAt="profile" />;
+  } else if (authStatus === 'needs_onboarding') {
+    activeStack = <FullSetupStack startAt="setup" />;
   } else {
     activeStack = (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -671,6 +774,17 @@ export default function App() {
             onNextTidbit={handleNextTidbit}
           />
         )}
+        <Modal
+          visible={showNotificationPrompt}
+          animationType="slide"
+          presentationStyle="fullScreen"
+          onRequestClose={() => setShowNotificationPrompt(false)}
+        >
+          <PermissionRequestScreen
+            returningUser
+            onDismiss={() => setShowNotificationPrompt(false)}
+          />
+        </Modal>
       </ThemedNavigationContainer>
       <StatusBar style="auto" />
     </SafeAreaProvider>

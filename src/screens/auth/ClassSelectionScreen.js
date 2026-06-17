@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,23 +11,40 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClassService } from '../../services/ClassService';
-import { StorageService } from '../../services/StorageService';
+import CatalogSegmentedControl from '../../components/CatalogSegmentedControl';
+import { DEFAULT_SCHOOL_ID, getSchool } from '../../config/schools';
 
 export default function ClassSelectionScreen({ route, navigation }) {
-  const schoolId = route?.params?.schoolId || 'uc-berkeley';
+  const preferredSchoolId = route?.params?.schoolId || DEFAULT_SCHOOL_ID;
 
+  const [catalogSchoolId, setCatalogSchoolId] = useState(preferredSchoolId);
+  const [profileSchoolId] = useState(preferredSchoolId);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [query, setQuery] = useState('');
 
+  const catalogSchool = getSchool(catalogSchoolId);
+
+  const loadCatalog = useCallback(async (schoolId, { silent = false } = {}) => {
+    if (!silent) setCatalogLoading(true);
+    try {
+      const data = await ClassService.listBySchool(schoolId);
+      setClasses(data);
+    } catch (e) {
+      Alert.alert('Error loading classes', e.message || 'Try again.');
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     (async () => {
+      setLoading(true);
       try {
-        const data = await ClassService.listBySchool(schoolId);
-        setClasses(data);
-        // Pre-check any classes the user already joined (e.g. re-entering onboarding)
+        await loadCatalog(preferredSchoolId, { silent: true });
         const existing = await ClassService.getMyClassIds();
         setSelectedIds(new Set(existing));
       } catch (e) {
@@ -36,7 +53,13 @@ export default function ClassSelectionScreen({ route, navigation }) {
         setLoading(false);
       }
     })();
-  }, [schoolId]);
+  }, [preferredSchoolId, loadCatalog]);
+
+  const handleCatalogChange = useCallback((schoolId) => {
+    setCatalogSchoolId(schoolId);
+    setQuery('');
+    loadCatalog(schoolId);
+  }, [loadCatalog]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -100,6 +123,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
 
   const renderItem = ({ item }) => {
     const selected = selectedIds.has(item.id);
+    const hasContent = ClassService.hasTidbitContent(item.id);
     return (
       <TouchableOpacity
         style={[styles.classRow, selected && styles.classRowSelected]}
@@ -107,9 +131,16 @@ export default function ClassSelectionScreen({ route, navigation }) {
         activeOpacity={0.7}
       >
         <View style={styles.classInfo}>
-          <Text style={[styles.classCode, selected && styles.classCodeSelected]}>
-            {item.code}
-          </Text>
+          <View style={styles.classTitleLine}>
+            <Text style={[styles.classCode, selected && styles.classCodeSelected]}>
+              {item.code}
+            </Text>
+            {!hasContent && (
+              <View style={styles.soonBadge}>
+                <Text style={styles.soonBadgeText}>Soon</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.classTitle} numberOfLines={1}>
             {item.title}
           </Text>
@@ -142,11 +173,19 @@ export default function ClassSelectionScreen({ route, navigation }) {
         </Text>
       </View>
 
+      <View style={styles.segmentWrap}>
+        <CatalogSegmentedControl
+          value={catalogSchoolId}
+          onChange={handleCatalogChange}
+          preferredSchoolId={profileSchoolId}
+        />
+      </View>
+
       {/* Search */}
       <View style={styles.searchWrapper}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search classes…"
+          placeholder={catalogSchool.searchPlaceholder}
           placeholderTextColor="#9ca3af"
           value={query}
           onChangeText={setQuery}
@@ -165,7 +204,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
       )}
 
       {/* List */}
-      {loading ? (
+      {loading || catalogLoading ? (
         <ActivityIndicator style={{ flex: 1 }} color="#6366f1" />
       ) : (
         <FlatList
@@ -220,6 +259,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 6 },
   subtitle: { fontSize: 14, color: '#6b7280', lineHeight: 20 },
+  segmentWrap: { paddingHorizontal: 16, paddingBottom: 4 },
 
   searchWrapper: { paddingHorizontal: 16, paddingVertical: 8 },
   searchInput: {
@@ -270,9 +310,17 @@ const styles = StyleSheet.create({
     borderColor: '#6366f1',
   },
   classInfo: { flex: 1, marginRight: 12 },
+  classTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   classCode: { fontSize: 15, fontWeight: '600', color: '#111827' },
   classCodeSelected: { color: '#4338ca' },
   classTitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  soonBadge: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  soonBadgeText: { fontSize: 10, fontWeight: '700', color: '#b45309' },
 
   checkbox: {
     width: 24,

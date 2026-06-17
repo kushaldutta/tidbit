@@ -4,6 +4,7 @@ import { StorageService } from './StorageService';
 import { ContentService } from './ContentService';
 import { UnlockService } from './UnlockService';
 import { AuthService } from './AuthService';
+import { SyncService } from './SyncService';
 import API_CONFIG from '../config/api';
 import Constants from 'expo-constants';
 
@@ -128,6 +129,9 @@ class NotificationService {
             console.log('[PUSH_NOTIFICATIONS] Device token registered successfully');
             // Store token locally for reference
             await StorageService.setItem('push_token', pushToken);
+            if (userId) {
+              await SyncService.linkDeviceTokenToUser(pushToken);
+            }
           } else {
             console.error('[PUSH_NOTIFICATIONS] Failed to register token:', result.error);
           }

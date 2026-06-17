@@ -1,39 +1,229 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
+import { ProfileService } from './ProfileService';
+import { ClassService } from './ClassService';
 import { StorageService } from './StorageService';
 
-const SYNCED_FLAG = 'cloud_sync_completed_v1';
+const SYNCED_FLAG_PREFIX = 'cloud_sync_completed_v1';
 
 /**
- * One-way sync of legacy AsyncStorage-only state into the cloud the first
- * time a user logs in. Idempotent: stops after a successful run.
- *
- * What we sync up:
- *  - notification preferences (interval, enabled, quiet hours)
- *  - selected categories
- *  - aggregate stats (tidbits seen, daily counts)
- *
- * What we do NOT sync (yet):
- *  - per-card spaced-repetition state (lives in legacy
- *    SpacedRepetitionService format; migrated in W3 when decks/cards exist)
+ * Keeps device-local prefs aligned with the Supabase user account so the same
+ * Apple / email login is the same account on every device.
  */
 class SyncService {
-  static async syncIfNeeded() {
-    if (!SUPABASE_CONFIGURED) return false;
-    if (!AuthService.isAuthenticated()) return false;
+  static _syncedForUserId = null;
 
-    const alreadySynced = await AsyncStorage.getItem(SYNCED_FLAG);
+  static resetSyncCache() {
+    this._syncedForUserId = null;
+  }
+
+  static syncedFlagKey(userId) {
+    return `${SYNCED_FLAG_PREFIX}:${userId}`;
+  }
+
+  static isOnboardingCompleteInCloud(profile) {
+    return profile?.notification_settings?.onboarding_completed === true;
+  }
+
+  /** Legacy accounts or anyone with meaningful cloud state — skip setup on re-login. */
+  static async isFullyOnboarded(profile) {
+    if (!profile?.display_name || !profile?.school_id) return false;
+    if (this.isOnboardingCompleteInCloud(profile)) return true;
+    if (profile?.notification_settings?.onboarding_completed === false) return false;
+
+    const settings = profile?.notification_settings || {};
+    const userId = profile.id || AuthService.getUserId();
+
+    if (settings.interval_minutes != null) {
+      await this.markOnboardingCompleteInCloud(userId, settings);
+      return true;
+    }
+
+    if (
+      Array.isArray(settings.legacy_selected_categories) &&
+      settings.legacy_selected_categories.length > 0
+    ) {
+      await this.markOnboardingCompleteInCloud(userId, settings);
+      return true;
+    }
+
+    const classIds = await ClassService.getMyClassIds();
+    if (classIds.length > 0) {
+      await this.markOnboardingCompleteInCloud(userId, settings);
+      return true;
+    }
+
+    const { data: stats } = await supabase
+      .from('user_stats')
+      .select('tidbits_seen')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (stats?.tidbits_seen > 0) {
+      await this.markOnboardingCompleteInCloud(userId, settings);
+      return true;
+    }
+
+    const alreadySynced = await AsyncStorage.getItem(this.syncedFlagKey(userId));
+    if (alreadySynced === 'true') {
+      await this.markOnboardingCompleteInCloud(userId, settings);
+      return true;
+    }
+
+    return false;
+  }
+
+  static async markOnboardingCompleteInCloud(userId, existingSettings = {}) {
+    if (!userId) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        notification_settings: {
+          ...existingSettings,
+          onboarding_completed: true,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+    if (error) console.warn('[SYNC] markOnboardingCompleteInCloud failed:', error.message);
+  }
+
+  /**
+   * Call after every successful auth (app launch + sign-in).
+   * Fully onboarded users: pull cloud state and skip setup.
+   * Mid-onboarding users: keep setup flow; do not mark onboarding done.
+   */
+  static async onAuthenticated() {
+    if (!SUPABASE_CONFIGURED || !AuthService.isAuthenticated()) return false;
+
+    const userId = AuthService.getUserId();
+    if (!userId) return false;
+
+    if (this._syncedForUserId === userId) return true;
+
+    try {
+      const profile = await ProfileService.getMyProfile();
+      const onboardingDone = await this.isFullyOnboarded(profile);
+
+      if (onboardingDone) {
+        await this.hydrateFromCloud(profile);
+        await StorageService.setOnboardingCompleted(true);
+        await AsyncStorage.setItem(this.syncedFlagKey(userId), 'true');
+
+        const classIds = await ClassService.getMyClassIds();
+        if (classIds.length > 0) {
+          await ClassService.replaceCategoriesToEnrollment(classIds);
+        }
+      } else {
+        // Profile may exist mid-setup — never skip class selection / permissions.
+        await StorageService.setOnboardingCompleted(false);
+
+        const hasPartialProfile = Boolean(profile?.display_name && profile?.school_id);
+        if (!hasPartialProfile) {
+          const localOnboardingDone = await StorageService.getOnboardingCompleted();
+          if (localOnboardingDone) {
+            await this.pushLegacyLocalStateIfNeeded(userId);
+          }
+        }
+      }
+
+      await this.linkDeviceTokenIfRegistered();
+      this._syncedForUserId = userId;
+      return true;
+    } catch (err) {
+      console.error('[SYNC] onAuthenticated failed:', err);
+      return false;
+    }
+  }
+
+  /** Mark onboarding finished locally and in the cloud (PermissionRequest screen). */
+  static async completeOnboarding() {
+    await StorageService.setOnboardingCompleted(true);
+    this.resetSyncCache();
+
+    const userId = AuthService.getUserId();
+    if (!userId) return;
+
+    const profile = await ProfileService.getMyProfile();
+    const existing = profile?.notification_settings || {};
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        notification_settings: {
+          ...existing,
+          onboarding_completed: true,
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    await AsyncStorage.setItem(this.syncedFlagKey(userId), 'true');
+    await this.syncProfilePreferences();
+    await this.syncUserStats();
+  }
+
+  /** @deprecated Use onAuthenticated() */
+  static async syncIfNeeded() {
+    return this.onAuthenticated();
+  }
+
+  /**
+   * Pull server-side account state onto this device.
+   */
+  static async hydrateFromCloud(profile) {
+    const userId = profile?.id || AuthService.getUserId();
+    if (!userId) return;
+
+    const settings = profile?.notification_settings || {};
+
+    if (settings.interval_minutes != null) {
+      await StorageService.setNotificationInterval(settings.interval_minutes);
+    }
+    if (typeof settings.enabled === 'boolean') {
+      await StorageService.setNotificationsEnabled(settings.enabled);
+    }
+    const qh = settings.quiet_hours;
+    if (qh) {
+      if (typeof qh.enabled === 'boolean') {
+        await StorageService.setQuietHoursEnabled(qh.enabled);
+      }
+      if (qh.start != null) await StorageService.setQuietHoursStart(qh.start);
+      if (qh.end != null) await StorageService.setQuietHoursEnd(qh.end);
+    }
+
+    const { data: stats } = await supabase
+      .from('user_stats')
+      .select('tidbits_seen, cards_mastered')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (stats?.tidbits_seen != null) {
+      const local = await StorageService.getTidbitsSeen();
+      await StorageService.setTidbitsSeen(Math.max(local, stats.tidbits_seen));
+    }
+
+    console.log('[SYNC] Hydrated account state from cloud for user', userId);
+  }
+
+  /**
+   * First login on this device for a new account — upload legacy AsyncStorage once.
+   */
+  static async pushLegacyLocalStateIfNeeded(userId) {
+    const flagKey = this.syncedFlagKey(userId);
+    const alreadySynced = await AsyncStorage.getItem(flagKey);
     if (alreadySynced === 'true') return false;
 
     try {
       await this.syncProfilePreferences();
       await this.syncUserStats();
-      await AsyncStorage.setItem(SYNCED_FLAG, 'true');
-      console.log('[SYNC] Legacy state synced to cloud');
+      await AsyncStorage.setItem(flagKey, 'true');
+      console.log('[SYNC] Legacy local state pushed to cloud');
       return true;
     } catch (err) {
-      console.error('[SYNC] Cloud sync failed (will retry on next launch):', err);
+      console.error('[SYNC] pushLegacyLocalStateIfNeeded failed:', err);
       return false;
     }
   }
@@ -41,6 +231,9 @@ class SyncService {
   static async syncProfilePreferences() {
     const userId = AuthService.getUserId();
     if (!userId) return;
+
+    const profile = await ProfileService.getMyProfile();
+    const existing = profile?.notification_settings || {};
 
     const [
       notificationInterval,
@@ -59,6 +252,7 @@ class SyncService {
     ]);
 
     const notification_settings = {
+      ...existing,
       interval_minutes: notificationInterval,
       enabled: notificationsEnabled,
       quiet_hours: {
@@ -97,8 +291,13 @@ class SyncService {
     if (error) throw error;
   }
 
-  // Link the existing push-notification device token to the now-authenticated
-  // user (backfill of device_tokens.user_id added in W2 migration).
+  static async linkDeviceTokenIfRegistered() {
+    const pushToken = await StorageService.getItem('push_token');
+    if (pushToken) {
+      await this.linkDeviceTokenToUser(pushToken);
+    }
+  }
+
   static async linkDeviceTokenToUser(pushToken) {
     if (!SUPABASE_CONFIGURED || !pushToken) return;
     const userId = AuthService.getUserId();
@@ -111,6 +310,20 @@ class SyncService {
     if (error) {
       console.warn('[SYNC] linkDeviceTokenToUser failed:', error.message);
     }
+  }
+
+  /**
+   * Clear device-local session cache on sign-out so the next login does not
+   * inherit another account's onboarding / category picks.
+   */
+  static async clearLocalSessionState() {
+    await StorageService.setOnboardingCompleted(false);
+    await StorageService.setSelectedCategories([]);
+    await StorageService.setSelectedDeckIds([]);
+    await StorageService.setNotificationDisabledCategories([]);
+    await StorageService.setNotificationsEnabled(true);
+    await StorageService.setNotificationInterval(60);
+    await StorageService.setQuietHoursEnabled(false);
   }
 }
 

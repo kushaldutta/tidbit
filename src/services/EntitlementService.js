@@ -9,6 +9,7 @@
  */
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { AuthService } from './AuthService';
 
 const IOS_KEY     = process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY     || '';
@@ -18,6 +19,7 @@ const ENTITLEMENT_ID = 'Tidbit - Never Cram Again! Premium';
 
 class EntitlementService {
   static _initialized = false;
+  static _identifiedUserId = null;
   static _premiumCache = false;
   static _listeners = new Set();
 
@@ -36,6 +38,14 @@ class EntitlementService {
   /** Call once from App.js after auth is resolved. */
   static async init() {
     try {
+      if (this._initialized) return;
+
+      // Native IAP is unavailable in Expo Go — skip to avoid noisy configure errors.
+      if (Constants.executionEnvironment === 'storeClient') {
+        console.warn('[EntitlementService] Skipping RevenueCat in Expo Go');
+        return;
+      }
+
       if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 
       const apiKey = Platform.OS === 'ios' ? IOS_KEY : ANDROID_KEY;
@@ -65,9 +75,11 @@ class EntitlementService {
 
   /** Call after sign-in so RevenueCat links purchases to the user. */
   static async identifyUser(userId) {
-    if (!this._initialized) return;
+    if (!this._initialized || !userId) return;
+    if (this._identifiedUserId === userId) return;
     try {
       await Purchases.logIn(userId);
+      this._identifiedUserId = userId;
     } catch (err) {
       console.warn('[EntitlementService] identifyUser error:', err.message);
     }
@@ -75,6 +87,7 @@ class EntitlementService {
 
   /** Call on sign-out. */
   static async reset() {
+    this._identifiedUserId = null;
     if (!this._initialized) return;
     try {
       await Purchases.logOut();

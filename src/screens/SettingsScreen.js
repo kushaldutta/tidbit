@@ -54,6 +54,7 @@ export default function SettingsScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
   const [notificationDecks, setNotificationDecks] = useState({ classSources: [], myDecks: [] });
   const [decksLoading, setDecksLoading] = useState(false);
+  const [accountBusy, setAccountBusy] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -76,6 +77,70 @@ export default function SettingsScreen({ navigation }) {
     } catch (error) {
       console.error('Error loading profile:', error);
     }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign out?',
+      'You can sign back in anytime with the same Apple ID or email to restore your account.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: async () => {
+            setAccountBusy(true);
+            try {
+              await AuthService.signOut();
+            } catch (e) {
+              Alert.alert('Could not sign out', e.message || 'Please try again.');
+            } finally {
+              setAccountBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This permanently deletes your profile, classes, decks, and progress. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you sure?',
+              'Your account and all associated data will be permanently removed.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, delete everything',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setAccountBusy(true);
+                    try {
+                      await AuthService.deleteAccount();
+                    } catch (e) {
+                      Alert.alert(
+                        'Could not delete account',
+                        e.message || 'Please try again or contact support.'
+                      );
+                    } finally {
+                      setAccountBusy(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   const loadNotificationDecks = useCallback(async () => {
@@ -907,6 +972,34 @@ export default function SettingsScreen({ navigation }) {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Account</Text>
+        <TouchableOpacity
+          style={[styles.signOutButton, accountBusy && styles.accountButtonDisabled]}
+          onPress={handleSignOut}
+          disabled={accountBusy}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.signOutButtonText}>
+            {accountBusy ? 'Please wait…' : 'Sign Out'}
+          </Text>
+        </TouchableOpacity>
+        <Text style={styles.accountHint}>
+          Sign out on this device. Your account stays saved in the cloud.
+        </Text>
+        <TouchableOpacity
+          style={[styles.deleteAccountButton, accountBusy && styles.accountButtonDisabled]}
+          onPress={handleDeleteAccount}
+          disabled={accountBusy}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.deleteAccountButtonText}>Delete Account</Text>
+        </TouchableOpacity>
+        <Text style={styles.deleteAccountHint}>
+          Permanently removes your account and all data. Required for App Store compliance.
+        </Text>
+      </View>
+
       {/* Dev-only reset section — only visible in Expo Go / __DEV__ builds */}
       {__DEV__ && (
         <View style={styles.section}>
@@ -940,7 +1033,8 @@ export default function SettingsScreen({ navigation }) {
                           .eq('user_id', userId);
                       }
                       await StorageService.setOnboardingCompleted(false);
-                      await AsyncStorage.removeItem('cloud_sync_completed_v1');
+                      const syncKey = userId ? `cloud_sync_completed_v1:${userId}` : 'cloud_sync_completed_v1';
+                      await AsyncStorage.removeItem(syncKey);
                       Alert.alert(
                         'Done — Force close required',
                         'Profile cleared. Now FORCE CLOSE Expo Go from the iOS app switcher, then reopen it. (Pressing R in terminal is not enough.)'
@@ -1339,6 +1433,49 @@ const makeStyles = (theme) => StyleSheet.create({
     color: '#dc2626',
     fontSize: 14,
     fontWeight: '600',
+  },
+  signOutButton: {
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  signOutButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  accountHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 8,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  deleteAccountButton: {
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  deleteAccountButtonText: {
+    color: '#dc2626',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteAccountHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  accountButtonDisabled: {
+    opacity: 0.5,
   },
 });
 

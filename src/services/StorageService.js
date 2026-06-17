@@ -97,10 +97,18 @@ class StorageService {
     }
   }
 
+  static async setTidbitsSeen(count) {
+    try {
+      await AsyncStorage.setItem(KEYS.TIDBITS_SEEN, String(Math.max(0, count || 0)));
+    } catch (error) {
+      console.error('Error setting tidbits seen:', error);
+    }
+  }
+
   static async incrementTidbitsSeen() {
     try {
       const current = await this.getTidbitsSeen();
-      await AsyncStorage.setItem(KEYS.TIDBITS_SEEN, String(current + 1));
+      await this.setTidbitsSeen(current + 1);
     } catch (error) {
       console.error('Error incrementing tidbits seen:', error);
     }

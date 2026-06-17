@@ -22,7 +22,7 @@ class ProfileService {
 
   static async upsertProfile(updates) {
     if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
-    const user = AuthService.getUser();
+    const user = await AuthService.ensureValidSession();
     if (!user?.id) throw new Error('Not signed in');
 
     const row = {
@@ -34,11 +34,42 @@ class ProfileService {
 
     const { data, error } = await supabase
       .from('profiles')
-      .upsert(row, { onConflict: 'id' })
+      .update(row)
+      .eq('id', user.id)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      if (
+        AuthService.isAuthMismatchError(error) ||
+        AuthService.isStaleSessionError(error)
+      ) {
+        await AuthService.clearLocalAuthSession();
+        throw new Error('Your session expired. Please sign in again.');
+      }
+      throw error;
+    }
+
+    if (data) return data;
+
+    // Profile row missing (trigger may not have run) — update only works if row exists.
+    const { data: inserted, error: insertError } = await supabase
+      .from('profiles')
+      .insert(row)
       .select()
       .single();
-    if (error) throw error;
-    return data;
+
+    if (insertError) {
+      if (
+        AuthService.isAuthMismatchError(insertError) ||
+        AuthService.isStaleSessionError(insertError)
+      ) {
+        await AuthService.clearLocalAuthSession();
+        throw new Error('Your session expired. Please sign in again.');
+      }
+      throw insertError;
+    }
+    return inserted;
   }
 
   static async hasCompletedProfile() {
