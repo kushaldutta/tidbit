@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,9 @@ import { AuthService } from '../services/AuthService';
 import { ModerationService } from '../services/ModerationService';
 import ModerationReasonModal from '../components/ModerationReasonModal';
 import ReportContentModal from '../components/ReportContentModal';
+import SharedDeckRow from '../components/SharedDeckRow';
 import { ReportService } from '../services/ReportService';
+import { DeckVoteService } from '../services/DeckVoteService';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -45,6 +47,7 @@ function postBodyText(post) {
 }
 
 const REACTION_EMOJIS = ['👍', '❤️', '🔥'];
+const TOP_DECKS_VISIBLE = 3;
 
 // ─── sub-components ─────────────────────────────────────────────────────────
 
@@ -185,7 +188,15 @@ export default function GroupScreen({ route, navigation }) {
   const [isModerator, setIsModerator] = useState(false);
   const [modTarget, setModTarget] = useState(null);
   const [reportTarget, setReportTarget] = useState(null);
+  const [votingDeckId, setVotingDeckId] = useState(null);
   const inputRef = useRef(null);
+
+  const sortedDecks = useMemo(
+    () => DeckVoteService.sortDecksByUpvotes(decks),
+    [decks]
+  );
+  const topDecks = sortedDecks.slice(0, TOP_DECKS_VISIBLE);
+  const hasMoreDecks = sortedDecks.length > TOP_DECKS_VISIBLE;
 
   const load = useCallback(async (isRefresh = false, silent = false) => {
     if (isRefresh) setRefreshing(true);
@@ -283,6 +294,39 @@ export default function GroupScreen({ route, navigation }) {
   const openReportPost = (post) => setReportTarget({ type: 'post', post });
 
   const openReportDeck = (deck) => setReportTarget({ type: 'deck', deck });
+
+  const handleVote = async (deck, vote) => {
+    const prevVote = deck.myVote ?? 0;
+    const delta = DeckVoteService.voteDeltaFromToggle(prevVote, vote);
+    const optimistic = DeckVoteService.applyVoteChange(deck, delta);
+
+    setVotingDeckId(deck.id);
+    setDecks((prev) => {
+      const next = prev.map((d) => (d.id === deck.id ? optimistic : d));
+      return DeckVoteService.sortDecksByUpvotes(next);
+    });
+
+    try {
+      await DeckVoteService.setVote(deck.id, groupId, vote);
+    } catch (e) {
+      load();
+      Alert.alert('Could not vote', e.message || 'Try again.');
+    } finally {
+      setVotingDeckId(null);
+    }
+  };
+
+  const handleStudyDeck = (deck) => {
+    navigation.navigate('GroupDeckStudy', {
+      deckId: deck.id,
+      deckTitle: deck.title,
+      classId,
+    });
+  };
+
+  const openAllDecks = () => {
+    navigation.navigate('GroupSharedDecks', { groupId, classId, code, title });
+  };
 
   const handleReportSubmit = async ({ category, details }) => {
     try {
@@ -409,7 +453,7 @@ export default function GroupScreen({ route, navigation }) {
       {/* Shared Decks */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Shared Decks</Text>
-        {decks.length === 0 ? (
+        {sortedDecks.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyEmoji}>📚</Text>
             <Text style={styles.emptyText}>No shared decks yet</Text>
@@ -418,51 +462,32 @@ export default function GroupScreen({ route, navigation }) {
             </Text>
           </View>
         ) : (
-            decks.map((d) => (
-                <View key={d.id} style={styles.deckCard}>
-                  <View style={styles.deckInfo}>
-                    <Text style={styles.deckTitle}>{d.title}</Text>
-                    <Text style={styles.deckMeta}>
-                      {d.cardCount} cards · by {d.ownerName}
-                    </Text>
-                  </View>
-                  <View style={styles.deckActions}>
-                    {ReportService.canReportDeck(d, myUserId) && (
-                      <TouchableOpacity
-                        style={styles.reportDeckBtn}
-                        onPress={() => openReportDeck(d)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.reportBtnText}>Report</Text>
-                      </TouchableOpacity>
-                    )}
-                    {isModerator && (
-                      <TouchableOpacity
-                        style={styles.modRemoveDeckBtn}
-                        onPress={() => openModDeck(d)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.modRemoveBtnText}>Remove</Text>
-                      </TouchableOpacity>
-                    )}
-                    {d.cardCount > 0 && (
-                      <TouchableOpacity
-                        style={styles.studyBtn}
-                        onPress={() =>
-                          navigation.navigate('GroupDeckStudy', {
-                            deckId: d.id,
-                            deckTitle: d.title,
-                            classId,
-                          })
-                        }
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.studyBtnText}>Study</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              ))
+          <>
+            {topDecks.map((d) => (
+              <SharedDeckRow
+                key={d.id}
+                deck={d}
+                myUserId={myUserId}
+                isModerator={isModerator}
+                onVote={handleVote}
+                onStudy={handleStudyDeck}
+                onReport={openReportDeck}
+                onModRemove={openModDeck}
+                voting={votingDeckId}
+              />
+            ))}
+            {hasMoreDecks && (
+              <TouchableOpacity
+                style={styles.showMoreDecksBtn}
+                onPress={openAllDecks}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.showMoreDecksText}>
+                  Show all {sortedDecks.length} decks
+                </Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </View>
 
@@ -693,27 +718,16 @@ const makeStyles = (theme) => StyleSheet.create({
   feedEmptySubtext: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 18 },
 
   // ── shared decks ────────────────────────────────────────────────────────
-  deckCard: {
-    flexDirection: 'row',
+  showMoreDecksBtn: {
     alignItems: 'center',
-    backgroundColor: theme.background,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 8,
+    paddingVertical: 12,
+    marginTop: 4,
   },
-  deckInfo: { flex: 1 },
-  deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
-  deckMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
-  deckActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  modRemoveDeckBtn: { paddingVertical: 6, paddingHorizontal: 8 },
-  deckChevron: { fontSize: 20, color: theme.textSecondary },
-  studyBtn: {
-    backgroundColor: '#6366f1',
-    borderRadius: 10,
-    paddingVertical: 7,
-    paddingHorizontal: 14,
+  showMoreDecksText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6366f1',
   },
-  studyBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
   // ── post card ───────────────────────────────────────────────────────────
   postCard: {

@@ -1,5 +1,6 @@
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
+import { DeckVoteService } from './DeckVoteService';
 
 class GroupService {
   /**
@@ -78,34 +79,95 @@ class GroupService {
   }
 
   /**
-   * Returns decks shared to the group for this class.
-   * Shape: [{ id, title, card_count, owner_name }]
+   * Returns decks shared to the group, sorted by upvotes (desc).
+   * Shape: [{ id, title, ownerId, cardCount, ownerName, upvotes, downvotes, score, myVote }]
    */
   static async getGroupDecks(groupId) {
     if (!SUPABASE_CONFIGURED) return [];
+    const userId = AuthService.getUserId();
 
-    const { data, error } = await supabase
+    const { data: shareRows, error: shareErr } = await supabase
       .from('deck_shares')
-      .select(`
-        decks(
-          id, title, owner_id,
-          cards(count),
-          profiles(display_name)
-        )
-      `)
-      .eq('group_id', groupId);
+      .select('deck_id, shared_at')
+      .eq('group_id', groupId)
+      .order('shared_at', { ascending: false });
 
-    if (error || !data) return [];
-    return data
-      .map((r) => r.decks)
+    if (shareErr) {
+      console.error('[GroupService] getGroupDecks shares error:', shareErr.message);
+      return [];
+    }
+    if (!shareRows?.length) return [];
+
+    const deckIds = shareRows.map((r) => r.deck_id);
+
+    const [{ data: deckRows, error: deckErr }, { data: voteRows, error: voteErr }] =
+      await Promise.all([
+        supabase
+          .from('decks')
+          .select('id, title, owner_id, card_count')
+          .in('id', deckIds),
+        supabase
+          .from('deck_votes')
+          .select('deck_id, user_id, vote')
+          .eq('group_id', groupId),
+      ]);
+
+    if (deckErr) {
+      console.error('[GroupService] getGroupDecks decks error:', deckErr.message);
+      return [];
+    }
+    if (voteErr) {
+      console.warn('[GroupService] getGroupDecks votes error:', voteErr.message);
+    }
+
+    const deckById = Object.fromEntries((deckRows || []).map((d) => [d.id, d]));
+    const missingDeckIds = deckIds.filter((id) => !deckById[id]);
+    if (missingDeckIds.length) {
+      console.warn(
+        '[GroupService] getGroupDecks: share rows exist but decks not readable',
+        { groupId, missingDeckIds }
+      );
+    }
+
+    const ownerIds = [
+      ...new Set((deckRows || []).map((d) => d.owner_id).filter(Boolean)),
+    ];
+    const profileMap = {};
+    if (ownerIds.length) {
+      const { data: profiles, error: profileErr } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', ownerIds);
+      if (profileErr) {
+        console.warn('[GroupService] getGroupDecks profiles error:', profileErr.message);
+      } else {
+        (profiles || []).forEach((p) => {
+          profileMap[p.id] = p.display_name;
+        });
+      }
+    }
+
+    const voteMap = DeckVoteService.aggregateVotes(voteRows, userId);
+
+    const decks = shareRows
+      .map((share) => deckById[share.deck_id])
       .filter(Boolean)
-      .map((d) => ({
-        id: d.id,
-        title: d.title,
-        ownerId: d.owner_id,
-        cardCount: d.cards?.[0]?.count ?? 0,
-        ownerName: d.profiles?.display_name || 'Unknown',
-      }));
+      .map((d) => {
+        const stats = voteMap[d.id] || { upvotes: 0, downvotes: 0, score: 0, myVote: 0 };
+        return {
+          id: d.id,
+          title: d.title,
+          ownerId: d.owner_id,
+          cardCount: d.card_count ?? 0,
+          ownerName: profileMap[d.owner_id] || 'Unknown',
+          upvotes: stats.upvotes,
+          downvotes: stats.downvotes,
+          score: stats.score,
+          myVote: stats.myVote,
+        };
+      });
+
+    return DeckVoteService.sortDecksByUpvotes(decks);
   }
 }
 

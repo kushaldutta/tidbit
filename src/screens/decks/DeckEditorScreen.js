@@ -302,7 +302,7 @@ export default function DeckEditorScreen({ route, navigation }) {
                             <View>
                               <Text style={styles.shareGroupName}>{group.title}</Text>
                               <Text style={styles.shareGroupMeta}>
-                                {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
+                                {group.code} · {group.memberCount} member{group.memberCount !== 1 ? 's' : ''}
                               </Text>
                             </View>
                           </View>
