@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthService } from '../../services/AuthService';
+import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../../constants/legalUrls';
 
 const MIN_PASSWORD = 8;
 
@@ -158,7 +159,21 @@ export default function SignUpScreen({ navigation }) {
           )}
 
           <Text style={styles.legal}>
-            By continuing you agree to our Terms of Service and Privacy Policy.
+            By continuing you agree to our{' '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => openLegalUrl(TERMS_URL, 'Terms of Service')}
+            >
+              Terms of Service
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => openLegalUrl(PRIVACY_URL, 'Privacy Policy')}
+            >
+              Privacy Policy
+            </Text>
+            .
           </Text>
 
           <TouchableOpacity
@@ -233,6 +248,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     lineHeight: 18,
+  },
+  legalLink: {
+    color: '#6366f1',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   footerRow: {
     flexDirection: 'row',

@@ -7,9 +7,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EntitlementService } from '../services/EntitlementService';
+import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../constants/legalUrls';
 
 const ENTITLEMENT_ID = 'Tidbit - Never Cram Again! Premium';
 
@@ -110,6 +112,16 @@ export default function PaywallScreen({ navigation, route }) {
       Alert.alert('Restore failed', err.message || 'Something went wrong.');
     } finally {
       setRestoring(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    const opened = await EntitlementService.showManageSubscriptions();
+    if (!opened && Platform.OS === 'ios') {
+      Alert.alert(
+        'Manage subscription',
+        'Open Settings → Apple ID → Subscriptions to change or cancel your Tidbit Premium plan.',
+      );
     }
   };
 
@@ -220,9 +232,29 @@ export default function PaywallScreen({ navigation, route }) {
             )}
           </TouchableOpacity>
 
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={styles.manageBtn}
+              onPress={handleManageSubscription}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.manageText}>Manage subscription</Text>
+            </TouchableOpacity>
+          )}
+
           <Text style={styles.legal}>
-            Payment will be charged to your Apple ID. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period.
+            Payment will be charged to your Apple ID at confirmation of purchase. Subscription automatically renews unless cancelled at least 24 hours before the end of the current period. Your account will be charged for renewal within 24 hours prior to the end of the current period.
           </Text>
+
+          <View style={styles.legalLinks}>
+            <TouchableOpacity onPress={() => openLegalUrl(PRIVACY_URL, 'Privacy Policy')}>
+              <Text style={styles.legalLink}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalDot}>·</Text>
+            <TouchableOpacity onPress={() => openLegalUrl(TERMS_URL, 'Terms of Service')}>
+              <Text style={styles.legalLink}>Terms of Service (EULA)</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -305,10 +337,28 @@ const styles = StyleSheet.create({
   subscribeBtnDisabled: { opacity: 0.6 },
   subscribeBtnText: { color: '#fff', fontWeight: '800', fontSize: 17 },
 
-  restoreBtn: { paddingVertical: 12, marginBottom: 20 },
+  restoreBtn: { paddingVertical: 12, marginBottom: 4 },
   restoreText: { color: '#6b7280', fontSize: 14, fontWeight: '500' },
+
+  manageBtn: { paddingVertical: 8, marginBottom: 16 },
+  manageText: { color: '#6b7280', fontSize: 14, fontWeight: '500' },
 
   legal: {
     fontSize: 11, color: '#4b5563', textAlign: 'center', lineHeight: 16,
+    marginBottom: 12,
   },
+  legalLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  legalLink: {
+    fontSize: 12,
+    color: '#a5b4fc',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  legalDot: { fontSize: 12, color: '#4b5563' },
 });

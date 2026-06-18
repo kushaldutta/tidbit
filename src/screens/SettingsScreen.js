@@ -27,6 +27,7 @@ import { usePremium } from '../components/PremiumGate';
 import { EntitlementService } from '../services/EntitlementService';
 import { getSchool } from '../config/schools';
 import * as Notifications from 'expo-notifications';
+import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../constants/legalUrls';
 
 const INTERVAL_OPTIONS = [
   { label: '1 hour', value: 60 },
@@ -892,23 +893,21 @@ export default function SettingsScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => {
-              const privacyUrl = 'https://kushaldutta.github.io/tidbit/privacy'; 
-              Linking.canOpenURL(privacyUrl).then(supported => {
-                if (supported) {
-                  Linking.openURL(privacyUrl);
-                } else {
-                  Alert.alert('Error', 'Could not open privacy policy link.');
-                }
-              }).catch(() => {
-                Alert.alert('Error', 'Could not open privacy policy link.');
-              });
-            }}
+            onPress={() => openLegalUrl(PRIVACY_URL, 'Privacy Policy')}
             activeOpacity={0.7}
             style={{ marginTop: 8 }}
           >
             <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
               Privacy Policy
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => openLegalUrl(TERMS_URL, 'Terms of Service')}
+            activeOpacity={0.7}
+            style={{ marginTop: 8 }}
+          >
+            <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
+              Terms of Service
             </Text>
           </TouchableOpacity>
         </View>
