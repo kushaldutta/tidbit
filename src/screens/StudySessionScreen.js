@@ -134,8 +134,11 @@ export default function StudySessionScreen({ route, navigation }) {
       if (updatedSession) {
         setSessionStats(updatedSession.stats);
         
-        // Update study plan progress
         await StudyPlanService.updatePlanProgress(updatedSession.stats.completed);
+      }
+
+      if (action === 'knew' || action === 'didnt') {
+        await StorageService.recordTidbitAnswered();
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -158,12 +161,7 @@ export default function StudySessionScreen({ route, navigation }) {
     try {
       const finalSession = await StudySessionService.endSession();
       if (finalSession) {
-        // Update study plan
         await StudyPlanService.markPlanCompleted(finalSession.stats.completed);
-        
-        // Update daily tidbit count
-        await StorageService.incrementTidbitsSeen(finalSession.stats.completed);
-        await StorageService.incrementDailyTidbitCount(finalSession.stats.completed);
         
         setIsComplete(true);
         setShowSummary(true);

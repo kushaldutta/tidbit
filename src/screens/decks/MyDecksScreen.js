@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -75,6 +76,32 @@ export default function MyDecksScreen({ navigation }) {
     setRefreshing(false);
   }, [load]);
 
+  const handleDeleteDeck = (deck) => {
+    Alert.alert(
+      'Delete this deck?',
+      `"${deck.title}" and all its cards will be permanently removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await DeckService.deleteDeck(deck.id);
+              await load();
+            } catch (e) {
+              Alert.alert('Could not delete deck', e.message || 'Try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleLearnDeck = (deck) => {
+    navigation.navigate('LearnModePicker', { deckId: deck.id, deckTitle: deck.title });
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
@@ -129,33 +156,55 @@ export default function MyDecksScreen({ navigation }) {
     }
     const d = item.deck;
     return (
-      <TouchableOpacity
-        style={styles.deckCard}
-        onPress={() =>
-          navigation.navigate('DeckEditor', {
-            mode: item.isMine ? 'edit' : 'view',
-            deckId: d.id,
-          })
-        }
-        activeOpacity={0.85}
-      >
-        <Text style={styles.deckEmoji}>{d.cover_emoji || '📚'}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.deckTitle} numberOfLines={1}>
-            {d.title}
-          </Text>
-          {d.description ? (
-            <Text style={styles.deckDescription} numberOfLines={1}>
-              {d.description}
+      <View style={styles.deckCard}>
+        <TouchableOpacity
+          style={styles.deckCardMain}
+          onPress={() =>
+            navigation.navigate('DeckEditor', {
+              mode: item.isMine ? 'edit' : 'view',
+              deckId: d.id,
+            })
+          }
+          activeOpacity={0.85}
+        >
+          <Text style={styles.deckEmoji}>{d.cover_emoji || '📚'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.deckTitle} numberOfLines={1}>
+              {d.title}
             </Text>
-          ) : null}
-          <Text style={styles.deckMeta}>
-            {d.card_count || 0} card{d.card_count === 1 ? '' : 's'}
-            {d.is_premium_generated ? ' • AI generated' : ''}
-            {!item.isMine ? ' • Preset' : ''}
-          </Text>
+            {d.description ? (
+              <Text style={styles.deckDescription} numberOfLines={1}>
+                {d.description}
+              </Text>
+            ) : null}
+            <Text style={styles.deckMeta}>
+              {d.card_count || 0} card{d.card_count === 1 ? '' : 's'}
+              {d.is_premium_generated ? ' • AI generated' : ''}
+              {!item.isMine ? ' • Preset' : ''}
+            </Text>
+          </View>
+        </TouchableOpacity>
+        <View style={styles.deckActions}>
+          {(d.card_count || 0) > 0 && (
+            <TouchableOpacity
+              style={styles.learnBtn}
+              onPress={() => handleLearnDeck(d)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.learnBtnText}>Learn</Text>
+            </TouchableOpacity>
+          )}
+          {item.isMine && (
+            <TouchableOpacity
+              style={styles.deleteBtn}
+              onPress={() => handleDeleteDeck(d)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.deleteBtnText}>Delete</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -256,6 +305,32 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
+  deckCardMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deckActions: {
+    flexDirection: 'column',
+    gap: 6,
+    marginLeft: 8,
+  },
+  learnBtn: {
+    backgroundColor: '#6366f1',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  learnBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  deleteBtn: {
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    backgroundColor: '#fef2f2',
+  },
+  deleteBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '600' },
   deckEmoji: { fontSize: 32, marginRight: 14 },
   deckTitle: { fontSize: 16, fontWeight: '600', color: theme.text },
   deckDescription: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },

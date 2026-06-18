@@ -1,5 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActionSheetIOS,
+  Platform,
+} from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { ReportService } from '../services/ReportService';
 
@@ -11,7 +19,9 @@ export default function SharedDeckRow({
   onStudy,
   onReport,
   onModRemove,
+  onSave,
   voting,
+  saving,
 }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
@@ -19,6 +29,52 @@ export default function SharedDeckRow({
   const upActive = deck.myVote === 1;
   const downActive = deck.myVote === -1;
   const busy = voting === deck.id;
+  const savingBusy = saving === deck.id;
+
+  const canReport = ReportService.canReportDeck(deck, myUserId);
+  const canSave = onSave && deck.ownerId !== myUserId;
+  const hasMenu = canReport || isModerator || canSave;
+
+  const openMenu = () => {
+    const options = [];
+    const handlers = [];
+
+    if (canSave) {
+      options.push('Save to My Decks');
+      handlers.push(() => onSave(deck));
+    }
+    if (canReport) {
+      options.push('Report');
+      handlers.push(() => onReport(deck));
+    }
+    if (isModerator) {
+      options.push('Remove');
+      handlers.push(() => onModRemove(deck));
+    }
+    options.push('Cancel');
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: options.length - 1,
+          destructiveButtonIndex: isModerator ? options.indexOf('Remove') : undefined,
+        },
+        (index) => {
+          if (index >= 0 && index < handlers.length) handlers[index]();
+        }
+      );
+    } else {
+      Alert.alert('Deck options', undefined, [
+        ...handlers.map((fn, i) => ({
+          text: options[i],
+          onPress: fn,
+          style: options[i] === 'Remove' ? 'destructive' : 'default',
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
 
   return (
     <View style={styles.deckCard}>
@@ -50,35 +106,18 @@ export default function SharedDeckRow({
         >
           <Text style={[styles.voteArrow, downActive && styles.voteArrowDownActive]}>▼</Text>
         </TouchableOpacity>
-        <Text style={styles.voteMeta}>{deck.upvotes}↑</Text>
       </View>
 
       <View style={styles.deckInfo}>
-        <Text style={styles.deckTitle}>{deck.title}</Text>
+        <Text style={styles.deckTitle} numberOfLines={2}>
+          {deck.title}
+        </Text>
         <Text style={styles.deckMeta}>
           {deck.cardCount} cards · by {deck.ownerName}
         </Text>
       </View>
 
       <View style={styles.deckActions}>
-        {ReportService.canReportDeck(deck, myUserId) && (
-          <TouchableOpacity
-            style={styles.reportDeckBtn}
-            onPress={() => onReport(deck)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.reportBtnText}>Report</Text>
-          </TouchableOpacity>
-        )}
-        {isModerator && (
-          <TouchableOpacity
-            style={styles.modRemoveDeckBtn}
-            onPress={() => onModRemove(deck)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.modRemoveBtnText}>Remove</Text>
-          </TouchableOpacity>
-        )}
         {deck.cardCount > 0 && (
           <TouchableOpacity
             style={styles.studyBtn}
@@ -86,6 +125,17 @@ export default function SharedDeckRow({
             activeOpacity={0.8}
           >
             <Text style={styles.studyBtnText}>Study</Text>
+          </TouchableOpacity>
+        )}
+        {hasMenu && (
+          <TouchableOpacity
+            style={styles.menuBtn}
+            onPress={openMenu}
+            disabled={savingBusy}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuBtnText}>⋯</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -125,15 +175,10 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   voteScorePositive: { color: '#16a34a' },
   voteScoreNegative: { color: '#dc2626' },
-  voteMeta: { fontSize: 10, color: theme.textSecondary, marginTop: 2 },
-  deckInfo: { flex: 1 },
-  deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
+  deckInfo: { flex: 1, marginRight: 8 },
+  deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text, lineHeight: 20 },
   deckMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
-  deckActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
-  reportDeckBtn: { paddingVertical: 6, paddingHorizontal: 8 },
-  reportBtnText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
-  modRemoveDeckBtn: { paddingVertical: 6, paddingHorizontal: 8 },
-  modRemoveBtnText: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
+  deckActions: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 },
   studyBtn: {
     backgroundColor: '#6366f1',
     borderRadius: 10,
@@ -141,4 +186,21 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingHorizontal: 14,
   },
   studyBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  menuBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: theme.card || '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  menuBtnText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    lineHeight: 20,
+    marginTop: -2,
+  },
 });

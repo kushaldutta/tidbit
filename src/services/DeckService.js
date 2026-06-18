@@ -147,6 +147,37 @@ class DeckService {
     if (error) throw error;
   }
 
+  /** Copy a shared deck into the current user's library (editable personal copy). */
+  static async copyDeckToMyDecks(sourceDeckId) {
+    if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const source = await this.getDeck(sourceDeckId);
+    if (!source) throw new Error('Deck not found');
+
+    const cards = await this.listCards(sourceDeckId);
+    if (!cards.length) throw new Error('This deck has no cards to copy');
+
+    const newDeck = await this.createDeck({
+      title: source.title,
+      description: source.description || '',
+      classId: source.class_id,
+      coverEmoji: source.cover_emoji || '📚',
+      isPublic: false,
+      source: 'saved_copy',
+    });
+
+    await this.bulkAddCards(
+      newDeck.id,
+      cards.map((c) => ({
+        front: c.front,
+        back: c.back,
+        cardType: c.card_type,
+        meta: c.meta || {},
+      }))
+    );
+
+    return newDeck;
+  }
+
   // -- Cards --
 
   static async listCards(deckId) {

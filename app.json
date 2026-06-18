@@ -18,13 +18,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.cinnamiddles.tidbit",
-      "buildNumber": "5",
+      "buildNumber": "6",
       "icon": "./assets/tidbit.png",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Tidbit uses the camera to snap pages of your notes or textbook and turn them into flashcards.",
-        "NSMicrophoneUsageDescription": "Tidbit uses the microphone for voice answers in recall mode and to record study voice memos."
+        "NSMicrophoneUsageDescription": "Tidbit uses the microphone for voice answers in recall mode and to record study voice memos.",
+        "NSPhotoLibraryUsageDescription": "Tidbit accesses your photo library so you can choose pictures of notes or textbook pages to turn into flashcards."
       }
     },
     "android": {

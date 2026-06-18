@@ -16,8 +16,7 @@ export default function StudyModeScreen({ navigation }) {
       setIsGenerating(true);
       setError(null);
 
-      // Simple heuristic: ~1 tidbit per minute
-      const totalTidbits = Math.max(3, durationMinutes); // ensure at least a few
+      const totalTidbits = Math.max(3, durationMinutes);
       const tidbits = await StudyPlanService.generateSessionTidbits(totalTidbits);
 
       if (!tidbits || tidbits.length === 0) {
@@ -41,7 +40,31 @@ export default function StudyModeScreen({ navigation }) {
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <Text style={styles.title}>Study Mode</Text>
       <Text style={styles.subtitle}>
-        Pick a focused session length. Tidbit will mix reviews you owe with new material.
+        Quiz, recall, and match from your decks — or run a focused review session.
+      </Text>
+
+      <View style={styles.learnSection}>
+        <Text style={styles.learnSectionTitle}>Interactive Learn Modes</Text>
+        <Text style={styles.learnSectionSub}>
+          Quiz, Recall, and Match — study from your own decks
+        </Text>
+        <TouchableOpacity
+          style={styles.learnBtn}
+          onPress={() => navigation.navigate('LearnModePicker')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.learnBtnEmoji}>🎯</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.learnBtnLabel}>Start Learning</Text>
+            <Text style={styles.learnBtnSub}>Quiz · Recall · Match</Text>
+          </View>
+          <Text style={styles.learnBtnArrow}>›</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.focusedHeader}>Focused Sessions</Text>
+      <Text style={styles.focusedSub}>
+        Pick a session length. Tidbit will mix reviews you owe with new material.
       </Text>
 
       <View style={styles.optionsContainer}>
@@ -77,25 +100,18 @@ export default function StudyModeScreen({ navigation }) {
         <Text style={styles.loadingText}>Building your session...</Text>
       )}
 
-      {/* W7: Interactive Learn Modes */}
-      <View style={styles.learnSection}>
-        <Text style={styles.learnSectionTitle}>Interactive Learn Modes</Text>
-        <Text style={styles.learnSectionSub}>
-          Quiz, Recall, and Match — study from your own decks
-        </Text>
-        <TouchableOpacity
-          style={styles.learnBtn}
-          onPress={() => navigation.navigate('LearnModePicker')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.learnBtnEmoji}>🎯</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.learnBtnLabel}>Start Learning</Text>
-            <Text style={styles.learnBtnSub}>Quiz · Recall · Match</Text>
-          </View>
-          <Text style={styles.learnBtnArrow}>›</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={styles.myDecksBtn}
+        onPress={() => navigation.navigate('MyDecks')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.myDecksEmoji}>📚</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.myDecksLabel}>My Decks</Text>
+          <Text style={styles.myDecksSub}>Create, edit, and manage your flashcard decks</Text>
+        </View>
+        <Text style={styles.myDecksArrow}>›</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -123,6 +139,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   content: {
     padding: 20,
+    paddingBottom: 40,
   },
   title: {
     fontSize: 32,
@@ -134,6 +151,45 @@ const makeStyles = (theme) => StyleSheet.create({
     fontSize: 16,
     color: theme.textSecondary,
     marginBottom: 24,
+  },
+  learnSection: {
+    marginBottom: 28,
+  },
+  learnSectionTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.text,
+    marginBottom: 4,
+  },
+  learnSectionSub: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    marginBottom: 16,
+  },
+  learnBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: theme.primaryLight,
+    borderRadius: 18,
+    padding: 20,
+    borderWidth: 2,
+    borderColor: theme.accent,
+  },
+  learnBtnEmoji: { fontSize: 32 },
+  learnBtnLabel: { fontSize: 17, fontWeight: '800', color: theme.primary, marginBottom: 2 },
+  learnBtnSub: { fontSize: 13, color: theme.primary },
+  learnBtnArrow: { fontSize: 28, color: theme.primary, fontWeight: '700' },
+  focusedHeader: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: theme.text,
+    marginBottom: 4,
+  },
+  focusedSub: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    marginBottom: 16,
   },
   optionsContainer: {
     marginBottom: 24,
@@ -173,33 +229,19 @@ const makeStyles = (theme) => StyleSheet.create({
     fontSize: 14,
     fontStyle: 'italic',
   },
-  learnSection: {
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  learnSectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: theme.text,
-    marginBottom: 4,
-  },
-  learnSectionSub: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 16,
-  },
-  learnBtn: {
+  myDecksBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: theme.primaryLight,
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: theme.accent,
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    marginTop: 8,
   },
-  learnBtnEmoji: { fontSize: 32 },
-  learnBtnLabel: { fontSize: 17, fontWeight: '800', color: theme.primary, marginBottom: 2 },
-  learnBtnSub: { fontSize: 13, color: theme.primary },
-  learnBtnArrow: { fontSize: 28, color: theme.primary, fontWeight: '700' },
+  myDecksEmoji: { fontSize: 28 },
+  myDecksLabel: { fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 2 },
+  myDecksSub: { fontSize: 13, color: theme.textSecondary },
+  myDecksArrow: { fontSize: 24, color: theme.textSecondary, fontWeight: '700' },
 });

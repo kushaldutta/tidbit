@@ -1,5 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Platform } from 'react-native';
+import * as Linking from 'expo-linking';
+import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 
 const PROVIDERS = {
@@ -10,6 +12,8 @@ const PROVIDERS = {
 
 let currentSession = null;
 const listeners = new Set();
+let deepLinkSubscription = null;
+let pendingVerificationEmail = null;
 
 function notify(session) {
   currentSession = session;
@@ -24,12 +28,110 @@ function notify(session) {
 
 class AuthService {
   static PROVIDERS = PROVIDERS;
+  static EMAIL_NOT_CONFIRMED = 'EMAIL_NOT_CONFIRMED';
+
+  static consumePendingVerificationEmail() {
+    const email = pendingVerificationEmail;
+    pendingVerificationEmail = null;
+    return email;
+  }
+
+  static rememberPendingVerificationEmail(email) {
+    pendingVerificationEmail = email || null;
+  }
+
+  /** Deep link Supabase redirects to after the user taps the confirmation email. */
+  static getEmailRedirectUrl() {
+    return Linking.createURL('auth/confirm');
+  }
+
+  static isEmailPasswordUser(user) {
+    if (!user) return false;
+    const provider = user.app_metadata?.provider;
+    if (provider && provider !== 'email') return false;
+    const identities = user.identities || [];
+    if (identities.length === 0) {
+      return Boolean(user.email);
+    }
+    return identities.some((i) => i.provider === 'email');
+  }
+
+  static isEmailVerified(user) {
+    if (!user) return false;
+    if (!this.isEmailPasswordUser(user)) return true;
+    return Boolean(user.email_confirmed_at);
+  }
+
+  static isEmailNotConfirmedError(error) {
+    if (!error) return false;
+    if (error.code === this.EMAIL_NOT_CONFIRMED) return true;
+    const msg = (error.message || '').toLowerCase();
+    return (
+      msg.includes('email not confirmed') ||
+      msg.includes('email_not_confirmed')
+    );
+  }
+
+  static emailNotConfirmedError(email) {
+    this.rememberPendingVerificationEmail(email);
+    const err = new Error('Confirm your email before signing in.');
+    err.code = this.EMAIL_NOT_CONFIRMED;
+    err.email = email;
+    return err;
+  }
+
+  static async createSessionFromUrl(url) {
+    if (!SUPABASE_CONFIGURED || !url) return null;
+
+    const { params, errorCode } = QueryParams.getQueryParams(url);
+    if (errorCode) throw new Error(errorCode);
+
+    const accessToken = params.access_token;
+    const refreshToken = params.refresh_token;
+    if (!accessToken) return null;
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error) throw error;
+
+    if (data.session) {
+      require('./SyncService').SyncService.resetSyncCache();
+      currentSession = data.session;
+      notify(data.session);
+    }
+    return data.session;
+  }
+
+  static listenForAuthDeepLinks() {
+    if (deepLinkSubscription) return;
+
+    const handleUrl = (url) => {
+      this.createSessionFromUrl(url).catch((err) => {
+        console.warn('[AUTH] deep link session error:', err.message);
+      });
+    };
+
+    Linking.getInitialURL()
+      .then((url) => {
+        if (url) handleUrl(url);
+      })
+      .catch(() => {});
+
+    deepLinkSubscription = Linking.addEventListener('url', ({ url }) => {
+      handleUrl(url);
+    });
+  }
 
   static async init() {
     if (!SUPABASE_CONFIGURED) {
       console.warn('[AUTH] Supabase not configured. Auth disabled.');
       return null;
     }
+
+    this.listenForAuthDeepLinks();
+
     const { data, error } = await supabase.auth.getSession();
     if (error) {
       console.error('[AUTH] getSession error:', error);
@@ -38,9 +140,13 @@ class AuthService {
     currentSession = data?.session || null;
 
     if (currentSession?.user?.id) {
-      const { error: userError } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError && this.isStaleSessionError(userError)) {
         console.warn('[AUTH] Stale session — clearing local auth cache');
+        await this.clearLocalAuthSession();
+      } else if (user && !this.isEmailVerified(user)) {
+        console.warn('[AUTH] Unverified email — clearing session');
+        this.rememberPendingVerificationEmail(user.email);
         await this.clearLocalAuthSession();
       }
     }
@@ -77,28 +183,85 @@ class AuthService {
 
   static async signUpWithEmail({ email, password }) {
     if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signUp({
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password,
+      options: {
+        emailRedirectTo: this.getEmailRedirectUrl(),
+      },
     });
     if (error) throw error;
-    if (data?.session) {
+
+    const user = data?.user;
+    const session = data?.session;
+    const needsEmailVerification = Boolean(user && !this.isEmailVerified(user));
+
+    if (needsEmailVerification) {
+      if (session) {
+        await supabase.auth.signOut({ scope: 'local' });
+        currentSession = null;
+        notify(null);
+      }
+      this.rememberPendingVerificationEmail(normalizedEmail);
+      return { user, session: null, needsEmailVerification: true };
+    }
+
+    if (session) {
       require('./SyncService').SyncService.resetSyncCache();
       await this.ensureValidSession({ force: true });
     }
-    return data;
+    return { ...data, needsEmailVerification: false };
   }
 
   static async signInWithEmail({ email, password }) {
     if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const normalizedEmail = email.trim().toLowerCase();
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password,
     });
-    if (error) throw error;
+    if (error) {
+      if (this.isEmailNotConfirmedError(error)) {
+        throw this.emailNotConfirmedError(normalizedEmail);
+      }
+      throw error;
+    }
+
+    if (!this.isEmailVerified(data.user)) {
+      await this.clearLocalAuthSession();
+      throw this.emailNotConfirmedError(normalizedEmail);
+    }
+
     require('./SyncService').SyncService.resetSyncCache();
     await this.ensureValidSession({ force: true });
     return data;
+  }
+
+  static async resendSignupConfirmation(email) {
+    if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+      options: {
+        emailRedirectTo: this.getEmailRedirectUrl(),
+      },
+    });
+    if (error) throw error;
+  }
+
+  /** Re-fetch the user from Supabase after they confirm via email link. */
+  static async refreshVerificationStatus() {
+    if (!SUPABASE_CONFIGURED) return { verified: false, email: null };
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      return { verified: false, email: null };
+    }
+    return {
+      verified: this.isEmailVerified(user),
+      email: user.email || null,
+      user,
+    };
   }
 
   static async sendPasswordReset(email) {
@@ -199,6 +362,11 @@ class AuthService {
       throw error || new Error('Not signed in');
     }
 
+    if (!this.isEmailVerified(user)) {
+      await this.clearLocalAuthSession();
+      throw this.emailNotConfirmedError(user.email);
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user?.id === user.id) {
       currentSession = session;
@@ -215,6 +383,7 @@ class AuthService {
     this._sessionValidatedAt = 0;
     SyncService.resetSyncCache();
     require('./ModerationService').ModerationService.clearCache();
+    require('./BlockService').BlockService.clearCache();
     await SyncService.clearLocalSessionState();
     await EntitlementService.reset().catch(() => {});
     if (SUPABASE_CONFIGURED) {

@@ -151,6 +151,18 @@ class EntitlementService {
       return false;
     }
   }
+
+  /** Open native subscription management (cancel / change plan). */
+  static async showManageSubscriptions() {
+    if (!this._initialized) return false;
+    try {
+      await Purchases.showManageSubscriptions();
+      return true;
+    } catch (err) {
+      console.warn('[EntitlementService] showManageSubscriptions error:', err.message);
+      return false;
+    }
+  }
 }
 
 export { EntitlementService };

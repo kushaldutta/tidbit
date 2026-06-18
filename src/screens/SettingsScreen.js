@@ -23,12 +23,12 @@ import { ContentService } from '../services/ContentService';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import { ProfileService } from '../services/ProfileService';
 import { ReportService } from '../services/ReportService';
+import { usePremium } from '../components/PremiumGate';
+import { EntitlementService } from '../services/EntitlementService';
 import { getSchool } from '../config/schools';
 import * as Notifications from 'expo-notifications';
 
 const INTERVAL_OPTIONS = [
-  { label: '15 minutes', value: 15 },
-  { label: '30 minutes', value: 30 },
   { label: '1 hour', value: 60 },
   { label: '2 hours', value: 120 },
   { label: '4 hours', value: 240 },
@@ -38,6 +38,7 @@ export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = makeStyles(theme);
+  const { isPremium } = usePremium(navigation);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [notificationInterval, setNotificationInterval] = useState(60);
   const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
@@ -300,6 +301,23 @@ export default function SettingsScreen({ navigation }) {
     await NotificationService.registerDeviceToken();
   };
 
+  const handlePremiumPress = () => {
+    if (isPremium) {
+      Alert.alert('Your Premium Plan', undefined, [
+        {
+          text: 'Manage Subscription',
+          onPress: () => EntitlementService.showManageSubscriptions(),
+        },
+        {
+          text: 'View Premium Features',
+          onPress: () => navigation.navigate('Paywall'),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } else {
+      navigation.navigate('Paywall');
+    }
+  };
   const formatHour = (hour) => {
     const period = hour >= 12 ? 'PM' : 'AM';
     const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
@@ -669,13 +687,19 @@ export default function SettingsScreen({ navigation }) {
       {/* Premium upgrade banner */}
       <TouchableOpacity
         style={styles.premiumBanner}
-        onPress={() => navigation.navigate('Paywall')}
+        onPress={handlePremiumPress}
         activeOpacity={0.85}
       >
-        <Text style={styles.premiumBannerEmoji}>✨</Text>
+        <Text style={styles.premiumBannerEmoji}>{isPremium ? '⭐' : '✨'}</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.premiumBannerTitle}>Upgrade to Premium</Text>
-          <Text style={styles.premiumBannerSub}>AI generation, analytics, themes & more</Text>
+          <Text style={styles.premiumBannerTitle}>
+            {isPremium ? 'View Your Plan' : 'Upgrade to Premium'}
+          </Text>
+          <Text style={styles.premiumBannerSub}>
+            {isPremium
+              ? 'Manage or cancel your subscription'
+              : 'AI generation, analytics, themes & more'}
+          </Text>
         </View>
         <Text style={styles.premiumBannerArrow}>›</Text>
       </TouchableOpacity>
@@ -708,58 +732,6 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.premiumBannerArrow}>›</Text>
       </TouchableOpacity>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Categories</Text>
-        <Text style={styles.sectionDescription}>
-          Choose what topics you want to learn about
-        </Text>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate('Categories')}
-        >
-          <Text style={styles.actionButtonText}>Manage Classes & Categories</Text>
-          <Text style={styles.chevron}>›</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>About Notifications</Text>
-          <Text style={styles.infoText}>
-            {Platform.OS === 'ios' 
-              ? 'Notifications are scheduled throughout the day based on your interval setting.'
-              : 'Notifications are sent when you unlock your phone.'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Content</Text>
-        <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: '#6366f1' }]}
-          onPress={async () => {
-            const cleared = await ContentService.clearCache();
-            if (cleared) {
-              // Force refresh content
-              await ContentService.refresh();
-              Alert.alert(
-                'Cache Cleared',
-                'Content cache cleared. The app will fetch fresh data from the server. Please restart the app to see the updated content.',
-                [{ text: 'OK' }]
-              );
-            } else {
-              Alert.alert('Error', 'Failed to clear cache.');
-            }
-          }}
-        >
-          <Text style={[styles.actionButtonText, { color: '#ffffff' }]}>Clear Content Cache & Refresh</Text>
-          <Text style={[styles.chevron, { color: '#ffffff' }]}>›</Text>
-        </TouchableOpacity>
-        <Text style={styles.sectionDescription}>
-          Clear cached content and fetch fresh data from the server. Use this if categories or tidbits aren't showing up correctly.
-        </Text>
-      </View>
-
       {false && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Testing</Text>
@@ -772,41 +744,6 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.testButtonDescription}>
             Send an immediate push notification with action buttons
           </Text>
-        
-        {Platform.OS === 'ios' && false && (
-          <>
-            <TouchableOpacity
-              style={[styles.testButton, styles.testButtonSecondary]}
-              onPress={handleCheckScheduledNotifications}
-            >
-              <Text style={styles.testButtonText}>Check Scheduled Notifications</Text>
-            </TouchableOpacity>
-            <Text style={styles.testButtonDescription}>
-              See how many notifications are scheduled (check console for debug logs)
-            </Text>
-            <TouchableOpacity
-              style={[styles.testButton, { backgroundColor: '#f59e0b', marginTop: 8 }]}
-              onPress={async () => {
-                try {
-                  await NotificationService.cancelAllNotifications();
-                  const scheduled = await NotificationService.getAllScheduledNotifications();
-                  Alert.alert(
-                    'Success',
-                    `Cleared all local notifications.\n\nRemaining scheduled: ${scheduled.length}\n\nNote: Push notifications from the server are not affected.`
-                  );
-                } catch (error) {
-                  console.error('Error clearing notifications:', error);
-                  Alert.alert('Error', 'Could not clear notifications.');
-                }
-              }}
-            >
-              <Text style={styles.testButtonText}>Clear Old Local Notifications</Text>
-            </TouchableOpacity>
-            <Text style={styles.testButtonDescription}>
-              Clears any old local notifications that might still be scheduled. Push notifications from the server are not affected.
-            </Text>
-          </>
-        )}
         </View>
       )}
 
@@ -930,18 +867,6 @@ export default function SettingsScreen({ navigation }) {
         </Text>
       </View>
       )}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>My Classes</Text>
-        <TouchableOpacity
-          style={styles.classesButton}
-          onPress={() => navigation.navigate('Categories')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.classesButtonText}>View & Edit My Classes</Text>
-          <Text style={styles.classesChevron}>›</Text>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>

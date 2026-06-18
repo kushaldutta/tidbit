@@ -13,13 +13,15 @@ import {
 import * as Haptics from 'expo-haptics';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import { ContentService } from '../services/ContentService';
+import { StorageService } from '../services/StorageService';
 
-const { width } = Dimensions.get('window');
+const { width, height: windowHeight } = Dimensions.get('window');
 
 export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [learningState, setLearningState] = useState(null);
+  const [cardHeight, setCardHeight] = useState(400);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const flipAnim = useRef(new Animated.Value(0)).current;
@@ -170,10 +172,8 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
       }, 300);
       
       // For "I knew it" or "I didn't" actions, dismiss the modal
-      // User can use "Get Tidbit Now" button if they want another tidbit
       if (action === 'knew' || action === 'didnt') {
-        console.log(`[TIDBIT_MODAL] Action "${action}" - dismissing modal (not showing next tidbit)`);
-        // Small delay to show feedback, then dismiss
+        await StorageService.recordTidbitAnswered();
         setTimeout(() => {
           handleDismiss();
         }, 500);
@@ -258,7 +258,7 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
           <TouchableOpacity
             activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
-            style={styles.cardContainer}
+            style={[styles.cardContainer, { minHeight: cardHeight }]}
           >
             {/* Front of Card */}
             <Animated.View
@@ -339,6 +339,10 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
                   contentContainerStyle={styles.actionsContainer}
                   showsVerticalScrollIndicator={false}
                   bounces={false}
+                  onContentSizeChange={(_w, h) => {
+                    const needed = Math.min(windowHeight * 0.85, Math.max(400, h + 100));
+                    setCardHeight(needed);
+                  }}
                 >
                   {tidbit.term && (
                     <View style={styles.definitionBox}>

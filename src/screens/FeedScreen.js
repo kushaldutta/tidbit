@@ -24,6 +24,7 @@ import { ModerationService } from '../services/ModerationService';
 import ModerationReasonModal from '../components/ModerationReasonModal';
 import ReportContentModal from '../components/ReportContentModal';
 import { ReportService } from '../services/ReportService';
+import { BlockService } from '../services/BlockService';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -205,15 +206,24 @@ function ComposeModal({ visible, groups, onClose, onPost }) {
   const [selectedGroupId, setSelectedGroupId] = useState(groups[0]?.groupId || '');
   const [anonymous, setAnonymous] = useState(false);
   const [posting, setPosting] = useState(false);
+  const wasVisibleRef = React.useRef(false);
 
-  // Reset when opened
   React.useEffect(() => {
-    if (visible) {
+    if (visible && !wasVisibleRef.current) {
       setText('');
       setSelectedGroupId(groups[0]?.groupId || '');
       setAnonymous(false);
     }
+    wasVisibleRef.current = visible;
   }, [visible, groups]);
+
+  React.useEffect(() => {
+    if (!visible || !groups.length) return;
+    const stillValid = groups.some((g) => g.groupId === selectedGroupId);
+    if (!stillValid) {
+      setSelectedGroupId(groups[0]?.groupId || '');
+    }
+  }, [groups, visible, selectedGroupId]);
 
   const handlePost = async () => {
     const trimmed = text.trim();
@@ -356,11 +366,12 @@ export default function FeedScreen({ navigation }) {
     if (isRefresh) setRefreshing(true);
     else if (!silent) setLoading(true);
     try {
-      const [feedPosts, myGroups] = await Promise.all([
+      const [feedPosts, myGroups, blockedIds] = await Promise.all([
         FeedService.getHomeFeed(),
         GroupService.getMyGroups(),
+        BlockService.getBlockedUserIds(),
       ]);
-      setPosts(feedPosts);
+      setPosts(BlockService.filterPosts(feedPosts, blockedIds));
       setGroups(myGroups);
     } catch (e) {
       console.warn('[FeedScreen] load error:', e.message);

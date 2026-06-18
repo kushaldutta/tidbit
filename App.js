@@ -24,6 +24,7 @@ import CategoryProgressScreen from './src/screens/CategoryProgressScreen';
 import CategoryDetailScreen from './src/screens/CategoryDetailScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
+import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
 import OnboardingProfileScreen from './src/screens/auth/OnboardingProfileScreen';
 import ClassSelectionScreen from './src/screens/auth/ClassSelectionScreen';
 import MyClassesScreen from './src/screens/MyClassesScreen';
@@ -168,12 +169,17 @@ function TabIcon({ name, color }) {
 }
 
 // Shown to unauthenticated users: splash → login/signup.
-function UnauthStack() {
+function UnauthStack({ initialRouteName = 'Welcome', verifyEmailParams = undefined }) {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Welcome">
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRouteName}>
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen
+        name="VerifyEmail"
+        component={VerifyEmailScreen}
+        initialParams={verifyEmailParams}
+      />
     </Stack.Navigator>
   );
 }
@@ -286,8 +292,9 @@ export default function App() {
   const [appState, setAppState] = useState(AppState.currentState);
   const [isOnboardingComplete, setIsOnboardingComplete] = useState(null); // null = checking, true/false = determined
   const [isLoading, setIsLoading] = useState(true); // Show loading screen initially
-  // Auth gate: unauthenticated | needs_profile | needs_onboarding | ready
+  // Auth gate: unauthenticated | needs_email_verification | needs_profile | needs_onboarding | ready
   const [authStatus, setAuthStatus] = useState(null);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState('');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const authStatusRef = useRef(null);
   const isOnboardingCompleteRef = useRef(null);
@@ -312,11 +319,25 @@ export default function App() {
     const task = (async () => {
       const session = AuthService.getSession();
       if (!session?.user?.id) {
+        const pendingEmail = AuthService.consumePendingVerificationEmail();
+        if (pendingEmail) {
+          setPendingVerificationEmail(pendingEmail);
+          setAuthStatus('needs_email_verification');
+          return;
+        }
         setAuthStatus('unauthenticated');
         return;
       }
       try {
         await AuthService.ensureValidSession();
+        const user = AuthService.getUser();
+        if (user && !AuthService.isEmailVerified(user)) {
+          AuthService.rememberPendingVerificationEmail(user.email);
+          setPendingVerificationEmail(user.email || '');
+          await AuthService.clearLocalAuthSession();
+          setAuthStatus('needs_email_verification');
+          return;
+        }
         EntitlementService.init().catch(() => {});
         const userId = AuthService.getUserId();
         if (userId) EntitlementService.identifyUser(userId).catch(() => {});
@@ -336,6 +357,14 @@ export default function App() {
         }
       } catch (err) {
         console.warn('[APP] resolveAuthStatus profile check failed:', err);
+        if (AuthService.isEmailNotConfirmedError(err)) {
+          const pendingEmail =
+            err.email || AuthService.consumePendingVerificationEmail();
+          if (pendingEmail) setPendingVerificationEmail(pendingEmail);
+          await AuthService.clearLocalAuthSession();
+          setAuthStatus('needs_email_verification');
+          return;
+        }
         if (
           AuthService.isStaleSessionError(err) ||
           AuthService.isAuthMismatchError(err)
@@ -549,11 +578,13 @@ export default function App() {
             if (spacedRepAction) {
               try {
                 console.log(`[NOTIFICATION_ACTION] Recording feedback: tidbitId=${tidbitId}, action=${spacedRepAction}`);
-                // 1. Update local spaced-repetition state (AsyncStorage)
                 await SpacedRepetitionService.recordFeedback(tidbitId, spacedRepAction);
                 console.log('[NOTIFICATION_ACTION] Local feedback recorded');
 
-                // 2. Sync to Supabase so it counts toward cloud stats + Same-Boat
+                if (spacedRepAction === 'knew' || spacedRepAction === 'didnt_know') {
+                  await StorageService.recordTidbitAnswered();
+                }
+
                 await syncNotificationFeedbackToCloud(tidbitId, spacedRepAction);
               } catch (error) {
                 console.error('[NOTIFICATION_ACTION] Error recording feedback:', error);
@@ -723,7 +754,14 @@ export default function App() {
   // Order: unauthenticated → welcome+auth, needs_profile → profile only,
   // needs_onboarding → classes/frequency/permissions, else → main app.
   let activeStack;
-  if (authStatus === 'unauthenticated') {
+  if (authStatus === 'needs_email_verification') {
+    activeStack = (
+      <UnauthStack
+        initialRouteName="VerifyEmail"
+        verifyEmailParams={{ email: pendingVerificationEmail }}
+      />
+    );
+  } else if (authStatus === 'unauthenticated') {
     activeStack = <UnauthStack />;
   } else if (authStatus === 'needs_profile') {
     activeStack = <FullSetupStack startAt="profile" />;

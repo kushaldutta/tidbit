@@ -2,6 +2,7 @@ import { DeckService } from './DeckService';
 import { ClassService } from './ClassService';
 import { StorageService } from './StorageService';
 import { NotificationService } from './NotificationService';
+import { SyncService } from './SyncService';
 
 /**
  * Notification sources: enrolled class tidbits (categories) + deck cards.
@@ -15,6 +16,7 @@ class NotificationDeckService {
     const unique = [...new Set((deckIds || []).filter(Boolean))];
     await StorageService.setSelectedDeckIds(unique);
     await NotificationService.syncPreferences();
+    SyncService.syncProfilePreferences().catch(() => {});
   }
 
   static async toggleDeck(deckId, enabled) {
@@ -113,6 +115,7 @@ class NotificationDeckService {
     await StorageService.setSelectedCategories(categories);
     await StorageService.setSelectedDeckIds(deckIds);
     await NotificationService.syncPreferences();
+    SyncService.syncProfilePreferences().catch(() => {});
   }
 
   static async listAvailableDecks() {
@@ -144,12 +147,18 @@ class NotificationDeckService {
     const classIds = await ClassService.getMyClassIds();
     if (!classIds.length) return [];
 
-    const [existingDecks, existingCats] = await Promise.all([
+    const [existingDecks, existingCats, disabledCats] = await Promise.all([
       this.getSelectedDeckIds(),
       StorageService.getSelectedCategories(),
+      StorageService.getNotificationDisabledCategories(),
     ]);
 
-    if (existingDecks.length === 0 && existingCats.length === 0) {
+    const hasExplicitPrefs =
+      existingDecks.length > 0 ||
+      existingCats.length > 0 ||
+      disabledCats.length > 0;
+
+    if (!hasExplicitPrefs) {
       await ClassService.replaceCategoriesToEnrollment(classIds);
       return this.getSelectedDeckIds();
     }

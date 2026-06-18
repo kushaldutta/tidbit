@@ -49,15 +49,13 @@ export default function SignUpScreen({ navigation }) {
     setLoading(true);
     try {
       const result = await AuthService.signUpWithEmail({ email, password });
-      // Supabase may require email confirmation depending on project settings.
-      if (!result?.session) {
-        Alert.alert(
-          'Check your email',
-          'We sent a confirmation link. Verify your email, then come back and sign in.'
-        );
-        navigation.navigate('Login');
+      if (result?.needsEmailVerification) {
+        navigation.navigate('VerifyEmail', {
+          email: email.trim().toLowerCase(),
+        });
+        return;
       }
-      // If a session was returned, App.js auth gate routes to OnboardingProfile.
+      // Verified immediately (e.g. confirm email disabled in Supabase) — App.js routes on.
     } catch (err) {
       Alert.alert('Sign up failed', err.message || 'Try again.');
     } finally {

@@ -15,8 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthService } from '../../services/AuthService';
 
-export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState('');
+export default function LoginScreen({ route, navigation }) {
+  const [email, setEmail] = useState(route.params?.email || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -37,6 +37,12 @@ export default function LoginScreen({ navigation }) {
       await AuthService.signInWithEmail({ email, password });
       // App.js auth gate will handle navigation automatically.
     } catch (err) {
+      if (err?.code === AuthService.EMAIL_NOT_CONFIRMED) {
+        navigation.navigate('VerifyEmail', {
+          email: err.email || email.trim().toLowerCase(),
+        });
+        return;
+      }
       Alert.alert('Sign in failed', err.message || 'Try again.');
     } finally {
       setLoading(false);

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 
 const KEYS = {
   SELECTED_CATEGORIES: 'selected_categories',
@@ -171,13 +172,24 @@ class StorageService {
 
   static async incrementDailyTidbitCount() {
     try {
+      const lastDate = await this.getLastTidbitDate();
+      const today = new Date().toDateString();
+      if (lastDate !== today) {
+        await this.resetDailyStats();
+      }
       const current = await this.getDailyTidbitCount();
       await AsyncStorage.setItem(KEYS.DAILY_TIDBIT_COUNT, String(current + 1));
-      const today = new Date().toDateString();
       await AsyncStorage.setItem(KEYS.LAST_TIDBIT_DATE, today);
     } catch (error) {
       console.error('Error incrementing daily tidbit count:', error);
     }
+  }
+
+  /** Increment Today + Total counters when user answers a tidbit (knew / didn't). */
+  static async recordTidbitAnswered() {
+    await this.incrementDailyTidbitCount();
+    await this.incrementTidbitsSeen();
+    DeviceEventEmitter.emit('statsUpdated');
   }
 
   static async getLastTidbitDate() {

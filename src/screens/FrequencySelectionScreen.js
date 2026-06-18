@@ -4,15 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 
 const INTERVAL_OPTIONS = [
-  { label: '15 minutes', value: 15 },
-  { label: '30 minutes', value: 30 },
   { label: '1 hour', value: 60 },
   { label: '2 hours', value: 120 },
   { label: '4 hours', value: 240 },
 ];
 
 export default function FrequencySelectionScreen({ navigation }) {
-  const [selectedInterval, setSelectedInterval] = useState(30); // Default to 30 minutes
+  const [selectedInterval, setSelectedInterval] = useState(60);
 
   const handleIntervalSelect = async (interval) => {
     setSelectedInterval(interval);

@@ -49,7 +49,13 @@ export default function HomeScreen({ navigation }) {
       loadStudyPlan();
       loadCategoryProgress();
     });
-    return unsubscribe;
+    const statsSub = DeviceEventEmitter.addListener('statsUpdated', () => {
+      loadData();
+    });
+    return () => {
+      unsubscribe();
+      statsSub.remove();
+    };
   }, [navigation]);
 
   const loadDevMode = async () => {
@@ -207,13 +213,6 @@ export default function HomeScreen({ navigation }) {
         }
         // Fire event — App.js listens and shows TidbitModal directly
         DeviceEventEmitter.emit('showTidbitNow', tidbitWithId);
-        await StorageService.incrementTidbitsSeen();
-        await StorageService.incrementDailyTidbitCount();
-        setStats(prev => ({
-          ...prev,
-          tidbitsSeen: (prev.tidbitsSeen || 0) + 1,
-          dailyTidbits: (prev.dailyTidbits || 0) + 1,
-        }));
       }
     } catch (error) {
       console.error('Error getting tidbit:', error);

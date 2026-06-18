@@ -185,6 +185,17 @@ class SyncService {
     if (typeof settings.enabled === 'boolean') {
       await StorageService.setNotificationsEnabled(settings.enabled);
     }
+    if (Array.isArray(settings.selected_deck_ids)) {
+      await StorageService.setSelectedDeckIds(settings.selected_deck_ids);
+    }
+    if (Array.isArray(settings.notification_disabled_categories)) {
+      await StorageService.setNotificationDisabledCategories(
+        settings.notification_disabled_categories
+      );
+    }
+    if (Array.isArray(settings.legacy_selected_categories)) {
+      await StorageService.setSelectedCategories(settings.legacy_selected_categories);
+    }
     const qh = settings.quiet_hours;
     if (qh) {
       if (typeof qh.enabled === 'boolean') {
@@ -242,6 +253,8 @@ class SyncService {
       quietHoursStart,
       quietHoursEnd,
       selectedCategories,
+      selectedDeckIds,
+      notificationDisabledCategories,
     ] = await Promise.all([
       StorageService.getNotificationInterval(),
       StorageService.getNotificationsEnabled(),
@@ -249,6 +262,8 @@ class SyncService {
       StorageService.getQuietHoursStart(),
       StorageService.getQuietHoursEnd(),
       StorageService.getSelectedCategories(),
+      StorageService.getSelectedDeckIds(),
+      StorageService.getNotificationDisabledCategories(),
     ]);
 
     const notification_settings = {
@@ -261,6 +276,8 @@ class SyncService {
         end: quietHoursEnd,
       },
       legacy_selected_categories: selectedCategories,
+      selected_deck_ids: selectedDeckIds,
+      notification_disabled_categories: notificationDisabledCategories,
     };
 
     const { error } = await supabase

@@ -23,7 +23,9 @@ import ModerationReasonModal from '../components/ModerationReasonModal';
 import ReportContentModal from '../components/ReportContentModal';
 import SharedDeckRow from '../components/SharedDeckRow';
 import { ReportService } from '../services/ReportService';
+import { BlockService } from '../services/BlockService';
 import { DeckVoteService } from '../services/DeckVoteService';
+import { DeckService } from '../services/DeckService';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -69,7 +71,7 @@ function Avatar({ name, size = 40 }) {
   );
 }
 
-function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRemove, onReport }) {
+function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRemove, onReport, onBlock }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const body = postBodyText(post);
@@ -77,6 +79,7 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
   const canDelete = FeedService.canUserDeletePost(post, myUserId);
   const showModRemove = isModerator && !canDelete;
   const showReport = ReportService.canReportPost(post, myUserId);
+  const showBlock = BlockService.canBlockUser(post.authorId, myUserId);
 
   const confirmDelete = () => {
     Alert.alert(
@@ -140,6 +143,16 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
             <Text style={styles.reportBtnText}>Report</Text>
           </TouchableOpacity>
         )}
+        {showBlock && (
+          <TouchableOpacity
+            style={styles.blockBtn}
+            onPress={() => onBlock(post)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.blockBtnText}>Block</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text style={styles.postBody}>{body}</Text>
@@ -189,6 +202,7 @@ export default function GroupScreen({ route, navigation }) {
   const [modTarget, setModTarget] = useState(null);
   const [reportTarget, setReportTarget] = useState(null);
   const [votingDeckId, setVotingDeckId] = useState(null);
+  const [savingDeckId, setSavingDeckId] = useState(null);
   const inputRef = useRef(null);
 
   const sortedDecks = useMemo(
@@ -202,15 +216,16 @@ export default function GroupScreen({ route, navigation }) {
     if (isRefresh) setRefreshing(true);
     else if (!silent) setLoading(true);
     try {
-      const [cm, dk, ps, live] = await Promise.all([
+      const [cm, dk, ps, live, blockedIds] = await Promise.all([
         GroupService.getClassmates(classId),
         GroupService.getGroupDecks(groupId),
         FeedService.getGroupPosts(groupId),
         SameBoatService.getLiveCount(classId),
+        BlockService.getBlockedUserIds(),
       ]);
-      setClassmates(cm);
-      setDecks(dk);
-      setPosts(ps);
+      setClassmates(BlockService.filterClassmates(cm, blockedIds));
+      setDecks(BlockService.filterDecks(dk, blockedIds));
+      setPosts(BlockService.filterPosts(ps, blockedIds));
       setLiveCount(live);
     } catch (e) {
       console.warn('[GroupScreen] load error:', e.message);
@@ -295,6 +310,28 @@ export default function GroupScreen({ route, navigation }) {
 
   const openReportDeck = (deck) => setReportTarget({ type: 'deck', deck });
 
+  const handleBlockPost = (post) => {
+    Alert.alert(
+      'Block this user?',
+      `You won't see posts or shared decks from ${post.authorName || 'this user'} in your groups.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await BlockService.blockUser(post.authorId);
+              await load(false, true);
+            } catch (e) {
+              Alert.alert('Could not block user', e.message || 'Try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleVote = async (deck, vote) => {
     const prevVote = deck.myVote ?? 0;
     const delta = DeckVoteService.voteDeltaFromToggle(prevVote, vote);
@@ -322,6 +359,21 @@ export default function GroupScreen({ route, navigation }) {
       deckTitle: deck.title,
       classId,
     });
+  };
+
+  const handleSaveDeck = async (deck) => {
+    setSavingDeckId(deck.id);
+    try {
+      await DeckService.copyDeckToMyDecks(deck.id);
+      Alert.alert(
+        'Saved to My Decks',
+        `"${deck.title}" was copied to your decks. You can edit it and enable notifications in Settings.`
+      );
+    } catch (e) {
+      Alert.alert('Could not save deck', e.message || 'Try again.');
+    } finally {
+      setSavingDeckId(null);
+    }
   };
 
   const openAllDecks = () => {
@@ -473,7 +525,9 @@ export default function GroupScreen({ route, navigation }) {
                 onStudy={handleStudyDeck}
                 onReport={openReportDeck}
                 onModRemove={openModDeck}
+                onSave={handleSaveDeck}
                 voting={votingDeckId}
+                saving={savingDeckId}
               />
             ))}
             {hasMoreDecks && (
@@ -556,6 +610,7 @@ export default function GroupScreen({ route, navigation }) {
                 onDelete={handleDelete}
                 onModerateRemove={openModPost}
                 onReport={openReportPost}
+                onBlock={handleBlockPost}
               />
             )}
             ListEmptyComponent={
@@ -783,6 +838,12 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   reportDeckBtn: { paddingVertical: 6, paddingHorizontal: 8 },
   reportBtnText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
+  blockBtn: {
+    marginLeft: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  blockBtnText: { fontSize: 12, fontWeight: '600', color: '#374151' },
   postBody: {
     fontSize: 15,
     color: theme.text,

@@ -16,7 +16,9 @@ import { GroupService } from '../services/GroupService';
 import { AuthService } from '../services/AuthService';
 import { ModerationService } from '../services/ModerationService';
 import { ReportService } from '../services/ReportService';
+import { BlockService } from '../services/BlockService';
 import { DeckVoteService } from '../services/DeckVoteService';
+import { DeckService } from '../services/DeckService';
 import SharedDeckRow from '../components/SharedDeckRow';
 import ModerationReasonModal from '../components/ModerationReasonModal';
 import ReportContentModal from '../components/ReportContentModal';
@@ -32,6 +34,7 @@ export default function GroupSharedDecksScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [isModerator, setIsModerator] = useState(false);
   const [votingDeckId, setVotingDeckId] = useState(null);
+  const [savingDeckId, setSavingDeckId] = useState(null);
   const [modTarget, setModTarget] = useState(null);
   const [reportTarget, setReportTarget] = useState(null);
 
@@ -44,8 +47,11 @@ export default function GroupSharedDecksScreen({ route, navigation }) {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const dk = await GroupService.getGroupDecks(groupId);
-      setDecks(dk);
+      const [dk, blockedIds] = await Promise.all([
+        GroupService.getGroupDecks(groupId),
+        BlockService.getBlockedUserIds(),
+      ]);
+      setDecks(BlockService.filterDecks(dk, blockedIds));
     } catch (e) {
       console.warn('[GroupSharedDecksScreen] load error:', e.message);
     } finally {
@@ -89,6 +95,21 @@ export default function GroupSharedDecksScreen({ route, navigation }) {
       deckTitle: deck.title,
       classId,
     });
+  };
+
+  const handleSaveDeck = async (deck) => {
+    setSavingDeckId(deck.id);
+    try {
+      await DeckService.copyDeckToMyDecks(deck.id);
+      Alert.alert(
+        'Saved to My Decks',
+        `"${deck.title}" was copied to your decks. You can edit it and enable notifications in Settings.`
+      );
+    } catch (e) {
+      Alert.alert('Could not save deck', e.message || 'Try again.');
+    } finally {
+      setSavingDeckId(null);
+    }
   };
 
   const openModDeck = (deck) => {
@@ -166,7 +187,9 @@ export default function GroupSharedDecksScreen({ route, navigation }) {
               onStudy={handleStudyDeck}
               onReport={openReportDeck}
               onModRemove={openModDeck}
+              onSave={handleSaveDeck}
               voting={votingDeckId}
+              saving={savingDeckId}
             />
           )}
           ListEmptyComponent={
