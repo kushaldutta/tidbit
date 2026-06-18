@@ -4,7 +4,7 @@ title: Privacy Policy
 
 # Privacy Policy for Tidbit
 
-**Last Updated:** June 3, 2026
+**Last Updated:** June 18, 2026
 
 Tidbit ("we," "us," or "our") operates the Tidbit mobile application ("App"). This Privacy Policy explains what information we collect, how we use it, and your choices.
 
