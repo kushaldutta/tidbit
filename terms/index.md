@@ -4,7 +4,7 @@ title: Terms of Service
 
 # Terms of Service for Tidbit
 
-**Last Updated:** June 3, 2026
+**Last Updated:** June 18, 2026
 
 These Terms of Service ("Terms") govern your use of the Tidbit mobile application and related services ("App") operated by Tidbit ("we," "us," or "our"). By creating an account or using the App, you agree to these Terms.
 
