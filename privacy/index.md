@@ -4,112 +4,134 @@ title: Privacy Policy
 
 # Privacy Policy for Tidbit
 
-**Last Updated:** [1/14/2026]
+**Last Updated:** June 3, 2026
 
-## Introduction
-
-Tidbit is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your information when you use our mobile application ("App").
+Tidbit ("we," "us," or "our") operates the Tidbit mobile application ("App"). This Privacy Policy explains what information we collect, how we use it, and your choices.
 
 ## Information We Collect
 
-### Personal Information
-- **Email Address**: We collect your email address when you contact us for support (optional).
-- **Device Information**: We collect device tokens for push notifications, device platform (iOS/Android), and app version.
+### Account Information
 
-### Usage Data
-- **Learning Progress**: We store your learning progress locally on your device, including:
-  - Tidbits you've seen
-  - Your feedback on tidbits ("I knew it", "I didn't know", "Saved")
-  - Spaced repetition scheduling data
-  - Daily tidbit counts
+When you create an account, we collect:
 
-### App Preferences
-- Notification frequency settings
-- Selected categories/topics
-- Quiet hours preferences
-- Notification enable/disable status
+- **Email address** (email/password sign-up) or **Apple-provided identifier** (Sign in with Apple; we may receive a relay email if you hide your email)
+- **User ID** assigned by our authentication provider (Supabase Auth)
+- **Profile data** you provide: display name, school affiliation, graduation year, avatar (if added), and onboarding preferences
+
+### Learning and Usage Data
+
+- **Study progress:** tidbits viewed, flashcard responses, spaced-repetition scheduling, deck study sessions, and mastery statistics
+- **Preferences:** notification settings, selected decks/categories, quiet hours, and theme choices
+- Some of this data is stored **on your device** (AsyncStorage). Summary stats and notification preferences may also sync to our cloud database so your account works across devices.
+
+### User-Generated Content (UGC)
+
+If you use social features, we store content you create or share:
+
+- Flashcard **decks** and cards (including decks shared with class groups)
+- **Activity posts** and deck votes in class feeds
+- **Group chat messages**
+- **Reports** you submit about other users' content
+
+### Device and Technical Data
+
+- **Push notification tokens** and device platform (iOS/Android) to deliver notifications
+- **App version** and basic diagnostic logs
+- **Subscription status** via RevenueCat (linked to your account user ID and store receipt data; we do not receive your full payment card details)
+
+### AI Feature Inputs (Premium)
+
+When you use AI deck generation or Snap-a-Page, we process:
+
+- Text prompts and pasted notes you submit
+- **Photos you choose** to upload for flashcard extraction
+
+These are sent to our server and processed using third-party AI services. We use this data only to generate flashcards for you and enforce usage limits. Do not upload images containing personal information you do not want processed.
+
+### Safety and Moderation
+
+- **Block lists** (users you have blocked)
+- **Content reports** and moderation actions taken by you or our moderators
 
 ## How We Use Your Information
 
-### Push Notifications
-- We use device tokens to send you tidbit notifications based on your selected frequency and preferences.
-- Device tokens are stored securely on our servers (Supabase) and are only used to deliver notifications.
-- You can disable notifications at any time in the app settings.
+We use collected information to:
 
-### Learning Progress
-- Your learning progress is stored locally on your device using AsyncStorage.
-- This data is used to:
-  - Prioritize tidbits you haven't seen
-  - Schedule spaced repetition reviews
-  - Track your learning statistics
-  - Personalize your learning experience
+- Provide account sign-in, cloud sync, and core study features
+- Deliver push notifications according to your preferences
+- Enable class groups, shared decks, feeds, chat, voting, and related social features
+- Process subscriptions and restore purchases
+- Generate AI flashcards when you request them
+- Enforce community guidelines, respond to reports, and improve safety
+- Respond to support requests
+- Maintain, secure, and improve the App
 
-### App Functionality
-- Your preferences (categories, notification interval, quiet hours) are stored both locally and on our servers to:
-  - Deliver notifications according to your schedule
-  - Respect your quiet hours
-  - Show only tidbits from your selected categories
+We do **not** sell your personal information.
 
-## Data Storage
+## Data Storage and Retention
 
-### Local Storage
-- Learning progress, preferences, and statistics are stored locally on your device.
-- This data remains on your device and is not transmitted to our servers except for notification preferences.
-
-### Server Storage
-- Device tokens and notification preferences are stored on Supabase (our database provider).
-- This data is necessary to send you push notifications.
-- We do not store your learning progress on our servers.
+- **Local storage:** Much of your study progress and preferences live on your device.
+- **Cloud storage (Supabase):** Account profiles, social content, notification tokens, synced preferences, usage stats, blocks, and reports.
+- **Deletion:** You can delete your account in **Settings → Delete Account**, which removes your account and associated server data through our deletion process. Some information may be retained briefly in backups or as required by law.
 
 ## Data Sharing
 
-We do not sell, trade, or rent your personal information to third parties. We only share data with:
-- **Supabase**: Our database provider, used solely for storing device tokens and notification preferences.
-- **Expo**: Used for push notification delivery (device tokens only).
+We share data only with service providers that help us operate the App:
 
-## Your Rights
+| Provider | Purpose |
+|----------|---------|
+| **Supabase** | Authentication, database, and file storage |
+| **Expo** | Push notification delivery |
+| **RevenueCat** | Subscription management and purchase validation |
+| **Apple** | Sign in with Apple and in-app purchases (iOS) |
+| **OpenAI** (via our server) | AI flashcard generation from your prompts and optional photos |
 
-You have the right to:
-- **Access**: View your stored data in the app's Settings screen.
-- **Delete**: Clear all learning state and data through the app settings (Developer Mode).
-- **Opt-Out**: Disable notifications at any time in app settings.
-- **Contact**: Email us at kushald@berkeley.edu with any privacy concerns.
+These providers process data under their own privacy policies and our instructions for providing the service.
+
+We may disclose information if required by law or to protect the rights, safety, and integrity of users and the App.
+
+## Your Rights and Choices
+
+You can:
+
+- **Access and update** profile information in the App
+- **Disable notifications** in Settings
+- **Block users** and **report content** in the App
+- **Delete your account** in Settings (permanent)
+- **Manage subscriptions** through Apple ID / Google Play settings
+- **Contact us** with privacy questions or requests at kushald@berkeley.edu
+
+Depending on where you live, you may have additional rights (such as access, correction, or deletion under GDPR or CCPA). Contact us to exercise those rights.
 
 ## Data Security
 
-- Device tokens are stored securely using Supabase's encrypted database.
-- Local data is stored using React Native's AsyncStorage (encrypted on iOS, secure on Android).
-- We use HTTPS for all server communications.
+We use industry-standard measures including HTTPS, encrypted storage on supported platforms, and access controls on our database. No method of transmission or storage is 100% secure.
 
 ## Children's Privacy
 
-Our App is not intended for children under 13. We do not knowingly collect personal information from children under 13.
+The App is not directed to children under 13. We do not knowingly collect personal information from children under 13. If you believe a child has provided us data, contact us and we will delete it.
 
-## Changes to This Privacy Policy
+## International Users
 
-We may update this Privacy Policy from time to time. We will notify you of any changes by:
-- Posting the new Privacy Policy on this page
-- Updating the "Last Updated" date
-- Notifying you through the app (if significant changes)
+Our services are operated from the United States. If you use the App from other regions, your information may be transferred to and processed in the U.S.
+
+## Changes to This Policy
+
+We may update this Privacy Policy from time to time. We will post changes at this URL and update the "Last Updated" date. Material changes may also be communicated in the App when appropriate.
 
 ## Contact Us
 
-If you have questions about this Privacy Policy, please contact us at:
-- **Email**: kushald@berkeley.edu
-- **Subject**: Tidbit App Privacy Policy Inquiry
+- **Email:** kushald@berkeley.edu
+- **Subject:** Tidbit App Privacy Policy Inquiry
 
-## Third-Party Services
+## Third-Party Privacy Policies
 
-### Supabase
-- We use Supabase to store device tokens and preferences.
-- Supabase's privacy policy: https://supabase.com/privacy
-
-### Expo
-- We use Expo's push notification service.
-- Expo's privacy policy: https://expo.dev/privacy
+- Supabase: https://supabase.com/privacy
+- Expo: https://expo.dev/privacy
+- RevenueCat: https://www.revenuecat.com/privacy
+- Apple: https://www.apple.com/legal/privacy/
+- OpenAI: https://openai.com/policies/privacy-policy
 
 ---
 
-**Note**: This is a basic privacy policy. For production apps, consider having a lawyer review it to ensure compliance with GDPR, CCPA, and other applicable regulations.
-
-
+See also: [Terms of Service](/tidbit/terms/)
