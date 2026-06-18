@@ -358,6 +358,9 @@ export default function GroupScreen({ route, navigation }) {
       deckId: deck.id,
       deckTitle: deck.title,
       classId,
+      groupId,
+      code,
+      title,
     });
   };
 

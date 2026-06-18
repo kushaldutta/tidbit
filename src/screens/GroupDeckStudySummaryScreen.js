@@ -9,7 +9,32 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function GroupDeckStudySummaryScreen({ route, navigation }) {
-  const { deckTitle, results = [], totalCards } = route.params;
+  const {
+    deckId,
+    deckTitle,
+    classId,
+    groupId,
+    code,
+    title,
+    results = [],
+  } = route.params;
+
+  const studyParams = { deckId, deckTitle, classId, groupId, code, title };
+
+  const handleBackToGroup = () => {
+    if (groupId && classId) {
+      navigation.navigate('Group', { groupId, classId, code, title });
+      return;
+    }
+    navigation.goBack();
+  };
+
+  const handleStudyAgain = () => {
+    navigation.replace('GroupDeckStudy', {
+      ...studyParams,
+      restartKey: Date.now(),
+    });
+  };
 
   const knew = results.filter((r) => r.knew).length;
   const didntKnow = results.length - knew;
@@ -52,7 +77,7 @@ export default function GroupDeckStudySummaryScreen({ route, navigation }) {
         {/* Actions */}
         <TouchableOpacity
           style={styles.primaryBtn}
-          onPress={() => navigation.popToTop()}
+          onPress={handleBackToGroup}
           activeOpacity={0.85}
         >
           <Text style={styles.primaryBtnText}>Back to group</Text>
@@ -60,9 +85,7 @@ export default function GroupDeckStudySummaryScreen({ route, navigation }) {
 
         <TouchableOpacity
           style={styles.secondaryBtn}
-          onPress={() => {
-            navigation.replace('GroupDeckStudy', route.params);
-          }}
+          onPress={handleStudyAgain}
           activeOpacity={0.85}
         >
           <Text style={styles.secondaryBtnText}>Study again</Text>

@@ -55,7 +55,7 @@ function SameBoatBanner({ stat }) {
 // ─── main screen ─────────────────────────────────────────────────────────────
 
 export default function GroupDeckStudyScreen({ route, navigation }) {
-  const { deckId, deckTitle, classId } = route.params;
+  const { deckId, deckTitle, classId, groupId, code, title, restartKey } = route.params;
 
   const [cards, setCards] = useState([]);
   const [index, setIndex] = useState(0);
@@ -68,11 +68,18 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
   const flipAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    setIndex(0);
+    setFlipped(false);
+    setSameBoatStat(null);
+    setResults([]);
+    flipAnim.setValue(0);
+    setLoading(true);
+
     DeckService.listCards(deckId)
       .then((c) => setCards(c || []))
       .catch(() => setCards([]))
       .finally(() => setLoading(false));
-  }, [deckId]);
+  }, [deckId, restartKey]);
 
   const currentCard = cards[index];
 
@@ -106,7 +113,12 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
     if (next >= cards.length) {
       // Done — show summary
       navigation.replace('GroupDeckStudySummary', {
+        deckId,
         deckTitle,
+        classId,
+        groupId,
+        code,
+        title,
         results: [...results, { cardId: currentCard.id, knew }],
         totalCards: cards.length,
       });

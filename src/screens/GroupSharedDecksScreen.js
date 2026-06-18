@@ -94,6 +94,9 @@ export default function GroupSharedDecksScreen({ route, navigation }) {
       deckId: deck.id,
       deckTitle: deck.title,
       classId,
+      groupId,
+      code,
+      title,
     });
   };
 
