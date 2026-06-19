@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthService } from '../services/AuthService';
+import { ProfileService } from '../services/ProfileService';
 
 const THEME_KEY = '@tidbit:app_theme';
 
@@ -86,19 +88,65 @@ const ThemeContext = createContext({
   setThemeId: () => {},
 });
 
+function isValidThemeId(id) {
+  return Boolean(id && THEMES[id]);
+}
+
 export function ThemeProvider({ children }) {
   const [themeId, setThemeIdState] = useState('default');
 
-  useEffect(() => {
-    AsyncStorage.getItem(THEME_KEY).then((saved) => {
-      if (saved && THEMES[saved]) setThemeIdState(saved);
-    }).catch(() => {});
+  const applyThemeId = useCallback(async (id, { persistLocal = true } = {}) => {
+    const next = isValidThemeId(id) ? id : 'default';
+    setThemeIdState(next);
+    if (persistLocal) {
+      await AsyncStorage.setItem(THEME_KEY, next).catch(() => {});
+    }
   }, []);
 
+  const loadThemeForSession = useCallback(async () => {
+    if (!AuthService.isAuthenticated()) {
+      await applyThemeId('default');
+      return;
+    }
+
+    try {
+      const profile = await ProfileService.getMyProfile();
+      if (isValidThemeId(profile?.theme)) {
+        await applyThemeId(profile.theme);
+        return;
+      }
+    } catch {
+      // Fall back to local cache below.
+    }
+
+    const saved = await AsyncStorage.getItem(THEME_KEY).catch(() => null);
+    if (isValidThemeId(saved)) {
+      await applyThemeId(saved);
+      if (AuthService.isAuthenticated()) {
+        ProfileService.upsertProfile({ theme: saved }).catch(() => {});
+      }
+      return;
+    }
+
+    await applyThemeId('default');
+  }, [applyThemeId]);
+
+  useEffect(() => {
+    loadThemeForSession();
+    const unsubscribe = AuthService.onAuthChange(() => {
+      loadThemeForSession();
+    });
+    return unsubscribe;
+  }, [loadThemeForSession]);
+
   const setThemeId = async (id) => {
-    if (!THEMES[id]) return;
-    setThemeIdState(id);
-    await AsyncStorage.setItem(THEME_KEY, id).catch(() => {});
+    if (!isValidThemeId(id)) return;
+    await applyThemeId(id);
+    if (AuthService.isAuthenticated()) {
+      ProfileService.upsertProfile({ theme: id }).catch((err) => {
+        console.warn('[THEME] Failed to save theme to account:', err.message);
+      });
+    }
   };
 
   return (

@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActionSheetIOS,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -50,6 +52,7 @@ function postBodyText(post) {
 
 const REACTION_EMOJIS = ['👍', '❤️', '🔥'];
 const TOP_DECKS_VISIBLE = 3;
+const CLASSMATES_VIEW_ALL_MIN = 5;
 
 // ─── sub-components ─────────────────────────────────────────────────────────
 
@@ -92,6 +95,60 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
     );
   };
 
+  const hasMenu = canDelete || showModRemove || showReport || showBlock;
+
+  const openMenu = () => {
+    const options = [];
+    const handlers = [];
+
+    if (canDelete) {
+      options.push('Delete');
+      handlers.push(confirmDelete);
+    }
+    if (showModRemove) {
+      options.push('Remove');
+      handlers.push(() => onModerateRemove(post));
+    }
+    if (showReport) {
+      options.push('Report');
+      handlers.push(() => onReport(post));
+    }
+    if (showBlock) {
+      options.push('Block user');
+      handlers.push(() => onBlock(post));
+    }
+    options.push('Cancel');
+
+    const destructiveIndex = options.findIndex(
+      (label) => label === 'Delete' || label === 'Remove' || label === 'Block user',
+    );
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: options.length - 1,
+          destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex : undefined,
+        },
+        (index) => {
+          if (index >= 0 && index < handlers.length) handlers[index]();
+        },
+      );
+    } else {
+      Alert.alert('Message options', undefined, [
+        ...handlers.map((fn, i) => ({
+          text: options[i],
+          onPress: fn,
+          style:
+            options[i] === 'Delete' || options[i] === 'Remove' || options[i] === 'Block user'
+              ? 'destructive'
+              : 'default',
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  };
+
   // Build per-kind counts + my-reaction set
   const kindCount = {};
   const myKinds = new Set();
@@ -113,44 +170,14 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
             <Text style={styles.activityBadgeText}>⚡ activity</Text>
           </View>
         )}
-        {canDelete && (
+        {hasMenu && (
           <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={confirmDelete}
+            style={styles.postMenuBtn}
+            onPress={openMenu}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.7}
           >
-            <Text style={styles.deleteBtnText}>Delete</Text>
-          </TouchableOpacity>
-        )}
-        {showModRemove && (
-          <TouchableOpacity
-            style={styles.modRemoveBtn}
-            onPress={() => onModerateRemove(post)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.modRemoveBtnText}>Remove</Text>
-          </TouchableOpacity>
-        )}
-        {showReport && (
-          <TouchableOpacity
-            style={styles.reportBtn}
-            onPress={() => onReport(post)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.reportBtnText}>Report</Text>
-          </TouchableOpacity>
-        )}
-        {showBlock && (
-          <TouchableOpacity
-            style={styles.blockBtn}
-            onPress={() => onBlock(post)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.blockBtnText}>Block</Text>
+            <Text style={styles.postMenuBtnText}>⋯</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -383,6 +410,10 @@ export default function GroupScreen({ route, navigation }) {
     navigation.navigate('GroupSharedDecks', { groupId, classId, code, title });
   };
 
+  const openAllClassmates = () => {
+    navigation.navigate('GroupClassmates', { classId, code, title });
+  };
+
   const handleReportSubmit = async ({ category, details }) => {
     try {
       if (reportTarget.type === 'post') {
@@ -477,9 +508,16 @@ export default function GroupScreen({ route, navigation }) {
     <View>
       {/* Classmates */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          Classmates {classmates.length > 0 ? `(${classmates.length})` : ''}
-        </Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>
+            Classmates {classmates.length > 0 ? `(${classmates.length})` : ''}
+          </Text>
+          {classmates.length >= CLASSMATES_VIEW_ALL_MIN && (
+            <TouchableOpacity onPress={openAllClassmates} activeOpacity={0.7}>
+              <Text style={styles.viewAllLink}>View all</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         {classmates.length === 0 ? (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyEmoji}>🎓</Text>
@@ -489,7 +527,11 @@ export default function GroupScreen({ route, navigation }) {
             </Text>
           </View>
         ) : (
-          <View style={styles.classmateGrid}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.classmateRow}
+          >
             {classmates.map((c) => (
               <View key={c.id} style={styles.classmateCard}>
                 <Avatar name={c.display_name} size={44} />
@@ -501,7 +543,7 @@ export default function GroupScreen({ route, navigation }) {
                 ) : null}
               </View>
             ))}
-          </View>
+          </ScrollView>
         )}
       </View>
 
@@ -741,18 +783,28 @@ const makeStyles = (theme) => StyleSheet.create({
     elevation: 2,
   },
   sectionHeaderOnly: { paddingBottom: 10 },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: theme.text,
     textTransform: 'uppercase',
     letterSpacing: 0.6,
-    marginBottom: 4,
+  },
+  viewAllLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.primary,
   },
   sectionSubtitle: { fontSize: 12, color: theme.textSecondary, marginBottom: 4 },
 
   // ── classmates ─────────────────────────────────────────────────────────
-  classmateGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  classmateRow: { flexDirection: 'row', gap: 10, paddingVertical: 4 },
   classmateCard: { alignItems: 'center', width: 68 },
   classmateName: {
     fontSize: 11,
@@ -822,31 +874,13 @@ const makeStyles = (theme) => StyleSheet.create({
     borderColor: '#fde68a',
   },
   activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '600' },
-  deleteBtn: {
-    marginLeft: 8,
+  postMenuBtn: {
+    marginLeft: 4,
     paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
-  deleteBtnText: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
-  modRemoveBtn: {
-    marginLeft: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  modRemoveBtnText: { fontSize: 12, fontWeight: '600', color: '#b45309' },
-  reportBtn: {
-    marginLeft: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
+  postMenuBtnText: { fontSize: 20, fontWeight: '700', color: theme.textSecondary, lineHeight: 22 },
   reportDeckBtn: { paddingVertical: 6, paddingHorizontal: 8 },
-  reportBtnText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
-  blockBtn: {
-    marginLeft: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  blockBtnText: { fontSize: 12, fontWeight: '600', color: '#374151' },
   postBody: {
     fontSize: 15,
     color: theme.text,

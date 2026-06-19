@@ -25,7 +25,7 @@ function ThemePickerInner({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={[styles.hint, { color: theme.textSecondary }]}>
-          Choose a colour palette for the entire app. Your pick is saved automatically.
+          Choose a colour palette for the entire app. Your pick is saved to your account.
         </Text>
 
         {Object.values(THEMES).map((t) => {

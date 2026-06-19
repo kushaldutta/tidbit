@@ -216,6 +216,10 @@ class SyncService {
       await StorageService.setTidbitsSeen(Math.max(local, stats.tidbits_seen));
     }
 
+    if (profile?.theme) {
+      await AsyncStorage.setItem('@tidbit:app_theme', profile.theme).catch(() => {});
+    }
+
     console.log('[SYNC] Hydrated account state from cloud for user', userId);
   }
 
@@ -255,6 +259,7 @@ class SyncService {
       selectedCategories,
       selectedDeckIds,
       notificationDisabledCategories,
+      savedTheme,
     ] = await Promise.all([
       StorageService.getNotificationInterval(),
       StorageService.getNotificationsEnabled(),
@@ -264,6 +269,7 @@ class SyncService {
       StorageService.getSelectedCategories(),
       StorageService.getSelectedDeckIds(),
       StorageService.getNotificationDisabledCategories(),
+      AsyncStorage.getItem('@tidbit:app_theme'),
     ]);
 
     const notification_settings = {
@@ -280,10 +286,13 @@ class SyncService {
       notification_disabled_categories: notificationDisabledCategories,
     };
 
+    const theme = savedTheme || profile?.theme || 'default';
+
     const { error } = await supabase
       .from('profiles')
       .update({
         notification_settings,
+        theme,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId);
@@ -341,6 +350,7 @@ class SyncService {
     await StorageService.setNotificationsEnabled(true);
     await StorageService.setNotificationInterval(60);
     await StorageService.setQuietHoursEnabled(false);
+    await AsyncStorage.setItem('@tidbit:app_theme', 'default').catch(() => {});
   }
 }
 

@@ -14,6 +14,7 @@ import {
   ScrollView,
   RefreshControl,
   Switch,
+  ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -75,7 +76,7 @@ function Avatar({ name, size = 36, anon = false }) {
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 
-function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRemove, onReport }) {
+function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRemove, onReport, onBlock }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const isAnon = post.postType === 'dumb_question';
@@ -85,6 +86,7 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
   const canDelete = FeedService.canUserDeletePost(post, myUserId);
   const showModRemove = isModerator && !canDelete;
   const showReport = ReportService.canReportPost(post, myUserId);
+  const showBlock = onBlock && BlockService.canBlockUser(post.authorId, myUserId);
 
   const confirmDelete = () => {
     Alert.alert(
@@ -95,6 +97,60 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
         { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
       ]
     );
+  };
+
+  const hasMenu = canDelete || showModRemove || showReport || showBlock;
+
+  const openMenu = () => {
+    const options = [];
+    const handlers = [];
+
+    if (canDelete) {
+      options.push('Delete');
+      handlers.push(confirmDelete);
+    }
+    if (showModRemove) {
+      options.push('Remove');
+      handlers.push(() => onModerateRemove(post));
+    }
+    if (showReport) {
+      options.push('Report');
+      handlers.push(() => onReport(post));
+    }
+    if (showBlock) {
+      options.push('Block user');
+      handlers.push(() => onBlock(post));
+    }
+    options.push('Cancel');
+
+    const destructiveIndex = options.findIndex(
+      (label) => label === 'Delete' || label === 'Remove' || label === 'Block user',
+    );
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex: options.length - 1,
+          destructiveButtonIndex: destructiveIndex >= 0 ? destructiveIndex : undefined,
+        },
+        (index) => {
+          if (index >= 0 && index < handlers.length) handlers[index]();
+        },
+      );
+    } else {
+      Alert.alert('Message options', undefined, [
+        ...handlers.map((fn, i) => ({
+          text: options[i],
+          onPress: fn,
+          style:
+            options[i] === 'Delete' || options[i] === 'Remove' || options[i] === 'Block user'
+              ? 'destructive'
+              : 'default',
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
   };
 
   const kindCount = {};
@@ -136,34 +192,14 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
             <Text style={styles.postTime}>{relativeTime(post.createdAt)}</Text>
           </View>
         </View>
-        {canDelete && (
+        {hasMenu && (
           <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={confirmDelete}
+            style={styles.postMenuBtn}
+            onPress={openMenu}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.7}
           >
-            <Text style={styles.deleteBtnText}>Delete</Text>
-          </TouchableOpacity>
-        )}
-        {showModRemove && (
-          <TouchableOpacity
-            style={styles.modRemoveBtn}
-            onPress={() => onModerateRemove(post)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.modRemoveBtnText}>Remove</Text>
-          </TouchableOpacity>
-        )}
-        {showReport && (
-          <TouchableOpacity
-            style={styles.reportBtn}
-            onPress={() => onReport(post)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.reportBtnText}>Report</Text>
+            <Text style={styles.postMenuBtnText}>⋯</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -430,6 +466,29 @@ export default function FeedScreen({ navigation }) {
 
   const openReportPost = (post) => setReportTarget({ type: 'post', post });
 
+  const handleBlockPost = (post) => {
+    const label = post.postType === 'dumb_question' ? 'this user' : (post.authorName || 'this user');
+    Alert.alert(
+      'Block this user?',
+      `You won't see posts or shared decks from ${label} in your groups.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await BlockService.blockUser(post.authorId);
+              await load(false, true);
+            } catch (e) {
+              Alert.alert('Could not block user', e.message || 'Try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleReportSubmit = async ({ category, details }) => {
     try {
       await ReportService.submitPostReport(reportTarget.post, { category, details });
@@ -554,6 +613,7 @@ export default function FeedScreen({ navigation }) {
               onDelete={handleDelete}
               onModerateRemove={openModPost}
               onReport={openReportPost}
+              onBlock={handleBlockPost}
             />
           )}
           ListEmptyComponent={
@@ -730,24 +790,12 @@ const makeStyles = (theme) => StyleSheet.create({
     borderColor: '#fde68a',
   },
   activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '700' },
-  deleteBtn: {
-    marginLeft: 8,
+  postMenuBtn: {
+    marginLeft: 4,
     paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
-  deleteBtnText: { fontSize: 12, fontWeight: '600', color: '#dc2626' },
-  modRemoveBtn: {
-    marginLeft: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  modRemoveBtnText: { fontSize: 12, fontWeight: '600', color: '#b45309' },
-  reportBtn: {
-    marginLeft: 8,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  reportBtnText: { fontSize: 12, fontWeight: '600', color: '#6b7280' },
+  postMenuBtnText: { fontSize: 20, fontWeight: '700', color: theme.textSecondary, lineHeight: 22 },
   postBody: {
     fontSize: 15,
     color: theme.text,
