@@ -76,7 +76,6 @@ function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle
           {filtered.map((cls) => {
             const active = enrolledIds.has(cls.id);
             const isLoading = saving === cls.id;
-            const hasContent = ClassService.hasTidbitContent(cls.id);
             return (
               <TouchableOpacity
                 key={cls.id}
@@ -88,11 +87,6 @@ function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle
                 <View style={styles.catInfo}>
                   <View style={styles.catTitleRow}>
                     <Text style={[styles.catName, active && styles.catNameActive]}>{cls.code}</Text>
-                    {!hasContent && (
-                      <View style={styles.soonBadge}>
-                        <Text style={styles.soonBadgeText}>Soon</Text>
-                      </View>
-                    )}
                   </View>
                   <Text style={styles.catDesc} numberOfLines={1}>{cls.title}</Text>
                 </View>
@@ -397,11 +391,6 @@ const makeStyles = (theme) => StyleSheet.create({
   catName: { fontSize: 14, fontWeight: '600', color: theme.text },
   catNameActive: { color: '#4338ca' },
   catDesc: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
-  soonBadge: {
-    backgroundColor: '#fef3c7', borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 2,
-  },
-  soonBadgeText: { fontSize: 10, fontWeight: '700', color: '#b45309' },
   check: {
     width: 24, height: 24, borderRadius: 12,
     borderWidth: 2, borderColor: '#d1d5db',

@@ -123,7 +123,6 @@ export default function ClassSelectionScreen({ route, navigation }) {
 
   const renderItem = ({ item }) => {
     const selected = selectedIds.has(item.id);
-    const hasContent = ClassService.hasTidbitContent(item.id);
     return (
       <TouchableOpacity
         style={[styles.classRow, selected && styles.classRowSelected]}
@@ -135,11 +134,6 @@ export default function ClassSelectionScreen({ route, navigation }) {
             <Text style={[styles.classCode, selected && styles.classCodeSelected]}>
               {item.code}
             </Text>
-            {!hasContent && (
-              <View style={styles.soonBadge}>
-                <Text style={styles.soonBadgeText}>Soon</Text>
-              </View>
-            )}
           </View>
           <Text style={styles.classTitle} numberOfLines={1}>
             {item.title}
@@ -314,13 +308,6 @@ const styles = StyleSheet.create({
   classCode: { fontSize: 15, fontWeight: '600', color: '#111827' },
   classCodeSelected: { color: '#4338ca' },
   classTitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
-  soonBadge: {
-    backgroundColor: '#fef3c7',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  soonBadgeText: { fontSize: 10, fontWeight: '700', color: '#b45309' },
 
   checkbox: {
     width: 24,

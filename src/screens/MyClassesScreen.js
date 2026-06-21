@@ -134,7 +134,6 @@ export default function MyClassesScreen({ navigation }) {
   const renderClassRow = ({ item }) => {
     const enrolled = enrolledIds.has(item.id);
     const isLoading = saving === item.id;
-    const hasContent = ClassService.hasTidbitContent(item.id);
     return (
       <TouchableOpacity
         style={[styles.row, enrolled && styles.rowEnrolled]}
@@ -147,11 +146,6 @@ export default function MyClassesScreen({ navigation }) {
             <Text style={[styles.rowCode, enrolled && styles.rowCodeEnrolled]}>
               {item.code}
             </Text>
-            {!hasContent && (
-              <View style={styles.soonBadge}>
-                <Text style={styles.soonBadgeText}>Soon</Text>
-              </View>
-            )}
           </View>
           <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
         </View>
@@ -326,11 +320,6 @@ const makeStyles = (theme) => StyleSheet.create({
   rowCode: { fontSize: 15, fontWeight: '600', color: theme.text },
   rowCodeEnrolled: { color: '#4338ca' },
   rowTitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
-  soonBadge: {
-    backgroundColor: '#fef3c7', borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 2,
-  },
-  soonBadgeText: { fontSize: 10, fontWeight: '700', color: '#b45309' },
 
   checkbox: {
     width: 24, height: 24, borderRadius: 6,
