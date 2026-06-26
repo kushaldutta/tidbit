@@ -30,6 +30,9 @@ yarn-error.*
 .vscode/
 .idea/
 
+# Private planning (not for repo)
+SUMMER_VISION.md
+
 # Build outputs
 *.jks
 *.p12
