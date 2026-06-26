@@ -172,6 +172,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
           value={catalogSchoolId}
           onChange={handleCatalogChange}
           preferredSchoolId={profileSchoolId}
+          catalogMode="onboarding"
         />
       </View>
 

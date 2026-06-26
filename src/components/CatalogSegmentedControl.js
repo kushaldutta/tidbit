@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { schoolsForCatalog, DEFAULT_SCHOOL_ID } from '../config/schools';
+import { schoolsForCatalog, schoolsForOnboarding, DEFAULT_SCHOOL_ID } from '../config/schools';
 import { useTheme } from '../context/ThemeContext';
 
 export default function CatalogSegmentedControl({
@@ -8,14 +8,17 @@ export default function CatalogSegmentedControl({
   onChange,
   theme: themeProp,
   preferredSchoolId,
+  catalogMode = 'all',
 }) {
   const { theme: contextTheme } = useTheme();
   const theme = themeProp ?? contextTheme ?? {};
   const styles = makeStyles(theme);
-  const schools = useMemo(
-    () => schoolsForCatalog(preferredSchoolId || DEFAULT_SCHOOL_ID),
-    [preferredSchoolId]
-  );
+  const schools = useMemo(() => {
+    const preferred = preferredSchoolId || DEFAULT_SCHOOL_ID;
+    return catalogMode === 'onboarding'
+      ? schoolsForOnboarding(preferred)
+      : schoolsForCatalog(preferred);
+  }, [preferredSchoolId, catalogMode]);
 
   return (
     <View style={styles.row}>
@@ -62,7 +65,7 @@ const makeStyles = (theme = {}) => StyleSheet.create({
     elevation: 2,
   },
   segmentText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: theme.textSecondary || '#6b7280',
     textAlign: 'center',

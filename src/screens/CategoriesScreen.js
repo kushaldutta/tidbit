@@ -38,6 +38,13 @@ const SUBJECT_EMOJI = {
   'Social Studies':    '🌍',
   'Science':           '🔬',
   'Art':               '🎨',
+  'Books':             '📖',
+  'Life Skills':       '🌱',
+  'Languages':         '🗣️',
+  'Philosophy':        '💭',
+  'General Knowledge': '🧠',
+  'Technology':        '💻',
+  'Business':          '💼',
 };
 
 function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle, query }) {

@@ -158,6 +158,17 @@ const FALLBACK_CLASSES = {
     { id: 'hs-ap:ap_enviro:ap26',   code: 'AP Enviro',        title: 'AP Environmental Science',              subject: 'Science' },
     { id: 'hs-ap:ap_art_hist:ap26', code: 'AP Art History',   title: 'AP Art History',                        subject: 'Art' },
   ],
+  miscellaneous: sortClassesForDisplay([
+    { id: 'misc:literature:na',         code: 'Literature',            title: 'Book guides, characters, and terms from the community', subject: 'Books' },
+    { id: 'misc:personal-finance:na',  code: 'Personal Finance',      title: 'Budgeting, investing, and money basics',                 subject: 'Life Skills' },
+    { id: 'misc:language-learning:na', code: 'Language Learning',   title: 'Vocabulary and phrases for any language',                subject: 'Languages' },
+    { id: 'misc:history:na',           code: 'History',               title: 'World and US history beyond the classroom',              subject: 'History' },
+    { id: 'misc:philosophy:na',        code: 'Philosophy & Big Ideas', title: 'Stoicism, ethics, and thought experiments',             subject: 'Philosophy' },
+    { id: 'misc:fun-facts:na',         code: 'Fun Facts',             title: 'Trivia and interesting knowledge',                       subject: 'General Knowledge' },
+    { id: 'misc:science-nature:na',    code: 'Science & Nature',      title: 'How the world works',                                    subject: 'Science' },
+    { id: 'misc:health-wellness:na',   code: 'Health & Wellness',     title: 'Sleep, fitness, and mental health',                      subject: 'Life Skills' },
+    { id: 'misc:tech-for-everyone:na', code: 'Tech for Everyone',     title: 'Technology explained for everyday life',                 subject: 'Technology' },
+  ]),
 };
 
 class ClassService {
