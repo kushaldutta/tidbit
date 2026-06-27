@@ -445,7 +445,7 @@ const makeStyles = (theme) => StyleSheet.create({
   sectionTitle: {
     fontSize: 13, fontWeight: '800', color: theme.textSecondary,
     textTransform: 'uppercase', letterSpacing: 1,
-    marginTop: 20, marginBottom: 12,
+    marginHorizontal: 20, marginTop: 20, marginBottom: 12,
   },
   listSectionTitle: {
     fontSize: 12, fontWeight: '800', color: theme.textSecondary,
