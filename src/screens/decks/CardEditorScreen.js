@@ -16,14 +16,26 @@ import { supabase } from '../../config/supabase';
 import { DeckService } from '../../services/DeckService';
 
 export default function CardEditorScreen({ route, navigation }) {
-  const { deckId, cardId, mode } = route.params || {};
+  const { deckId, cardId, mode, sectionId: initialSectionId, sections: routeSections } =
+    route.params || {};
   const isCreate = mode === 'create' || !cardId;
   const readOnly = mode === 'view';
 
   const [front, setFront] = useState('');
   const [back, setBack] = useState('');
+  const [sections, setSections] = useState(routeSections || []);
+  const [selectedSectionId, setSelectedSectionId] = useState(initialSectionId || null);
   const [loading, setLoading] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (routeSections?.length) {
+      setSections(routeSections);
+      return;
+    }
+    if (!deckId) return;
+    DeckService.listSections(deckId).then(setSections);
+  }, [deckId, routeSections]);
 
   useEffect(() => {
     if (isCreate) return;
@@ -41,6 +53,7 @@ export default function CardEditorScreen({ route, navigation }) {
       if (alive && data) {
         setFront(data.front);
         setBack(data.back);
+        setSelectedSectionId(data.section_id || null);
       }
       if (alive) setLoading(false);
     })();
@@ -57,9 +70,17 @@ export default function CardEditorScreen({ route, navigation }) {
     setSaving(true);
     try {
       if (isCreate) {
-        await DeckService.addCard(deckId, { front, back });
+        await DeckService.addCard(deckId, {
+          front,
+          back,
+          sectionId: selectedSectionId,
+        });
       } else {
-        await DeckService.updateCard(cardId, { front, back });
+        await DeckService.updateCard(cardId, {
+          front,
+          back,
+          sectionId: selectedSectionId,
+        });
       }
       navigation.goBack();
     } catch (err) {
@@ -108,9 +129,7 @@ export default function CardEditorScreen({ route, navigation }) {
             </TouchableOpacity>
             {!readOnly && (
               <TouchableOpacity onPress={handleSave} disabled={saving}>
-                <Text
-                  style={[styles.saveLink, saving && styles.disabledText]}
-                >
+                <Text style={[styles.saveLink, saving && styles.disabledText]}>
                   {saving ? 'Saving…' : isCreate ? 'Add' : 'Save'}
                 </Text>
               </TouchableOpacity>
@@ -120,6 +139,55 @@ export default function CardEditorScreen({ route, navigation }) {
           <Text style={styles.heading}>
             {isCreate ? 'New card' : readOnly ? 'Card' : 'Edit card'}
           </Text>
+
+          {sections.length > 0 && (
+            <>
+              <Text style={styles.label}>Section</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.sectionRow}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.sectionChip,
+                    !selectedSectionId && styles.sectionChipActive,
+                  ]}
+                  onPress={() => !readOnly && setSelectedSectionId(null)}
+                  disabled={readOnly}
+                >
+                  <Text
+                    style={[
+                      styles.sectionChipText,
+                      !selectedSectionId && styles.sectionChipTextActive,
+                    ]}
+                  >
+                    None
+                  </Text>
+                </TouchableOpacity>
+                {sections.map((s) => {
+                  const active = selectedSectionId === s.id;
+                  return (
+                    <TouchableOpacity
+                      key={s.id}
+                      style={[styles.sectionChip, active && styles.sectionChipActive]}
+                      onPress={() => !readOnly && setSelectedSectionId(s.id)}
+                      disabled={readOnly}
+                    >
+                      <Text
+                        style={[
+                          styles.sectionChipText,
+                          active && styles.sectionChipTextActive,
+                        ]}
+                      >
+                        {s.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </>
+          )}
 
           <Text style={styles.label}>Front (prompt)</Text>
           <TextInput
@@ -144,10 +212,7 @@ export default function CardEditorScreen({ route, navigation }) {
           />
 
           {!isCreate && !readOnly && (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={handleDelete}
-            >
+            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
               <Text style={styles.deleteButtonText}>Delete card</Text>
             </TouchableOpacity>
           )}
@@ -185,6 +250,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  sectionRow: { gap: 8, paddingBottom: 4 },
+  sectionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  sectionChipActive: { backgroundColor: '#eef2ff', borderColor: '#6366f1' },
+  sectionChipText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
+  sectionChipTextActive: { color: '#4338ca' },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,

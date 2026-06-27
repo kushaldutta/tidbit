@@ -57,6 +57,8 @@ export default function SettingsScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
   const [notificationDecks, setNotificationDecks] = useState({ classSources: [], myDecks: [] });
   const [decksLoading, setDecksLoading] = useState(false);
+  const [expandedClassId, setExpandedClassId] = useState(null);
+  const [expandedDeckId, setExpandedDeckId] = useState(null);
   const [accountBusy, setAccountBusy] = useState(false);
   const [pendingReportCount, setPendingReportCount] = useState(0);
 
@@ -183,22 +185,40 @@ export default function SettingsScreen({ navigation }) {
 
   const handleClassNotificationToggle = async (classId, enabled) => {
     await NotificationDeckService.toggleClassNotification(classId, enabled);
-    setNotificationDecks((prev) => ({
-      ...prev,
-      classSources: prev.classSources.map((s) =>
-        s.classId === classId ? { ...s, selected: enabled } : s
-      ),
-    }));
+    const data = await NotificationDeckService.listAvailableDecks();
+    setNotificationDecks({ classSources: data.classSources, myDecks: data.myDecks });
+    if (!enabled && expandedClassId === classId) {
+      setExpandedClassId(null);
+    }
+  };
+
+  const handleSectionNotificationToggle = async (deckId, sectionId, enabled) => {
+    await NotificationDeckService.toggleSectionNotification(deckId, sectionId, enabled);
+    const data = await NotificationDeckService.listAvailableDecks();
+    setNotificationDecks({ classSources: data.classSources, myDecks: data.myDecks });
+  };
+
+  const handleUncategorizedNotificationToggle = async (deckId, enabled) => {
+    await NotificationDeckService.toggleUncategorizedNotification(deckId, enabled);
+    const data = await NotificationDeckService.listAvailableDecks();
+    setNotificationDecks({ classSources: data.classSources, myDecks: data.myDecks });
+  };
+
+  const toggleClassSectionsExpanded = (classId) => {
+    setExpandedClassId((prev) => (prev === classId ? null : classId));
+  };
+
+  const toggleDeckSectionsExpanded = (deckId) => {
+    setExpandedDeckId((prev) => (prev === deckId ? null : deckId));
   };
 
   const handleDeckToggle = async (deckId, enabled) => {
     await NotificationDeckService.toggleDeck(deckId, enabled);
-    setNotificationDecks((prev) => ({
-      ...prev,
-      myDecks: (prev.myDecks || []).map((d) =>
-        d.id === deckId ? { ...d, selected: enabled } : d
-      ),
-    }));
+    const data = await NotificationDeckService.listAvailableDecks();
+    setNotificationDecks({ classSources: data.classSources, myDecks: data.myDecks });
+    if (!enabled && expandedDeckId === deckId) {
+      setExpandedDeckId(null);
+    }
   };
 
   const loadSpacedRepStats = async () => {
@@ -634,23 +654,84 @@ export default function SettingsScreen({ navigation }) {
             {notificationDecks.classSources.length > 0 && (
               <>
                 <Text style={styles.deckGroupLabel}>Class preset decks</Text>
-                {notificationDecks.classSources.map((source) => (
-                  <View key={source.classId} style={styles.deckRow}>
-                    <Text style={styles.deckEmoji}>{source.emoji}</Text>
-                    <View style={styles.deckInfo}>
-                      <Text style={styles.deckTitle}>{source.title}</Text>
-                      <Text style={styles.deckSub} numberOfLines={1}>
-                        {source.subtitle} · {source.deckCards} card{source.deckCards === 1 ? '' : 's'}
-                      </Text>
+                {notificationDecks.classSources.map((source) => {
+                  const sectionsExpanded = expandedClassId === source.classId;
+                  const activeSections = (source.sections || []).filter((s) => s.hasCards);
+                  const showSections =
+                    source.hasSections &&
+                    source.selected &&
+                    (activeSections.length > 0 || source.uncategorizedCount > 0);
+                  return (
+                    <View key={source.classId}>
+                      <View style={styles.deckRow}>
+                        <Text style={styles.deckEmoji}>{source.emoji}</Text>
+                        <View style={styles.deckInfo}>
+                          <Text style={styles.deckTitle}>{source.title}</Text>
+                          <Text style={styles.deckSub} numberOfLines={1}>
+                            {source.subtitle} · {source.deckCards} card{source.deckCards === 1 ? '' : 's'}
+                          </Text>
+                        </View>
+                        {showSections && (
+                          <TouchableOpacity
+                            style={styles.sectionExpandBtn}
+                            onPress={() => toggleClassSectionsExpanded(source.classId)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Text style={styles.sectionExpandText}>
+                              {sectionsExpanded ? '▾' : '▸'} Sections
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        <Switch
+                          value={source.selected}
+                          onValueChange={(v) => handleClassNotificationToggle(source.classId, v)}
+                          trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                          thumbColor="#ffffff"
+                        />
+                      </View>
+                      {showSections && sectionsExpanded && (
+                        <View style={styles.sectionList}>
+                          {activeSections.map((section) => (
+                            <View key={section.id} style={styles.sectionRow}>
+                              <View style={styles.sectionInfo}>
+                                <Text style={styles.deckSectionTitle}>{section.title}</Text>
+                                <Text style={styles.sectionSub} numberOfLines={1}>
+                                  {section.cardCount} card{section.cardCount === 1 ? '' : 's'}
+                                </Text>
+                              </View>
+                              <Switch
+                                value={section.selected}
+                                onValueChange={(v) =>
+                                  handleSectionNotificationToggle(source.deckId, section.id, v)
+                                }
+                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                thumbColor="#ffffff"
+                              />
+                            </View>
+                          ))}
+                          {source.uncategorizedCount > 0 && (
+                            <View style={styles.sectionRow}>
+                              <View style={styles.sectionInfo}>
+                                <Text style={styles.deckSectionTitle}>Uncategorized</Text>
+                                <Text style={styles.sectionSub} numberOfLines={1}>
+                                  {source.uncategorizedCount} card{source.uncategorizedCount === 1 ? '' : 's'}
+                                </Text>
+                              </View>
+                              <Switch
+                                value={source.uncategorizedSelected}
+                                onValueChange={(v) =>
+                                  handleUncategorizedNotificationToggle(source.deckId, v)
+                                }
+                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                thumbColor="#ffffff"
+                              />
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
-                    <Switch
-                      value={source.selected}
-                      onValueChange={(v) => handleClassNotificationToggle(source.classId, v)}
-                      trackColor={{ false: '#e5e7eb', true: theme.primary }}
-                      thumbColor="#ffffff"
-                    />
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
             {notificationDecks.myDecks.length > 0 && (
@@ -658,21 +739,82 @@ export default function SettingsScreen({ navigation }) {
                 <Text style={[styles.deckGroupLabel, notificationDecks.classSources.length > 0 && { marginTop: 16 }]}>
                   My decks
                 </Text>
-                {notificationDecks.myDecks.map((deck) => (
-                  <View key={deck.id} style={styles.deckRow}>
-                    <Text style={styles.deckEmoji}>{deck.emoji}</Text>
-                    <View style={styles.deckInfo}>
-                      <Text style={styles.deckTitle}>{deck.title}</Text>
-                      <Text style={styles.deckSub}>{deck.subtitle}</Text>
+                {notificationDecks.myDecks.map((deck) => {
+                  const sectionsExpanded = expandedDeckId === deck.id;
+                  const activeSections = (deck.sections || []).filter((s) => s.hasCards);
+                  const showSections =
+                    deck.hasSections &&
+                    deck.selected &&
+                    (activeSections.length > 0 || deck.uncategorizedCount > 0);
+                  return (
+                    <View key={deck.id}>
+                      <View style={styles.deckRow}>
+                        <Text style={styles.deckEmoji}>{deck.emoji}</Text>
+                        <View style={styles.deckInfo}>
+                          <Text style={styles.deckTitle}>{deck.title}</Text>
+                          <Text style={styles.deckSub}>{deck.subtitle}</Text>
+                        </View>
+                        {showSections && (
+                          <TouchableOpacity
+                            style={styles.sectionExpandBtn}
+                            onPress={() => toggleDeckSectionsExpanded(deck.id)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Text style={styles.sectionExpandText}>
+                              {sectionsExpanded ? '▾' : '▸'} Sections
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        <Switch
+                          value={deck.selected}
+                          onValueChange={(v) => handleDeckToggle(deck.id, v)}
+                          trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                          thumbColor="#ffffff"
+                        />
+                      </View>
+                      {showSections && sectionsExpanded && (
+                        <View style={styles.sectionList}>
+                          {activeSections.map((section) => (
+                            <View key={section.id} style={styles.sectionRow}>
+                              <View style={styles.sectionInfo}>
+                                <Text style={styles.deckSectionTitle}>{section.title}</Text>
+                                <Text style={styles.sectionSub} numberOfLines={1}>
+                                  {section.cardCount} card{section.cardCount === 1 ? '' : 's'}
+                                </Text>
+                              </View>
+                              <Switch
+                                value={section.selected}
+                                onValueChange={(v) =>
+                                  handleSectionNotificationToggle(deck.deckId, section.id, v)
+                                }
+                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                thumbColor="#ffffff"
+                              />
+                            </View>
+                          ))}
+                          {deck.uncategorizedCount > 0 && (
+                            <View style={styles.sectionRow}>
+                              <View style={styles.sectionInfo}>
+                                <Text style={styles.deckSectionTitle}>Uncategorized</Text>
+                                <Text style={styles.sectionSub} numberOfLines={1}>
+                                  {deck.uncategorizedCount} card{deck.uncategorizedCount === 1 ? '' : 's'}
+                                </Text>
+                              </View>
+                              <Switch
+                                value={deck.uncategorizedSelected}
+                                onValueChange={(v) =>
+                                  handleUncategorizedNotificationToggle(deck.deckId, v)
+                                }
+                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                thumbColor="#ffffff"
+                              />
+                            </View>
+                          )}
+                        </View>
+                      )}
                     </View>
-                    <Switch
-                      value={deck.selected}
-                      onValueChange={(v) => handleDeckToggle(deck.id, v)}
-                      trackColor={{ false: '#e5e7eb', true: theme.primary }}
-                      thumbColor="#ffffff"
-                    />
-                  </View>
-                ))}
+                  );
+                })}
               </>
             )}
             {notificationDecks.classSources.length === 0 &&
@@ -1098,6 +1240,34 @@ const makeStyles = (theme) => StyleSheet.create({
   deckInfo: { flex: 1 },
   deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
   deckSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  sectionExpandBtn: {
+    marginRight: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  sectionExpandText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.primary || '#6366f1',
+  },
+  sectionList: {
+    marginLeft: 36,
+    marginBottom: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: theme.primaryLight || '#eef2ff',
+    paddingLeft: 12,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.primaryLight || '#eef2ff',
+  },
+  sectionInfo: { flex: 1 },
+  deckSectionTitle: { fontSize: 13, fontWeight: '600', color: theme.text },
+  sectionSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
   deckEmptyText: {
     fontSize: 14,
     color: theme.textSecondary,

@@ -4,7 +4,7 @@
  * Entry point for interactive study modes (W7).
  * Shows the user's decks plus preset class decks for enrolled classes.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeckService } from '../services/DeckService';
+import { StudyDeckService } from '../services/StudyDeckService';
 import { ClassService } from '../services/ClassService';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
@@ -88,6 +89,24 @@ function DeckRow({ deck, selected, onPress, styles }) {
   );
 }
 
+function SectionToggleRow({ label, sublabel, selected, onPress, styles }) {
+  return (
+    <TouchableOpacity
+      style={[styles.sectionRow, selected && styles.sectionRowSelected]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      <View style={[styles.sectionCheck, selected && styles.sectionCheckSelected]}>
+        {selected && <Text style={styles.sectionCheckMark}>✓</Text>}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.sectionRowTitle}>{label}</Text>
+        {sublabel ? <Text style={styles.sectionRowSub}>{sublabel}</Text> : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 export default function LearnModePickerScreen({ route, navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
@@ -103,6 +122,77 @@ export default function LearnModePickerScreen({ route, navigation }) {
       : null
   );
   const [phase, setPhase] = useState(preselectedDeckId ? 'mode' : 'deck');
+  const [deckSections, setDeckSections] = useState([]);
+  const [allCards, setAllCards] = useState([]);
+  const [uncategorizedCount, setUncategorizedCount] = useState(0);
+  const [selectedSectionIds, setSelectedSectionIds] = useState([]);
+  const [includeUncategorized, setIncludeUncategorized] = useState(false);
+  const [sectionsLoading, setSectionsLoading] = useState(!!preselectedDeckId);
+
+  const studyScope = useMemo(() => {
+    if (!deckSections.length) return null;
+    return { sectionIds: selectedSectionIds, includeUncategorized };
+  }, [deckSections.length, selectedSectionIds, includeUncategorized]);
+
+  const scopedCardCount = useMemo(
+    () => StudyDeckService.countCardsInScope(allCards, studyScope),
+    [allCards, studyScope]
+  );
+
+  const loadDeckSections = useCallback(async (deckId) => {
+    setSectionsLoading(true);
+    try {
+      const categoryId = ContentService.parseCategoryDeckId(deckId);
+      if (categoryId) {
+        const cards = ContentService.getStudyCardsForCategory(categoryId);
+        setAllCards(cards);
+        setDeckSections([]);
+        setUncategorizedCount(0);
+        setSelectedSectionIds([]);
+        setIncludeUncategorized(false);
+        return;
+      }
+
+      const [sections, cards, scope] = await Promise.all([
+        DeckService.listSectionsWithCounts(deckId),
+        DeckService.listCards(deckId),
+        StudyDeckService.resolveStudyScope(deckId),
+      ]);
+      const active = sections.filter((s) => s.cardCount > 0);
+      const uncategorized = cards.filter((c) => !c.section_id).length;
+
+      setAllCards(cards);
+      setUncategorizedCount(uncategorized);
+      setDeckSections(active);
+
+      if (!active.length) {
+        setSelectedSectionIds([]);
+        setIncludeUncategorized(false);
+        return;
+      }
+
+      if (scope) {
+        setSelectedSectionIds(scope.sectionIds || []);
+        setIncludeUncategorized(!!scope.includeUncategorized);
+      } else {
+        setSelectedSectionIds(active.map((s) => s.id));
+        setIncludeUncategorized(uncategorized > 0);
+      }
+    } finally {
+      setSectionsLoading(false);
+    }
+  }, []);
+
+  const persistStudyScope = useCallback(
+    (sectionIds, uncategorized) => {
+      if (!selectedDeck?.id || !deckSections.length) return;
+      StudyDeckService.saveStudyScope(selectedDeck.id, {
+        sectionIds,
+        includeUncategorized: uncategorized,
+      });
+    },
+    [selectedDeck?.id, deckSections.length]
+  );
 
   useEffect(() => {
     if (preselectedDeckId) return;
@@ -129,16 +219,61 @@ export default function LearnModePickerScreen({ route, navigation }) {
     })();
   }, [preselectedDeckId]);
 
-  const handleDeckSelect = (deck) => {
+  useEffect(() => {
+    if (!preselectedDeckId) return;
+    (async () => {
+      const deck = await DeckService.getDeck(preselectedDeckId);
+      if (deck) {
+        setSelectedDeck({
+          id: deck.id,
+          title: deck.title,
+          cover_emoji: deck.cover_emoji,
+          card_count: deck.card_count,
+        });
+      }
+      await loadDeckSections(preselectedDeckId);
+    })();
+  }, [preselectedDeckId, loadDeckSections]);
+
+  const handleDeckSelect = async (deck) => {
     setSelectedDeck(deck);
     setPhase('mode');
+    await loadDeckSections(deck.id);
+  };
+
+  const toggleSection = (sectionId) => {
+    setSelectedSectionIds((prev) => {
+      const next = prev.includes(sectionId)
+        ? prev.filter((id) => id !== sectionId)
+        : [...prev, sectionId];
+      persistStudyScope(next, includeUncategorized);
+      return next;
+    });
+  };
+
+  const toggleUncategorized = () => {
+    setIncludeUncategorized((prev) => {
+      const next = !prev;
+      persistStudyScope(selectedSectionIds, next);
+      return next;
+    });
+  };
+
+  const selectAllSections = () => {
+    const allIds = deckSections.map((s) => s.id);
+    const uncategorized = uncategorizedCount > 0;
+    setSelectedSectionIds(allIds);
+    setIncludeUncategorized(uncategorized);
+    persistStudyScope(allIds, uncategorized);
   };
 
   const handleModeSelect = (mode) => {
     if (!selectedDeck) return;
+    if (scopedCardCount < mode.minCards) return;
     navigation.navigate(mode.id, {
       deckId: selectedDeck.id,
       deckTitle: selectedDeck.title,
+      studyScope,
     });
   };
 
@@ -150,6 +285,11 @@ export default function LearnModePickerScreen({ route, navigation }) {
       ? [{ type: 'section', title: 'Class decks' }, ...classDecks.map((d) => ({ type: 'deck', deck: d }))]
       : []),
   ];
+
+  const allSectionsSelected =
+    deckSections.length > 0 &&
+    deckSections.every((s) => selectedSectionIds.includes(s.id)) &&
+    (uncategorizedCount === 0 || includeUncategorized);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -223,6 +363,43 @@ export default function LearnModePickerScreen({ route, navigation }) {
             )}
           </View>
 
+          {sectionsLoading ? (
+            <ActivityIndicator color={theme.primary} style={{ marginVertical: 16 }} />
+          ) : deckSections.length > 0 ? (
+            <View style={styles.sectionsBox}>
+              <View style={styles.sectionsHeader}>
+                <Text style={styles.sectionsTitle}>Sections</Text>
+                {!allSectionsSelected && (
+                  <TouchableOpacity onPress={selectAllSections} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={styles.selectAllText}>Select all</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={styles.sectionsSub}>
+                {scopedCardCount} card{scopedCardCount === 1 ? '' : 's'} in this session
+              </Text>
+              {deckSections.map((section) => (
+                <SectionToggleRow
+                  key={section.id}
+                  label={section.title}
+                  sublabel={`${section.cardCount} card${section.cardCount === 1 ? '' : 's'}`}
+                  selected={selectedSectionIds.includes(section.id)}
+                  onPress={() => toggleSection(section.id)}
+                  styles={styles}
+                />
+              ))}
+              {uncategorizedCount > 0 && (
+                <SectionToggleRow
+                  label="Uncategorized"
+                  sublabel={`${uncategorizedCount} card${uncategorizedCount === 1 ? '' : 's'}`}
+                  selected={includeUncategorized}
+                  onPress={toggleUncategorized}
+                  styles={styles}
+                />
+              )}
+            </View>
+          ) : null}
+
           <Text style={styles.sectionTitle}>Choose a mode</Text>
 
           {MODES.map((m) => (
@@ -231,9 +408,15 @@ export default function LearnModePickerScreen({ route, navigation }) {
               mode={m}
               styles={styles}
               onPress={() => handleModeSelect(m)}
-              disabled={selectedDeck?.card_count !== null && selectedDeck?.card_count < m.minCards}
+              disabled={scopedCardCount < m.minCards}
             />
           ))}
+
+          {deckSections.length > 0 && scopedCardCount === 0 && (
+            <Text style={styles.noCardsHint}>
+              Select at least one section to start studying.
+            </Text>
+          )}
 
           <View style={styles.tipsBox}>
             <Text style={styles.tipsTitle}>💡 Tips</Text>
@@ -262,7 +445,7 @@ const makeStyles = (theme) => StyleSheet.create({
   sectionTitle: {
     fontSize: 13, fontWeight: '800', color: theme.textSecondary,
     textTransform: 'uppercase', letterSpacing: 1,
-    marginHorizontal: 20, marginTop: 20, marginBottom: 12,
+    marginTop: 20, marginBottom: 12,
   },
   listSectionTitle: {
     fontSize: 12, fontWeight: '800', color: theme.textSecondary,
@@ -292,6 +475,83 @@ const makeStyles = (theme) => StyleSheet.create({
   selectedDeckLabel: { fontSize: 11, color: theme.textSecondary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8 },
   selectedDeckTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
   changeDeckText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
+
+  sectionsBox: {
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  sectionsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  sectionsTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  selectAllText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.primary,
+  },
+  sectionsSub: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginBottom: 10,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  sectionRowSelected: {},
+  sectionCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
+  sectionCheckSelected: {
+    borderColor: theme.primary,
+    backgroundColor: theme.primary,
+  },
+  sectionCheckMark: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  sectionRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  sectionRowSub: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: 2,
+  },
+  noCardsHint: {
+    fontSize: 13,
+    color: '#dc2626',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
 
   modeCard: {
     flexDirection: 'row', alignItems: 'center',

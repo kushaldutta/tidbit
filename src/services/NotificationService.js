@@ -82,6 +82,7 @@ class NotificationService {
           const quietHoursEnd = await StorageService.getQuietHoursEnd();
           const selectedCategories = await StorageService.getSelectedCategories();
           const selectedDeckIds = await StorageService.getSelectedDeckIds();
+          const selectedDeckSections = await StorageService.getNotificationDeckSections();
           const userId = AuthService.getUserId();
           
           // Get timezone offset in minutes (e.g., PST is UTC-8 = -480 minutes)
@@ -97,6 +98,7 @@ class NotificationService {
             quietHoursEnd,
             selectedCategories,
             selectedDeckIds,
+            selectedDeckSections,
             userId,
             timezoneOffsetMinutes,
           });
@@ -118,6 +120,7 @@ class NotificationService {
               quietHoursEnd,
               selectedCategories,
               selectedDeckIds,
+              selectedDeckSections,
               timezoneOffsetMinutes, // Send timezone offset to server
             }),
           });
@@ -169,6 +172,7 @@ class NotificationService {
       const quietHoursEnd = await StorageService.getQuietHoursEnd();
       const selectedCategories = await StorageService.getSelectedCategories();
       const selectedDeckIds = await StorageService.getSelectedDeckIds();
+      const selectedDeckSections = await StorageService.getNotificationDeckSections();
       const userId = AuthService.getUserId();
       
       // Get timezone offset
@@ -194,6 +198,7 @@ class NotificationService {
             quietHoursEnd,
             selectedCategories,
             selectedDeckIds,
+            selectedDeckSections,
             timezoneOffsetMinutes,
           }),
         });

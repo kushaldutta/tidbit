@@ -10,8 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DeckService } from '../services/DeckService';
-import { ContentService } from '../services/ContentService';
+import { StudyDeckService } from '../services/StudyDeckService';
 import { QuizService } from '../services/QuizService';
 import { SameBoatService } from '../services/SameBoatService';
 import { useTheme } from '../context/ThemeContext';
@@ -86,7 +85,7 @@ function ConfidenceSlider({ value, onChange }) {
 
 export default function QuizScreen({ route, navigation }) {
   const { theme } = useTheme();
-  const { deckId, deckTitle } = route.params;
+  const { deckId, deckTitle, studyScope } = route.params;
 
   const [questions, setQuestions] = useState([]);
   const [index, setIndex] = useState(0);
@@ -100,15 +99,11 @@ export default function QuizScreen({ route, navigation }) {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const categoryId = ContentService.parseCategoryDeckId(deckId);
-    const load = categoryId
-      ? Promise.resolve(ContentService.getStudyCardsForCategory(categoryId))
-      : DeckService.listCards(deckId);
-    load.then((cards) => {
+    StudyDeckService.loadStudyCards(deckId, studyScope).then((cards) => {
       setQuestions(QuizService.buildQuestions(cards));
       setLoading(false);
     });
-  }, [deckId]);
+  }, [deckId, studyScope]);
 
   const currentQ = questions[index];
 
@@ -141,7 +136,9 @@ export default function QuizScreen({ route, navigation }) {
     const next = index + 1;
     if (next >= questions.length) {
       navigation.replace('LearnSummary', {
+        deckId,
         deckTitle,
+        studyScope,
         correct: score.correct + (result?.correct ? 0 : 0),
         total: score.total,
         mode: 'quiz',

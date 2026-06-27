@@ -13,8 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
-import { DeckService } from '../services/DeckService';
-import { ContentService } from '../services/ContentService';
+import { StudyDeckService } from '../services/StudyDeckService';
 import { RecallService } from '../services/RecallService';
 import { SameBoatService } from '../services/SameBoatService';
 import { useTheme } from '../context/ThemeContext';
@@ -73,7 +72,7 @@ function DiffDisplay({ diff }) {
 
 export default function RecallScreen({ route, navigation }) {
   const { theme } = useTheme();
-  const { deckId, deckTitle } = route.params;
+  const { deckId, deckTitle, studyScope } = route.params;
 
   const [cards, setCards] = useState([]);
   const [index, setIndex] = useState(0);
@@ -89,16 +88,12 @@ export default function RecallScreen({ route, navigation }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    const categoryId = ContentService.parseCategoryDeckId(deckId);
-    const load = categoryId
-      ? Promise.resolve(ContentService.getStudyCardsForCategory(categoryId))
-      : DeckService.listCards(deckId);
-    load.then((c) => {
+    StudyDeckService.loadStudyCards(deckId, studyScope).then((c) => {
       const shuffled = [...c].sort(() => Math.random() - 0.5);
       setCards(shuffled);
       setLoading(false);
     });
-  }, [deckId]);
+  }, [deckId, studyScope]);
 
   const currentCard = cards[index];
 
@@ -163,7 +158,9 @@ export default function RecallScreen({ route, navigation }) {
     const next = index + 1;
     if (next >= cards.length) {
       navigation.replace('LearnSummary', {
+        deckId,
         deckTitle,
+        studyScope,
         correct: score.correct,
         total: score.total,
         mode: 'recall',

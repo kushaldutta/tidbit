@@ -26,8 +26,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DeckService } from '../services/DeckService';
-import { ContentService } from '../services/ContentService';
+import { StudyDeckService } from '../services/StudyDeckService';
 import { useTheme } from '../context/ThemeContext';
 
 const MAX_PAIRS = 8;
@@ -100,7 +99,7 @@ function Tile({ label, state, onPress }) {
 
 export default function MatchScreen({ route, navigation }) {
   const { theme } = useTheme();
-  const { deckId, deckTitle } = route.params;
+  const { deckId, deckTitle, studyScope } = route.params;
 
   const [loading, setLoading] = useState(true);
   const [allCards, setAllCards] = useState([]);
@@ -118,15 +117,11 @@ export default function MatchScreen({ route, navigation }) {
   const timerRef = useRef(null);
 
   useEffect(() => {
-    const categoryId = ContentService.parseCategoryDeckId(deckId);
-    const load = categoryId
-      ? Promise.resolve(ContentService.getStudyCardsForCategory(categoryId))
-      : DeckService.listCards(deckId);
-    load.then((cards) => {
+    StudyDeckService.loadStudyCards(deckId, studyScope).then((cards) => {
       setAllCards(cards);
       setLoading(false);
     });
-  }, [deckId]);
+  }, [deckId, studyScope]);
 
   // Build a round from allCards
   useEffect(() => {
@@ -268,7 +263,9 @@ export default function MatchScreen({ route, navigation }) {
             style={styles.doneBtn}
             onPress={() =>
               navigation.replace('LearnSummary', {
+                deckId,
                 deckTitle,
+                studyScope,
                 correct: totalPairs - mistakes,
                 total: totalPairs,
                 mode: 'match',

@@ -188,6 +188,9 @@ class SyncService {
     if (Array.isArray(settings.selected_deck_ids)) {
       await StorageService.setSelectedDeckIds(settings.selected_deck_ids);
     }
+    if (settings.notification_deck_sections && typeof settings.notification_deck_sections === 'object') {
+      await StorageService.setNotificationDeckSections(settings.notification_deck_sections);
+    }
     if (Array.isArray(settings.notification_disabled_categories)) {
       await StorageService.setNotificationDisabledCategories(
         settings.notification_disabled_categories
@@ -259,6 +262,7 @@ class SyncService {
       selectedCategories,
       selectedDeckIds,
       notificationDisabledCategories,
+      notificationDeckSections,
       savedTheme,
     ] = await Promise.all([
       StorageService.getNotificationInterval(),
@@ -269,6 +273,7 @@ class SyncService {
       StorageService.getSelectedCategories(),
       StorageService.getSelectedDeckIds(),
       StorageService.getNotificationDisabledCategories(),
+      StorageService.getNotificationDeckSections(),
       AsyncStorage.getItem('@tidbit:app_theme'),
     ]);
 
@@ -283,6 +288,7 @@ class SyncService {
       },
       legacy_selected_categories: selectedCategories,
       selected_deck_ids: selectedDeckIds,
+      notification_deck_sections: notificationDeckSections,
       notification_disabled_categories: notificationDisabledCategories,
     };
 

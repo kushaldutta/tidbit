@@ -332,6 +332,7 @@ app.post('/api/register-token', async (req, res) => {
       quietHoursEnd,
       selectedCategories,
       selectedDeckIds,
+      selectedDeckSections,
       timezoneOffsetMinutes, // Timezone offset in minutes (e.g., PST = -480, EST = -300)
     } = req.body;
     
@@ -397,6 +398,10 @@ app.post('/api/register-token', async (req, res) => {
     if (selectedDeckIds !== undefined) {
       updateData.selected_deck_ids = selectedDeckIds;
       console.log(`[SERVER] Updating selected_deck_ids to: ${JSON.stringify(selectedDeckIds)}`);
+    }
+    if (selectedDeckSections !== undefined) {
+      updateData.selected_deck_sections = selectedDeckSections;
+      console.log(`[SERVER] Updating selected_deck_sections keys: ${Object.keys(selectedDeckSections || {}).length}`);
     }
     // Always update timezone if provided (even if 0, to fix devices registered before timezone support)
     if (timezoneOffsetMinutes !== undefined) {
@@ -665,7 +670,7 @@ function generateTidbitId(text, category) {
 }
 
 /** Cards from selected preset + user-owned decks (scoped to device owner). */
-async function fetchCardsForDeckIds(deckIds, userId) {
+async function fetchCardsForDeckIds(deckIds, userId, sectionFilterByDeck = {}) {
   if (!supabase || !deckIds?.length) return [];
 
   const uniqueIds = [...new Set(deckIds.filter(Boolean))];
@@ -685,13 +690,33 @@ async function fetchCardsForDeckIds(deckIds, userId) {
 
   const { data: cards, error: cardErr } = await supabase
     .from('cards')
-    .select('id, deck_id, front, back')
+    .select('id, deck_id, front, back, section_id')
     .in('deck_id', allowedDeckIds);
 
   if (cardErr || !cards?.length) return [];
 
   return cards
-    .filter((c) => c.back?.trim())
+    .filter((c) => {
+      if (!c.back?.trim()) return false;
+      const raw = sectionFilterByDeck[c.deck_id];
+      if (raw === undefined) return true;
+
+      let sectionIds;
+      let includeUncategorized;
+      if (Array.isArray(raw)) {
+        sectionIds = raw;
+        includeUncategorized = raw.length > 0;
+      } else if (raw && typeof raw === 'object') {
+        sectionIds = Array.isArray(raw.sectionIds) ? raw.sectionIds : [];
+        includeUncategorized = !!raw.includeUncategorized;
+      } else {
+        return false;
+      }
+
+      if (!sectionIds.length && !includeUncategorized) return false;
+      if (!c.section_id) return includeUncategorized;
+      return sectionIds.includes(c.section_id);
+    })
     .map((c) => {
       const front = (c.front || '').trim();
       const back = c.back.trim();
@@ -1107,9 +1132,10 @@ async function sendScheduledNotifications() {
     async function getDeckCardsForDevice(device) {
       const deckIds = device.selected_deck_ids || [];
       if (!deckIds.length) return [];
-      const key = `${device.user_id || 'anon'}:${[...deckIds].sort().join(',')}`;
+      const sectionFilter = device.selected_deck_sections || {};
+      const key = `${device.user_id || 'anon'}:${[...deckIds].sort().join(',')}:${JSON.stringify(sectionFilter)}`;
       if (deckCardsCache.has(key)) return deckCardsCache.get(key);
-      const cards = await fetchCardsForDeckIds(deckIds, device.user_id);
+      const cards = await fetchCardsForDeckIds(deckIds, device.user_id, sectionFilter);
       deckCardsCache.set(key, cards);
       return cards;
     }
@@ -1347,9 +1373,10 @@ async function sendBedtimeBriefs() {
     async function getDeckCardsForDevice(device) {
       const deckIds = device.selected_deck_ids || [];
       if (!deckIds.length) return [];
-      const key = `${device.user_id || 'anon'}:${[...deckIds].sort().join(',')}`;
+      const sectionFilter = device.selected_deck_sections || {};
+      const key = `${device.user_id || 'anon'}:${[...deckIds].sort().join(',')}:${JSON.stringify(sectionFilter)}`;
       if (deckCardsCache.has(key)) return deckCardsCache.get(key);
-      const cards = await fetchCardsForDeckIds(deckIds, device.user_id);
+      const cards = await fetchCardsForDeckIds(deckIds, device.user_id, sectionFilter);
       deckCardsCache.set(key, cards);
       return cards;
     }

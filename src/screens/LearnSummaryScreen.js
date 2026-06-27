@@ -28,7 +28,7 @@ function ScoreMeter({ correct, total }) {
 }
 
 export default function LearnSummaryScreen({ route, navigation }) {
-  const { deckTitle, correct, total, mode, deckId } = route.params;
+  const { deckTitle, correct, total, mode, deckId, studyScope } = route.params;
   const cfg = MODE_CONFIG[mode] || MODE_CONFIG.quiz;
 
   return (
@@ -61,7 +61,7 @@ export default function LearnSummaryScreen({ route, navigation }) {
                 style={[styles.actionBtn, { borderColor: cfg.color }]}
                 onPress={() => navigation.replace(
                   mode === 'quiz' ? 'Quiz' : mode === 'recall' ? 'Recall' : 'Match',
-                  { deckId, deckTitle }
+                  { deckId, deckTitle, studyScope }
                 )}
                 activeOpacity={0.8}
               >

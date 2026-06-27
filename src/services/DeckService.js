@@ -156,6 +156,9 @@ class DeckService {
     const cards = await this.listCards(sourceDeckId);
     if (!cards.length) throw new Error('This deck has no cards to copy');
 
+    const sourceSections = await this.listSections(sourceDeckId);
+    const sectionIdMap = {};
+
     const newDeck = await this.createDeck({
       title: source.title,
       description: source.description || '',
@@ -165,6 +168,15 @@ class DeckService {
       source: 'saved_copy',
     });
 
+    for (const section of sourceSections) {
+      const created = await this.createSection(newDeck.id, {
+        title: section.title,
+        description: section.description || '',
+        kind: section.kind || 'custom',
+      });
+      sectionIdMap[section.id] = created.id;
+    }
+
     await this.bulkAddCards(
       newDeck.id,
       cards.map((c) => ({
@@ -172,6 +184,7 @@ class DeckService {
         back: c.back,
         cardType: c.card_type,
         meta: c.meta || {},
+        sectionId: c.section_id ? sectionIdMap[c.section_id] || null : null,
       }))
     );
 
@@ -180,14 +193,18 @@ class DeckService {
 
   // -- Cards --
 
-  static async listCards(deckId) {
+  static async listCards(deckId, { sectionIds = null } = {}) {
     if (!SUPABASE_CONFIGURED || !deckId) return [];
-    const { data, error } = await supabase
+    let query = supabase
       .from('cards')
-      .select('id, deck_id, front, back, card_type, meta, position, updated_at')
+      .select('id, deck_id, front, back, card_type, meta, position, section_id, updated_at')
       .eq('deck_id', deckId)
       .order('position', { ascending: true })
       .order('created_at', { ascending: true });
+    if (sectionIds?.length) {
+      query = query.in('section_id', sectionIds);
+    }
+    const { data, error } = await query;
     if (error) {
       console.error('[DECK] listCards:', error);
       return [];
@@ -195,7 +212,117 @@ class DeckService {
     return data || [];
   }
 
-  static async addCard(deckId, { front, back, cardType = 'basic', meta = {} }) {
+  static filterCardsBySections(cards, scope) {
+    if (!scope) return cards || [];
+    const { sectionIds = [], includeUncategorized = false } = scope;
+    return (cards || []).filter((c) => {
+      if (!c.section_id) return includeUncategorized;
+      return sectionIds.includes(c.section_id);
+    });
+  }
+
+  static async listSections(deckId) {
+    if (!SUPABASE_CONFIGURED || !deckId) return [];
+    const { data, error } = await supabase
+      .from('deck_sections')
+      .select('id, deck_id, slug, title, description, position, kind')
+      .eq('deck_id', deckId)
+      .order('position', { ascending: true });
+    if (error) {
+      console.error('[DECK] listSections:', error);
+      return [];
+    }
+    return data || [];
+  }
+
+  /** Sections with card counts for notification UI and study scoping. */
+  static async listSectionsWithCounts(deckId) {
+    const [sections, cards] = await Promise.all([
+      this.listSections(deckId),
+      this.listCards(deckId),
+    ]);
+    if (!sections.length) return [];
+    const counts = {};
+    cards.forEach((c) => {
+      if (!c.section_id) return;
+      counts[c.section_id] = (counts[c.section_id] || 0) + 1;
+    });
+    return sections.map((s) => ({
+      ...s,
+      cardCount: counts[s.id] || 0,
+    }));
+  }
+
+  static _slugifySectionTitle(title, existingSlugs) {
+    let base = String(title)
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    if (!base) base = 'section';
+    let slug = base;
+    let n = 2;
+    while (existingSlugs.has(slug)) {
+      slug = `${base}-${n++}`;
+    }
+    return slug;
+  }
+
+  static async createSection(deckId, { title, description = '', kind = 'custom' }) {
+    if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const trimmed = title?.trim();
+    if (!trimmed) throw new Error('Section title is required');
+
+    const existing = await this.listSections(deckId);
+    const slug = this._slugifySectionTitle(
+      trimmed,
+      new Set(existing.map((s) => s.slug))
+    );
+    const position = existing.length;
+
+    const { data, error } = await supabase
+      .from('deck_sections')
+      .insert({
+        deck_id: deckId,
+        slug,
+        title: trimmed,
+        description: description?.trim() || null,
+        position,
+        kind,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  static async updateSection(sectionId, { title, description, position }) {
+    if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const payload = {};
+    if (title !== undefined) payload.title = title.trim();
+    if (description !== undefined) payload.description = description?.trim() || null;
+    if (position !== undefined) payload.position = position;
+
+    const { data, error } = await supabase
+      .from('deck_sections')
+      .update(payload)
+      .eq('id', sectionId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  static async deleteSection(sectionId) {
+    if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const { error } = await supabase
+      .from('deck_sections')
+      .delete()
+      .eq('id', sectionId);
+    if (error) throw error;
+  }
+
+  static async addCard(deckId, { front, back, cardType = 'basic', meta = {}, sectionId = null }) {
     if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
     if (!front?.trim() || !back?.trim()) {
       throw new Error('Front and back are required');
@@ -217,6 +344,7 @@ class DeckService {
         card_type: cardType,
         meta,
         position,
+        section_id: sectionId || null,
       })
       .select()
       .single();
@@ -232,6 +360,7 @@ class DeckService {
     if (updates.cardType !== undefined) payload.card_type = updates.cardType;
     if (updates.meta !== undefined) payload.meta = updates.meta;
     if (updates.position !== undefined) payload.position = updates.position;
+    if (updates.sectionId !== undefined) payload.section_id = updates.sectionId;
 
     const { data, error } = await supabase
       .from('cards')
@@ -265,6 +394,7 @@ class DeckService {
         card_type: c.cardType || 'basic',
         meta: c.meta || {},
         position: pos++,
+        section_id: c.sectionId || null,
       }));
 
     if (!rows.length) return [];

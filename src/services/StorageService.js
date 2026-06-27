@@ -4,6 +4,8 @@ import { DeviceEventEmitter } from 'react-native';
 const KEYS = {
   SELECTED_CATEGORIES: 'selected_categories',
   SELECTED_DECK_IDS: 'selected_deck_ids',
+  NOTIFICATION_DECK_SECTIONS: 'notification_deck_sections',
+  STUDY_DECK_SECTIONS: 'study_deck_sections',
   NOTIFICATION_DISABLED_CATEGORIES: 'notification_disabled_categories',
   TIDBITS_SEEN: 'tidbits_seen',
   DAILY_UNLOCKS: 'daily_unlocks',
@@ -64,6 +66,80 @@ class StorageService {
     } catch (error) {
       console.error('Error setting selected deck ids:', error);
     }
+  }
+
+  /** Map of deckId → sectionId[] enabled for notifications. */
+  static async getNotificationDeckSections() {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.NOTIFICATION_DECK_SECTIONS);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      console.error('Error getting notification deck sections:', error);
+      return {};
+    }
+  }
+
+  static async setNotificationDeckSections(map) {
+    try {
+      await AsyncStorage.setItem(
+        KEYS.NOTIFICATION_DECK_SECTIONS,
+        JSON.stringify(map || {})
+      );
+    } catch (error) {
+      console.error('Error setting notification deck sections:', error);
+    }
+  }
+
+  static async getSelectedSectionIdsForDeck(deckId) {
+    const map = await this.getNotificationDeckSections();
+    return map[deckId];
+  }
+
+  static async setSelectedSectionIdsForDeck(deckId, sectionIds) {
+    const map = await this.getNotificationDeckSections();
+    if (!sectionIds?.length) {
+      delete map[deckId];
+    } else {
+      map[deckId] = [...new Set(sectionIds)];
+    }
+    await this.setNotificationDeckSections(map);
+  }
+
+  /** Map of deckId → { sectionIds, includeUncategorized } for study scope. */
+  static async getStudyDeckSections() {
+    try {
+      const data = await AsyncStorage.getItem(KEYS.STUDY_DECK_SECTIONS);
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      console.error('Error getting study deck sections:', error);
+      return {};
+    }
+  }
+
+  static async setStudyDeckSections(map) {
+    try {
+      await AsyncStorage.setItem(KEYS.STUDY_DECK_SECTIONS, JSON.stringify(map || {}));
+    } catch (error) {
+      console.error('Error setting study deck sections:', error);
+    }
+  }
+
+  static async getStudyScopeForDeck(deckId) {
+    const map = await this.getStudyDeckSections();
+    return map[deckId] ?? null;
+  }
+
+  static async setStudyScopeForDeck(deckId, scope) {
+    const map = await this.getStudyDeckSections();
+    if (!scope) {
+      delete map[deckId];
+    } else {
+      map[deckId] = {
+        sectionIds: [...new Set(scope.sectionIds || [])],
+        includeUncategorized: !!scope.includeUncategorized,
+      };
+    }
+    await this.setStudyDeckSections(map);
   }
 
   static async getNotificationDisabledCategories() {
