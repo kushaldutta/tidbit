@@ -34,6 +34,9 @@ export default function SharedDeckRow({
   const canReport = ReportService.canReportDeck(deck, myUserId);
   const canSave = onSave && deck.ownerId !== myUserId;
   const hasMenu = canReport || isModerator || canSave;
+  const saveCount = deck.saveCount ?? 0;
+
+  const formatSaveCount = (n) => `${n} save${n === 1 ? '' : 's'}`;
 
   const openMenu = () => {
     const options = [];
@@ -113,7 +116,7 @@ export default function SharedDeckRow({
           {deck.title}
         </Text>
         <Text style={styles.deckMeta}>
-          {deck.cardCount} cards · by {deck.ownerName}
+          {formatSaveCount(saveCount)} · {deck.cardCount} cards · by {deck.ownerName}
         </Text>
       </View>
 

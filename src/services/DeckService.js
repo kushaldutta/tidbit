@@ -188,7 +188,28 @@ class DeckService {
       }))
     );
 
-    return newDeck;
+    const saveIsNew = await this.recordDeckSave(sourceDeckId);
+
+    return { deck: newDeck, saveIsNew };
+  }
+
+  /** Record a save; returns true if this user had not saved this deck before. */
+  static async recordDeckSave(sourceDeckId) {
+    if (!SUPABASE_CONFIGURED) return false;
+    const userId = AuthService.getUserId();
+    if (!userId || !sourceDeckId) return false;
+
+    const { error } = await supabase.from('deck_saves').insert({
+      source_deck_id: sourceDeckId,
+      user_id: userId,
+    });
+
+    if (error) {
+      if (error.code === '23505') return false;
+      console.warn('[DECK] recordDeckSave:', error.message);
+      return false;
+    }
+    return true;
   }
 
   // -- Cards --

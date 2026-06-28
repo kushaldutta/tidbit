@@ -394,7 +394,14 @@ export default function GroupScreen({ route, navigation }) {
   const handleSaveDeck = async (deck) => {
     setSavingDeckId(deck.id);
     try {
-      await DeckService.copyDeckToMyDecks(deck.id);
+      const { saveIsNew } = await DeckService.copyDeckToMyDecks(deck.id);
+      if (saveIsNew) {
+        setDecks((prev) =>
+          prev.map((d) =>
+            d.id === deck.id ? { ...d, saveCount: (d.saveCount || 0) + 1 } : d
+          )
+        );
+      }
       Alert.alert(
         'Saved to My Decks',
         `"${deck.title}" was copied to your decks. You can edit it and enable notifications in Settings.`

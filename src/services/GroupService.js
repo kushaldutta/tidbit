@@ -100,7 +100,7 @@ class GroupService {
 
     const deckIds = shareRows.map((r) => r.deck_id);
 
-    const [{ data: deckRows, error: deckErr }, { data: voteRows, error: voteErr }] =
+    const [{ data: deckRows, error: deckErr }, { data: voteRows, error: voteErr }, { data: saveRows, error: saveErr }] =
       await Promise.all([
         supabase
           .from('decks')
@@ -110,6 +110,10 @@ class GroupService {
           .from('deck_votes')
           .select('deck_id, user_id, vote')
           .eq('group_id', groupId),
+        supabase
+          .from('deck_saves')
+          .select('source_deck_id')
+          .in('source_deck_id', deckIds),
       ]);
 
     if (deckErr) {
@@ -119,6 +123,14 @@ class GroupService {
     if (voteErr) {
       console.warn('[GroupService] getGroupDecks votes error:', voteErr.message);
     }
+    if (saveErr) {
+      console.warn('[GroupService] getGroupDecks saves error:', saveErr.message);
+    }
+
+    const saveCountMap = {};
+    (saveRows || []).forEach((row) => {
+      saveCountMap[row.source_deck_id] = (saveCountMap[row.source_deck_id] || 0) + 1;
+    });
 
     const deckById = Object.fromEntries((deckRows || []).map((d) => [d.id, d]));
     const missingDeckIds = deckIds.filter((id) => !deckById[id]);
@@ -159,6 +171,7 @@ class GroupService {
           title: d.title,
           ownerId: d.owner_id,
           cardCount: d.card_count ?? 0,
+          saveCount: saveCountMap[d.id] || 0,
           ownerName: profileMap[d.owner_id] || 'Unknown',
           upvotes: stats.upvotes,
           downvotes: stats.downvotes,
