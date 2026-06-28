@@ -44,6 +44,9 @@ export default function DeckEditorScreen({ route, navigation }) {
   const [newSectionTitle, setNewSectionTitle] = useState('');
   const [sectionSaving, setSectionSaving] = useState(false);
   const [sectionChangingId, setSectionChangingId] = useState(null);
+  const [renamingSectionId, setRenamingSectionId] = useState(null);
+  const [renameSectionTitle, setRenameSectionTitle] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
 
   const sectionById = useMemo(
     () => Object.fromEntries(sections.map((s) => [s.id, s])),
@@ -270,6 +273,36 @@ export default function DeckEditorScreen({ route, navigation }) {
         { text: 'Cancel', style: 'cancel' },
       ]
     );
+  };
+
+  const handleStartRename = (section) => {
+    setRenamingSectionId(section.id);
+    setRenameSectionTitle(section.title);
+  };
+
+  const handleCancelRename = () => {
+    setRenamingSectionId(null);
+    setRenameSectionTitle('');
+  };
+
+  const handleSaveRename = async (sectionId) => {
+    const trimmed = renameSectionTitle.trim();
+    if (!trimmed) {
+      Alert.alert('Name required', 'Enter a section name.');
+      return;
+    }
+    setRenameSaving(true);
+    try {
+      const updated = await DeckService.updateSection(sectionId, { title: trimmed });
+      setSections((prev) =>
+        prev.map((s) => (s.id === sectionId ? { ...s, title: updated.title } : s))
+      );
+      handleCancelRename();
+    } catch (err) {
+      Alert.alert('Could not rename section', err.message || 'Try again.');
+    } finally {
+      setRenameSaving(false);
+    }
   };
 
   const handleDeleteSection = (section) => {
@@ -558,12 +591,20 @@ export default function DeckEditorScreen({ route, navigation }) {
           visible={sectionsModalVisible}
           animationType="slide"
           presentationStyle="pageSheet"
-          onRequestClose={() => setSectionsModalVisible(false)}
+          onRequestClose={() => {
+            handleCancelRename();
+            setSectionsModalVisible(false);
+          }}
         >
           <SafeAreaView style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Deck sections</Text>
-              <TouchableOpacity onPress={() => setSectionsModalVisible(false)}>
+              <TouchableOpacity
+                onPress={() => {
+                  handleCancelRename();
+                  setSectionsModalVisible(false);
+                }}
+              >
                 <Text style={styles.modalDone}>Done</Text>
               </TouchableOpacity>
             </View>
@@ -598,16 +639,52 @@ export default function DeckEditorScreen({ route, navigation }) {
               }
               renderItem={({ item }) => {
                 const count = cards.filter((c) => c.section_id === item.id).length;
+                const isRenaming = renamingSectionId === item.id;
                 return (
                   <View style={styles.modalSectionRow}>
-                    <View style={styles.modalSectionInfo}>
-                      <Text style={styles.modalSectionTitle}>{item.title}</Text>
-                      <Text style={styles.modalSectionMeta}>{count} cards</Text>
-                    </View>
-                    {!readOnly && (
-                      <TouchableOpacity onPress={() => handleDeleteSection(item)}>
-                        <Text style={styles.modalDelete}>Delete</Text>
-                      </TouchableOpacity>
+                    {isRenaming ? (
+                      <>
+                        <TextInput
+                          style={styles.renameSectionInput}
+                          value={renameSectionTitle}
+                          onChangeText={setRenameSectionTitle}
+                          placeholder="Section name"
+                          placeholderTextColor="#9ca3af"
+                          autoFocus
+                          editable={!renameSaving}
+                          onSubmitEditing={() => handleSaveRename(item.id)}
+                        />
+                        <View style={styles.modalSectionActions}>
+                          <TouchableOpacity
+                            onPress={() => handleSaveRename(item.id)}
+                            disabled={renameSaving}
+                          >
+                            <Text style={styles.modalRenameSave}>
+                              {renameSaving ? 'Saving…' : 'Save'}
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={handleCancelRename} disabled={renameSaving}>
+                            <Text style={styles.modalRenameCancel}>Cancel</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.modalSectionInfo}>
+                          <Text style={styles.modalSectionTitle}>{item.title}</Text>
+                          <Text style={styles.modalSectionMeta}>{count} cards</Text>
+                        </View>
+                        {!readOnly && (
+                          <View style={styles.modalSectionActions}>
+                            <TouchableOpacity onPress={() => handleStartRename(item)}>
+                              <Text style={styles.modalRename}>Rename</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteSection(item)}>
+                              <Text style={styles.modalDelete}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </>
                     )}
                   </View>
                 );
@@ -866,7 +943,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalSectionInfo: { flex: 1 },
+  modalSectionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
   modalSectionTitle: { fontSize: 15, fontWeight: '600', color: '#111827' },
   modalSectionMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  modalRename: { color: '#6366f1', fontWeight: '600', fontSize: 14 },
+  modalRenameSave: { color: '#6366f1', fontWeight: '700', fontSize: 14 },
+  modalRenameCancel: { color: '#6b7280', fontWeight: '600', fontSize: 14 },
+  renameSectionInput: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: '#111827',
+    marginRight: 12,
+  },
   modalDelete: { color: '#dc2626', fontWeight: '600', fontSize: 14 },
 });
