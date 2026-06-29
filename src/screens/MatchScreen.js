@@ -6,7 +6,7 @@
  *   Right column = shuffled definition tiles (card.back)
  *
  * How to play:
- *   1. Tap a term  → it highlights (selected).
+ *   1. Tap a term  → it highlights (selected). Tap again to deselect.
  *   2. Tap a definition → attempt to match.
  *      - Correct  → both tiles flash green then fade out.
  *      - Wrong    → both shake red, selection clears.
@@ -157,6 +157,13 @@ export default function MatchScreen({ route, navigation }) {
 
   const handleTermPress = (id) => {
     if (tileState[`t-${id}`] === 'matched') return;
+
+    if (selectedTerm === id) {
+      setSelectedTerm(null);
+      setTileState((prev) => ({ ...prev, [`t-${id}`]: 'idle' }));
+      return;
+    }
+
     setSelectedTerm(id);
     setTileState((prev) => {
       const next = { ...prev };
