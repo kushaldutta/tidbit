@@ -40,13 +40,13 @@ export default function StudyModeScreen({ navigation }) {
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <Text style={styles.title}>Study Mode</Text>
       <Text style={styles.subtitle}>
-        Quiz, recall, and match from your decks — or run a focused review session.
+        Quiz, recall, and match from your decks, or run a focused review session.
       </Text>
 
       <View style={styles.learnSection}>
         <Text style={styles.learnSectionTitle}>Interactive Learn Modes</Text>
         <Text style={styles.learnSectionSub}>
-          Quiz, Recall, and Match — study from your own decks
+          Quiz, Recall, and Match: study from your own decks or preset class decks
         </Text>
         <TouchableOpacity
           style={styles.learnBtn}
