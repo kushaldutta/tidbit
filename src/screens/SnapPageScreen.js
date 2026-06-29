@@ -121,7 +121,7 @@ function SnapPageInner({ navigation }) {
         body: JSON.stringify({
           userId,
           mode: 'snap_page',
-          prompt: `Generate flashcards from these ${pageCount} page(s).`,
+          prompt: `Extract term-and-definition cards from these ${pageCount} page(s).`,
           imagesBase64,
           imageBase64: imagesBase64[0],
         }),

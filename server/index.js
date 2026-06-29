@@ -787,28 +787,30 @@ async function getMonthlyUsage(userId) {
 
 function buildSystemPrompt(mode, { pageCount = 1, targetPerPage = null } = {}) {
   const base = `You are an expert flashcard creator for college and AP-level students.
-Your job is to produce high-quality study flashcards from the user's input.
+Your job is to produce high-quality term-and-definition study cards from the user's input.
 
 Rules:
-- Each card's FRONT is a concise question, term, or prompt (max 15 words).
-- Each card's BACK is a clear, self-contained answer (max 40 words). One concept only.
+- Use term-and-definition format: each card's FRONT is the term, concept name, or formula label (max 10 words).
+- Each card's BACK is a clear, self-contained definition or explanation (max 40 words). One concept only.
+- Do NOT phrase the front as a question (avoid "What is…?", "Define…", "How does…?", etc.).
+- Only use a question on the front if the source material is itself a question with no natural term (rare — at most 1 in 10 cards).
 - Do not include card numbers or labels.
 - Be academically rigorous and precise. Do not make things up.
 - Return ONLY a valid JSON object with a "cards" array. No markdown, no explanation, no extra text.
 
 Format:
-{"cards": [{"front": "...", "back": "..."}, ...]}`;
+{"cards": [{"front": "Numerical Analysis", "back": "The study of algorithms for approximating solutions to mathematical problems that cannot be solved exactly."}, ...]}`;
 
   if (mode === 'paste_notes') {
-    return base + '\n\nThe user will paste raw notes or text. Extract the key concepts and turn each into a flashcard.';
+    return base + '\n\nThe user will paste raw notes or text. Extract the key concepts and turn each into a term/definition card.';
   }
   if (mode === 'snap_page') {
     const perPage = targetPerPage || SNAP_CARDS_PER_PAGE;
     const pageLabel = pageCount === 1 ? '1 page' : `${pageCount} pages`;
-    return base + `\n\nThe user photographed ${pageLabel} of notes or a textbook. Extract EVERY distinct concept, term, definition, bullet, and formula visible on the page. Turn each into its own flashcard — do not merge unrelated ideas. Aim for ${perPage} cards (typically 25–35). Cover the full page thoroughly; do not stop early.`;
+    return base + `\n\nThe user photographed ${pageLabel} of notes or a textbook. Extract EVERY distinct concept, term, definition, bullet, and formula visible on the page. For each one, put the term or concept name on "front" and its definition or explanation on "back". Do not merge unrelated ideas. Aim for ${perPage} cards (typically 25–35). Cover the full page thoroughly; do not stop early.`;
   }
   // text_prompt
-  return base + '\n\nThe user will describe a topic. Generate flashcards covering the most important concepts for that topic. Produce between 10 and 20 cards depending on how much material is provided.';
+  return base + '\n\nThe user will describe a topic. Generate term/definition cards covering the most important concepts for that topic. Produce between 10 and 20 cards depending on how much material is provided.';
 }
 
 function parseCardsFromAiContent(rawText) {
@@ -827,7 +829,7 @@ function parseCardsFromAiContent(rawText) {
 /** One OpenAI call per page so each gets a full token budget (~30 cards/page). */
 async function generateSnapPageCards(snapImages, userPrompt) {
   const pageCount = snapImages.length;
-  const basePrompt = userPrompt?.trim() || 'Generate flashcards from this page of notes.';
+  const basePrompt = userPrompt?.trim() || 'Extract term-and-definition cards from this page of notes.';
 
   const pageResults = await Promise.all(
     snapImages.map(async (img, index) => {
@@ -1046,7 +1048,7 @@ app.post('/api/ai/snap-page', snapUpload.single('image'), async (req, res) => {
 
     console.log(`[AI/SNAP] user=${userId} size=${req.file.size} bytes`);
 
-    const cards = await generateSnapPageCards([imageBase64], 'Generate flashcards from this page.');
+    const cards = await generateSnapPageCards([imageBase64], 'Extract term-and-definition cards from this page.');
     if (!cards?.length) {
       return res.status(500).json({ error: 'AI returned no cards. Try a clearer photo.' });
     }
