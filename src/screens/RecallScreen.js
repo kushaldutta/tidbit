@@ -18,6 +18,17 @@ import { RecallService } from '../services/RecallService';
 import { SameBoatService } from '../services/SameBoatService';
 import { useTheme } from '../context/ThemeContext';
 
+// Default: show definition, user types the term. Future: user-selectable direction.
+const RECALL_WRITE_TERM = true;
+
+function getRecallPrompt(card) {
+  return RECALL_WRITE_TERM ? card.back : card.front;
+}
+
+function getRecallAnswer(card) {
+  return RECALL_WRITE_TERM ? card.front : card.back;
+}
+
 // ─── Same-Boat banner ─────────────────────────────────────────────────────────
 
 function SameBoatBanner({ stat }) {
@@ -115,7 +126,7 @@ export default function RecallScreen({ route, navigation }) {
       if (isSpeakingNow) Speech.stop();
     } catch (_) {}
     setIsSpeaking(true);
-    Speech.speak(currentCard.front, {
+    Speech.speak(getRecallPrompt(currentCard), {
       language: 'en',
       rate: 0.85,
       onDone: () => setIsSpeaking(false),
@@ -130,8 +141,9 @@ export default function RecallScreen({ route, navigation }) {
   const handleSubmit = async () => {
     if (!userAnswer.trim() || gradeResult) return;
 
-    const result = RecallService.grade(userAnswer, currentCard.back);
-    const diff = result.isCorrect ? null : RecallService.diff(userAnswer, currentCard.back);
+    const correctAnswer = getRecallAnswer(currentCard);
+    const result = RecallService.grade(userAnswer, correctAnswer);
+    const diff = result.isCorrect ? null : RecallService.diff(userAnswer, correctAnswer);
     setGradeResult({ ...result, diff });
 
     setScore((prev) => ({
@@ -149,7 +161,7 @@ export default function RecallScreen({ route, navigation }) {
     // Speak the correct answer in audio mode
     if (audioMode) {
       Speech.stop();
-      Speech.speak(`The answer is: ${currentCard.back}`, { language: 'en', rate: 0.85 });
+      Speech.speak(`The term is: ${getRecallAnswer(currentCard)}`, { language: 'en', rate: 0.85 });
     }
   };
 
@@ -267,8 +279,10 @@ export default function RecallScreen({ route, navigation }) {
         >
           {/* Prompt card */}
           <View style={styles.promptCard}>
-            <Text style={styles.promptLabel}>TYPE THE ANSWER</Text>
-            <Text style={styles.promptText}>{currentCard.front}</Text>
+            <Text style={styles.promptLabel}>
+              {RECALL_WRITE_TERM ? 'TYPE THE TERM' : 'TYPE THE ANSWER'}
+            </Text>
+            <Text style={styles.promptText}>{getRecallPrompt(currentCard)}</Text>
 
             {audioMode && (
               <TouchableOpacity style={styles.speakBtn} onPress={speakQuestion}>
@@ -284,7 +298,7 @@ export default function RecallScreen({ route, navigation }) {
             <TextInput
               ref={inputRef}
               style={styles.input}
-              placeholder="Type your answer…"
+              placeholder={RECALL_WRITE_TERM ? 'Type the term…' : 'Type your answer…'}
               placeholderTextColor="#9ca3af"
               value={userAnswer}
               onChangeText={setUserAnswer}
@@ -307,8 +321,10 @@ export default function RecallScreen({ route, navigation }) {
                 </Text>
                 <Text style={styles.yourAnswerLabel}>You wrote:</Text>
                 <Text style={styles.yourAnswerText}>{userAnswer}</Text>
-                <Text style={styles.correctLabel}>Correct answer:</Text>
-                <Text style={styles.correctText}>{currentCard.back}</Text>
+                <Text style={styles.correctLabel}>
+                  {RECALL_WRITE_TERM ? 'Correct term:' : 'Correct answer:'}
+                </Text>
+                <Text style={styles.correctText}>{getRecallAnswer(currentCard)}</Text>
                 {!gradeResult.isCorrect && gradeResult.diff && (
                   <>
                     <Text style={styles.diffLabel}>Character diff:</Text>

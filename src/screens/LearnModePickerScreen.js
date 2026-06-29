@@ -36,7 +36,7 @@ const MODES = [
     id: 'Recall',
     emoji: '✏️',
     title: 'Recall',
-    subtitle: 'Type the answer · fuzzy matching · audio mode',
+    subtitle: 'Type the term · fuzzy matching · audio mode',
     color: '#8b5cf6',
     bg: '#f5f3ff',
     minCards: 1,
