@@ -15,7 +15,9 @@ export default function StudyPlanCard({ plan, onPress, isLoading }) {
     return (
       <View style={styles.card}>
         <Text style={styles.title}>📚 Today's Study Plan</Text>
-        <Text style={styles.emptyText}>No plan available. Select categories to get started!</Text>
+        <Text style={styles.emptyText}>
+          No plan available. Enroll in a class on the Categories tab to get started!
+        </Text>
       </View>
     );
   }

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SpacedRepetitionService } from './SpacedRepetitionService';
 import { ContentService } from './ContentService';
 import { StorageService } from './StorageService';
+import { ClassService } from './ClassService';
 
 const STORAGE_KEY = 'daily_study_plan';
 const PLAN_CONFIG = {
@@ -37,6 +38,14 @@ function isToday(dateString) {
 }
 
 class StudyPlanService {
+  /** Enrolled class categories (preferred), falling back to legacy selectedCategories. */
+  static async resolveStudyCategories() {
+    await ClassService.ensureCategoriesSyncedToEnrollments();
+    const enrolled = await ClassService.getEnrollmentCategoryIds();
+    if (enrolled.length > 0) return enrolled;
+    return StorageService.getSelectedCategories();
+  }
+
   /**
    * Get the current daily study plan
    * If no plan exists or plan is from a different day, generates a new one
@@ -50,14 +59,14 @@ class StudyPlanService {
       if (storedPlan) {
         const plan = JSON.parse(storedPlan);
         
-        // If plan is from today, return it
-        if (isToday(plan.date)) {
+        // If plan is from today and has content (or is completed), return it
+        if (isToday(plan.date) && (plan.totalCount > 0 || plan.completed)) {
           console.log('[STUDY_PLAN] Returning existing plan for today');
           return plan;
         }
         
-        // Plan is from a different day, generate new one
-        console.log('[STUDY_PLAN] Plan is from a different day, generating new plan');
+        // Plan is from a different day or was empty — generate new one
+        console.log('[STUDY_PLAN] Regenerating plan (new day or empty cached plan)');
       }
       
       // Generate new plan
@@ -77,10 +86,10 @@ class StudyPlanService {
     try {
       console.log('[STUDY_PLAN] Generating new daily plan...');
       
-      const selectedCategories = await StorageService.getSelectedCategories();
+      const selectedCategories = await this.resolveStudyCategories();
       
       if (selectedCategories.length === 0) {
-        console.log('[STUDY_PLAN] No categories selected, cannot generate plan');
+        console.log('[STUDY_PLAN] No enrolled classes or categories, cannot generate plan');
         return null;
       }
 
@@ -197,10 +206,11 @@ class StudyPlanService {
    */
   static async generateSessionTidbits(totalCount, categoryFilter = null) {
     try {
-      const selectedCategories = categoryFilter || await StorageService.getSelectedCategories();
+      const selectedCategories =
+        categoryFilter || (await this.resolveStudyCategories());
 
       if (selectedCategories.length === 0) {
-        console.log('[STUDY_PLAN] No categories selected, cannot generate session');
+        console.log('[STUDY_PLAN] No enrolled classes or categories, cannot generate session');
         return [];
       }
 

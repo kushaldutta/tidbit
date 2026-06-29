@@ -121,10 +121,14 @@ export default function HomeScreen({ navigation }) {
     const dailyTidbits = await StorageService.getDailyTidbitCount();
     const selected = await StorageService.getSelectedCategories();
     const available = ContentService.getAvailableCategories();
+    const enrolledCategoryIds = await ClassService.getEnrollmentCategoryIds();
     
-    // Filter out invalid categories (categories that no longer exist)
-    const availableIds = available.map(cat => cat.id);
-    const validCategories = selected.filter(catId => availableIds.includes(catId));
+    // Filter out invalid categories (keep bundled catalog ids + enrolled class slugs)
+    const availableIds = new Set([
+      ...available.map((cat) => cat.id),
+      ...enrolledCategoryIds,
+    ]);
+    const validCategories = selected.filter((catId) => availableIds.has(catId));
     
     // If any invalid categories were removed, update storage
     if (validCategories.length !== selected.length) {
