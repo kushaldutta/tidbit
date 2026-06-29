@@ -1,5 +1,6 @@
 import { StorageService } from './StorageService';
 import { SpacedRepetitionService } from './SpacedRepetitionService';
+import { ClassService } from './ClassService';
 import API_CONFIG from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AP_CATEGORY_BY_ID, AP_CATEGORY_IDS } from '../config/courseCatalog';
@@ -400,38 +401,97 @@ class ContentService {
     return decks.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   }
 
+  /** Enrolled class slugs first; fall back to legacy selectedCategories. */
+  static async resolveActiveCategories() {
+    await ClassService.ensureCategoriesSyncedToEnrollments();
+    const enrolled = await ClassService.getEnrollmentCategoryIds();
+    if (enrolled.length > 0) return enrolled;
+    return StorageService.getSelectedCategories();
+  }
+
+  static async getPresetDeckIdForSlug(categorySlug) {
+    if (!categorySlug) return null;
+    try {
+      const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
+      if (!SUPABASE_CONFIGURED) return null;
+      const { data } = await supabase
+        .from('decks')
+        .select('id')
+        .eq('slug', categorySlug)
+        .is('owner_id', null)
+        .maybeSingle();
+      return data?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  static async getCardAsTidbit(cardId) {
+    if (!cardId) return null;
+    try {
+      const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
+      if (!SUPABASE_CONFIGURED) return null;
+      const { data: card, error } = await supabase
+        .from('cards')
+        .select('id, deck_id, front, back')
+        .eq('id', cardId)
+        .maybeSingle();
+      if (error || !card) return null;
+
+      const { data: deck } = await supabase
+        .from('decks')
+        .select('slug')
+        .eq('id', card.deck_id)
+        .maybeSingle();
+
+      const category = deck?.slug || card.deck_id;
+      const term = card.front !== card.back ? card.front : null;
+      return {
+        id: card.id,
+        text: card.back,
+        term,
+        category,
+        deckId: card.deck_id,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (err) {
+      console.warn('[CONTENT_SERVICE] getCardAsTidbit failed:', err.message);
+      return null;
+    }
+  }
+
+  static async getRandomCardFromCategorySlug(categorySlug) {
+    const deckId = await this.getPresetDeckIdForSlug(categorySlug);
+    if (!deckId) return null;
+    return this.getRandomCardFromDecks([deckId], categorySlug);
+  }
+
   static async getRandomTidbit() {
-    const selectedCategories = await StorageService.getSelectedCategories();
-    
-    if (selectedCategories.length === 0) {
-      return null;
+    const categories = await this.resolveActiveCategories();
+    if (categories.length === 0) return null;
+
+    const shuffled = [...categories].sort(() => Math.random() - 0.5);
+    for (const category of shuffled) {
+      const categoryTidbits = TIDBITS[category] || [];
+      if (categoryTidbits.length > 0) {
+        const randomTidbit = categoryTidbits[Math.floor(Math.random() * categoryTidbits.length)];
+        const text = typeof randomTidbit === 'string' ? randomTidbit : randomTidbit.text;
+        const term = typeof randomTidbit === 'string' ? null : (randomTidbit.term || null);
+        const id = generateTidbitId(text, category);
+        return {
+          id,
+          text,
+          term,
+          category,
+          timestamp: new Date().toISOString(),
+        };
+      }
+
+      const deckTidbit = await this.getRandomCardFromCategorySlug(category);
+      if (deckTidbit) return deckTidbit;
     }
 
-    // Pick a random category from user's selections
-    const randomCategory = selectedCategories[Math.floor(Math.random() * selectedCategories.length)];
-    const categoryTidbits = TIDBITS[randomCategory] || [];
-
-    if (categoryTidbits.length === 0) {
-      return null;
-    }
-
-    // Pick a random tidbit from that category
-    const randomTidbit = categoryTidbits[Math.floor(Math.random() * categoryTidbits.length)];
-
-    // Handle both old string format and new { text, term } object format
-    const text = typeof randomTidbit === 'string' ? randomTidbit : randomTidbit.text;
-    const term = typeof randomTidbit === 'string' ? null : (randomTidbit.term || null);
-
-    // Generate stable ID based on content
-    const id = generateTidbitId(text, randomCategory);
-
-    return {
-      id,
-      text,
-      term,
-      category: randomCategory,
-      timestamp: new Date().toISOString(),
-    };
+    return null;
   }
 
   /**
@@ -473,14 +533,14 @@ class ContentService {
   static async getTidbitById(tidbitId, requireSelectedCategory = true) {
     if (!tidbitId) return null;
 
-    const selectedCategories = requireSelectedCategory 
-      ? await StorageService.getSelectedCategories()
-      : Object.keys(TIDBITS);
-    
-    // Search through categories (selected or all)
-    for (const category of selectedCategories) {
+    const activeCategories = requireSelectedCategory
+      ? await this.resolveActiveCategories()
+      : null;
+    const categoriesToSearch = activeCategories ?? Object.keys(TIDBITS);
+
+    for (const category of categoriesToSearch) {
       const categoryTidbits = TIDBITS[category] || [];
-      
+
       for (const tidbitItem of categoryTidbits) {
         const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
         const term = typeof tidbitItem === 'string' ? null : (tidbitItem.term || null);
@@ -496,8 +556,13 @@ class ContentService {
         }
       }
     }
-    
-    return null;
+
+    const cardTidbit = await this.getCardAsTidbit(tidbitId);
+    if (!cardTidbit) return null;
+    if (activeCategories && !activeCategories.includes(cardTidbit.category)) {
+      return null;
+    }
+    return cardTidbit;
   }
 
   /**
@@ -507,10 +572,10 @@ class ContentService {
    */
   static async getSmartTidbit() {
     try {
-      const selectedCategories = await StorageService.getSelectedCategories();
-      
-      if (selectedCategories.length === 0) {
-        console.log('[SMART_TIDBIT] No categories selected');
+      const activeCategories = await this.resolveActiveCategories();
+
+      if (activeCategories.length === 0) {
+        console.log('[SMART_TIDBIT] No enrolled classes or categories');
         return null;
       }
 
@@ -525,7 +590,7 @@ class ContentService {
         // Filter due tidbits by user's selected categories
         for (const tidbitId of dueTidbitIds) {
           const tidbit = await this.getTidbitById(tidbitId, false);
-          if (tidbit && selectedCategories.includes(tidbit.category)) {
+          if (tidbit && activeCategories.includes(tidbit.category)) {
             filteredDueTidbits.push(tidbit);
           }
         }
@@ -645,7 +710,7 @@ class ContentService {
    * NEW (W3): Pick a random card from a set of deck IDs. Mirrors the
    * shape of getRandomTidbit() so HomeScreen and friends can swap in.
    */
-  static async getRandomCardFromDecks(deckIds) {
+  static async getRandomCardFromDecks(deckIds, categorySlug = null) {
     if (!deckIds?.length) return null;
     try {
       const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
@@ -660,8 +725,8 @@ class ContentService {
       return {
         id: card.id,
         text: card.back,
-        prompt: card.front,
-        category: card.deck_id,
+        term: card.front !== card.back ? card.front : null,
+        category: categorySlug || card.deck_id,
         deckId: card.deck_id,
         timestamp: new Date().toISOString(),
       };

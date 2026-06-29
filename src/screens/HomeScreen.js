@@ -215,11 +215,16 @@ export default function HomeScreen({ navigation }) {
         if (tidbitWithId.id) {
           await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
         }
-        // Fire event — App.js listens and shows TidbitModal directly
         DeviceEventEmitter.emit('showTidbitNow', tidbitWithId);
+      } else {
+        Alert.alert(
+          'No tidbit available',
+          'Enroll in a class on the Categories tab to get started.',
+        );
       }
     } catch (error) {
       console.error('Error getting tidbit:', error);
+      Alert.alert('Something went wrong', 'Could not load a tidbit. Please try again.');
     }
   };
 
