@@ -275,6 +275,8 @@ class CardLearningService {
     if (!state?.contentId) return;
     state.updatedAt = new Date().toISOString();
     await AsyncStorage.setItem(localKey(state.contentId), JSON.stringify(state));
+    const { QueueService } = require('./QueueService');
+    QueueService.invalidateReviewQueueCache();
     if (isUuid(state.contentId)) {
       await this.syncCardToCloud(state.contentId);
     }
@@ -504,16 +506,39 @@ class CardLearningService {
   static async getAllLocalStates() {
     const keys = await AsyncStorage.getAllKeys();
     const clKeys = keys.filter((k) => k.startsWith(LOCAL_PREFIX));
+    if (!clKeys.length) return [];
+    const pairs = await AsyncStorage.multiGet(clKeys);
     const states = [];
-    for (const key of clKeys) {
+    for (const [, raw] of pairs) {
       try {
-        const raw = await AsyncStorage.getItem(key);
         if (raw) states.push(JSON.parse(raw));
       } catch {
         /* skip */
       }
     }
     return states;
+  }
+
+  /** One-shot map of contentId → state (uses multiGet). */
+  static async getStateMap() {
+    const states = await this.getAllLocalStates();
+    return new Map(states.map((s) => [s.contentId, s]));
+  }
+
+  /** Sync effective-state lookup when a state map is already loaded. */
+  static getEffectiveStateFromMap(card, categoryId, stateMap) {
+    if (!card?.id || !stateMap) return null;
+    const direct = stateMap.get(card.id) || null;
+    const hashId = this.legacyHashForCard(card, categoryId);
+    const legacy = hashId && hashId !== card.id ? stateMap.get(hashId) || null : null;
+
+    if (direct && legacy) {
+      const directReviewed = direct.lastReviewAt || direct.totalSeen > 0;
+      if (directReviewed) return direct;
+      if (this.isDue(legacy) && !this.isDue(direct)) return legacy;
+      return direct;
+    }
+    return direct || legacy || null;
   }
 
   static async getDueContentIds(targetTime = new Date()) {

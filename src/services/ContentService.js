@@ -574,12 +574,15 @@ class ContentService {
 
     const { QueueService } = require('./QueueService');
     const { CardLearningService } = require('./CardLearningService');
-    const eligible = await QueueService.loadEligibleCards(categories);
+    const [eligible, stateMap] = await Promise.all([
+      QueueService.loadEligibleCards(categories),
+      CardLearningService.getStateMap(),
+    ]);
     const unseen = [];
     const seenNotDue = [];
 
     for (const card of eligible) {
-      const state = await CardLearningService.getEffectiveState(card, card.categoryId);
+      const state = CardLearningService.getEffectiveStateFromMap(card, card.categoryId, stateMap);
       // Skip anything awaiting or ready for review (including 1h post-"I knew it" window)
       if (state?.stage === 'introduced') continue;
       if (state && CardLearningService.isReviewQueueEligible(state)) continue;
