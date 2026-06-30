@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const MODE_CONFIG = {
   quiz:     { emoji: '🧠', label: 'Quiz',        color: '#6366f1' },
   recall:   { emoji: '✏️',  label: 'Recall',      color: '#8b5cf6' },
+  review:   { emoji: '🔄', label: 'Review',      color: '#6366f1' },
   match:    { emoji: '🧩', label: 'Match',       color: '#f59e0b' },
   flashcard:{ emoji: '📇', label: 'Flashcards',  color: '#06b6d4' },
 };

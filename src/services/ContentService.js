@@ -472,6 +472,9 @@ class ContentService {
 
     const shuffled = [...categories].sort(() => Math.random() - 0.5);
     for (const category of shuffled) {
+      const deckTidbit = await this.getRandomCardFromCategorySlug(category);
+      if (deckTidbit) return deckTidbit;
+
       const categoryTidbits = TIDBITS[category] || [];
       if (categoryTidbits.length > 0) {
         const randomTidbit = categoryTidbits[Math.floor(Math.random() * categoryTidbits.length)];
@@ -486,9 +489,6 @@ class ContentService {
           timestamp: new Date().toISOString(),
         };
       }
-
-      const deckTidbit = await this.getRandomCardFromCategorySlug(category);
-      if (deckTidbit) return deckTidbit;
     }
 
     return null;
@@ -566,6 +566,43 @@ class ContentService {
   }
 
   /**
+   * Discovery tidbit for "Get Tidbit Now" — excludes due/review cards, prefers unseen.
+   */
+  static async getDiscoveryTidbit() {
+    const categories = await this.resolveActiveCategories();
+    if (!categories.length) return null;
+
+    const { QueueService } = require('./QueueService');
+    const { CardLearningService } = require('./CardLearningService');
+    const eligible = await QueueService.loadEligibleCards(categories);
+    const unseen = [];
+    const seenNotDue = [];
+
+    for (const card of eligible) {
+      const state = await CardLearningService.getEffectiveState(card, card.categoryId);
+      // Skip anything awaiting or ready for review (including 1h post-"I knew it" window)
+      if (state?.stage === 'introduced') continue;
+      if (state && CardLearningService.isReviewQueueEligible(state)) continue;
+
+      const tidbit = {
+        id: card.id,
+        text: card.back,
+        term: card.front !== card.back ? card.front : null,
+        category: card.categoryId,
+        deckId: card.deck_id || card.deckId,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (!state || state.stage === 'new') unseen.push(tidbit);
+      else seenNotDue.push(tidbit);
+    }
+
+    const pool = unseen.length > 0 ? unseen : seenNotDue;
+    if (!pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  /**
    * Get a smart tidbit with 50/50 chance between due tidbits and random selection
    * This encourages both learning new content and reviewing previously seen tidbits
    * @returns {Promise<Object|null>} A tidbit object or null
@@ -581,30 +618,25 @@ class ContentService {
 
       // 50% chance to show due tidbit (if available), 50% chance to show random
       const shouldShowDueTidbit = Math.random() < 0.5;
-      
-      // Check for due tidbits (even if we might not use them)
-      const dueTidbitIds = await SpacedRepetitionService.getDueTidbits();
-      let filteredDueTidbits = [];
-      
-      if (dueTidbitIds.length > 0) {
-        // Filter due tidbits by user's selected categories
-        for (const tidbitId of dueTidbitIds) {
-          const tidbit = await this.getTidbitById(tidbitId, false);
-          if (tidbit && activeCategories.includes(tidbit.category)) {
-            filteredDueTidbits.push(tidbit);
-          }
-        }
-      }
-      
-      // If we want to show due tidbit AND have due tidbits available, show one
-      if (shouldShowDueTidbit && filteredDueTidbits.length > 0) {
-        const randomDueTidbit = filteredDueTidbits[Math.floor(Math.random() * filteredDueTidbits.length)];
-        console.log(`[SMART_TIDBIT] 50/50 selected: Due tidbit (${filteredDueTidbits.length}/${dueTidbitIds.length} due in selected categories)`);
+
+      const { QueueService } = require('./QueueService');
+      const queue = await QueueService.buildQueue({
+        categoryIds: activeCategories,
+        limit: 20,
+        includeNew: false,
+      });
+      const filteredDueTidbits = queue.due;
+      const { isUuid } = require('./CardLearningService');
+      const uuidDue = filteredDueTidbits.filter((t) => isUuid(t.id));
+      const duePool = uuidDue.length > 0 ? uuidDue : filteredDueTidbits;
+
+      if (shouldShowDueTidbit && duePool.length > 0) {
+        const randomDueTidbit = duePool[Math.floor(Math.random() * duePool.length)];
+        console.log(`[SMART_TIDBIT] 50/50 selected: Due tidbit (${duePool.length} due in active categories)`);
         return randomDueTidbit;
       }
-      
-      // Otherwise, show random tidbit (either by choice or because no due tidbits available)
-      if (shouldShowDueTidbit && filteredDueTidbits.length === 0) {
+
+      if (shouldShowDueTidbit && duePool.length === 0) {
         console.log(`[SMART_TIDBIT] 50/50 selected: Due tidbit, but none available in selected categories, showing random instead`);
       } else {
         console.log('[SMART_TIDBIT] 50/50 selected: Random tidbit (new learning)');

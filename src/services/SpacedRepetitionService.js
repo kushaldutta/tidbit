@@ -1,366 +1,75 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-const STORAGE_PREFIX = 'spaced_repetition_';
+/**
+ * SpacedRepetitionService — compatibility wrapper delegating to CardLearningService (v2.3).
+ * @deprecated Use CardLearningService directly for new code.
+ */
+import { CardLearningService } from './CardLearningService';
 
 class SpacedRepetitionService {
-  /**
-   * Get the storage key for a tidbit's state
-   */
   static getStorageKey(tidbitId) {
-    return `${STORAGE_PREFIX}${tidbitId}`;
+    return `card_learning_${tidbitId}`;
   }
 
-  /**
-   * Get the current state for a tidbit
-   * Returns null if tidbit has no state yet
-   */
-  static async getTidbitState(tidbitId) {
-    if (!tidbitId) return null;
-    
-    try {
-      const key = this.getStorageKey(tidbitId);
-      const data = await AsyncStorage.getItem(key);
-      return data ? JSON.parse(data) : null;
-    } catch (error) {
-      console.error(`Error getting tidbit state for ${tidbitId}:`, error);
-      return null;
-    }
+  static getTidbitState(tidbitId) {
+    return CardLearningService.getTidbitState(tidbitId);
   }
 
-  /**
-   * Save tidbit state to storage
-   */
   static async saveTidbitState(tidbitId, state) {
-    if (!tidbitId) return;
-    
-    try {
-      const key = this.getStorageKey(tidbitId);
-      await AsyncStorage.setItem(key, JSON.stringify(state));
-    } catch (error) {
-      console.error(`Error saving tidbit state for ${tidbitId}:`, error);
-    }
+    const mapped = {
+      contentId: tidbitId,
+      cardId: tidbitId,
+      stage: state.masteryLevel === 'mastered' ? 'mastered' : state.nextDue ? 'introduced' : 'new',
+      dueAt: state.nextDue || null,
+      lastSeenAt: state.lastSeen || null,
+      correctStreak: state.correctStreak || 0,
+      totalSeen: state.totalViews || 0,
+      totalCorrect: state.totalCorrect || 0,
+      isSaved: state.saved === true,
+      isMastered: state.masteryLevel === 'mastered',
+      wasShownAsDue: state.wasShownAsDue,
+      shownAsDueAt: state.shownAsDueAt,
+    };
+    return CardLearningService.saveState(mapped);
   }
 
-  /**
-   * Mark a tidbit as shown (when displayed to user)
-   * If it was due and no action is taken, this will be used to clear the due status
-   * @param {string} tidbitId - The tidbit ID
-   */
-  static async markTidbitAsShown(tidbitId) {
-    if (!tidbitId) return;
-    
-    try {
-      const state = await this.getTidbitState(tidbitId);
-      if (state && state.nextDue) {
-        // Check if this tidbit was due (nextDue is in the past)
-        const nextDueDate = new Date(state.nextDue);
-        const now = new Date();
-        
-        if (nextDueDate <= now) {
-          // This was a due tidbit - mark it as shown
-          state.wasShownAsDue = true;
-          state.shownAsDueAt = now.toISOString();
-          await this.saveTidbitState(tidbitId, state);
-        }
-      }
-    } catch (error) {
-      console.error(`Error marking tidbit as shown: ${tidbitId}`, error);
-    }
+  static markTidbitAsShown(tidbitId) {
+    return CardLearningService.markTidbitAsShown(tidbitId);
   }
 
-  /**
-   * Clear the due status for a tidbit (when shown but no action taken)
-   * This makes it a normal random tidbit again
-   * @param {string} tidbitId - The tidbit ID
-   */
-  static async clearDueStatus(tidbitId) {
-    if (!tidbitId) return;
-    
-    try {
-      const state = await this.getTidbitState(tidbitId);
-      if (state) {
-        // Clear nextDue so it's no longer prioritized
-        state.nextDue = null;
-        state.wasShownAsDue = false;
-        state.shownAsDueAt = null;
-        await this.saveTidbitState(tidbitId, state);
-        console.log(`[SPACED_REP] Cleared due status for tidbit ${tidbitId} (no action taken)`);
-      }
-    } catch (error) {
-      console.error(`Error clearing due status for ${tidbitId}:`, error);
-    }
+  static clearDueStatus(tidbitId) {
+    return CardLearningService.clearDueStatus(tidbitId);
   }
 
-  /**
-   * Record user feedback for a tidbit
-   * @param {string} tidbitId - The tidbit ID
-   * @param {string} action - 'knew', 'didnt_know', or 'save'
-   */
-  static async recordFeedback(tidbitId, action) {
-    if (!tidbitId) {
-      console.warn('Cannot record feedback: tidbitId is missing');
-      return;
-    }
-
-    const now = new Date();
-    const nowISO = now.toISOString();
-    
-    // Get existing state or create new
-    let state = await this.getTidbitState(tidbitId);
-    
-    // Check if this was a due tidbit being reset
-    const wasDueTidbit = state?.wasShownAsDue === true;
-    
-    if (!state) {
-      // First time user interacts with this tidbit
-      state = {
-        tidbitId,
-        lastSeen: nowISO,
-        correctStreak: 0,
-        nextDue: null,
-        masteryLevel: 'new',
-        saved: false,
-        totalViews: 0,
-        totalCorrect: 0,
-      };
-    }
-
-    // Update lastSeen and totalViews
-    state.lastSeen = nowISO;
-    state.totalViews = (state.totalViews || 0) + 1;
-    
-    // Clear the "shown as due" flag since user took action
-    state.wasShownAsDue = false;
-    state.shownAsDueAt = null;
-
-    // Handle different actions
-    if (action === 'didnt_know') {
-      // "I didn't know" → Repeat in 3-6 hours
-      // If this was a due tidbit, reset to initial schedule (as if first time)
-      const hoursFromNow = 3 + Math.random() * 3; // Random between 3-6 hours
-      const nextDueDate = new Date(now.getTime() + hoursFromNow * 60 * 60 * 1000);
-      state.nextDue = nextDueDate.toISOString();
-      state.correctStreak = 0; // Reset streak
-      state.masteryLevel = 'learning';
-      // Don't clear saved status - user explicitly saved it
-      
-      if (wasDueTidbit) {
-        console.log(`[SPACED_REP] Due tidbit ${tidbitId} reset to initial "didn't know" schedule`);
-      }
-      
-    } else if (action === 'knew') {
-      // "I knew it" → Repeat tomorrow (first time) or 2-3 days (subsequent)
-      state.totalCorrect = (state.totalCorrect || 0) + 1;
-      state.correctStreak = (state.correctStreak || 0) + 1;
-      
-      if (state.correctStreak === 1) {
-        // First time correct: repeat tomorrow (24 hours)
-        const nextDueDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        state.nextDue = nextDueDate.toISOString();
-      } else {
-        // Subsequent times: repeat in 2-3 days
-        const daysFromNow = 2 + Math.random(); // Random between 2-3 days
-        const nextDueDate = new Date(now.getTime() + daysFromNow * 24 * 60 * 60 * 1000);
-        state.nextDue = nextDueDate.toISOString();
-      }
-      
-      // Update mastery level
-      if (state.correctStreak >= 3) {
-        state.masteryLevel = 'mastered';
-      } else {
-        state.masteryLevel = 'learning';
-      }
-      
-    } else if (action === 'save') {
-      // "Save" → Just mark as saved, don't change schedule
-      state.saved = true;
-      // Keep existing nextDue if it exists
-      // If no nextDue, don't set one (user can view in saved section)
-    } else if (action === 'unsave') {
-      // "Unsave" → Remove saved status
-      state.saved = false;
-      // Keep existing nextDue and other state
-    }
-
-    // Save updated state
-    await this.saveTidbitState(tidbitId, state);
+  static recordFeedback(tidbitId, action, categoryId = null) {
+    return CardLearningService.recordFeedback(tidbitId, action, categoryId);
   }
 
-  /**
-   * Get all tidbits that are due for review
-   * @param {Date} targetTime - Time to check against (defaults to now)
-   * @returns {Promise<string[]>} Array of tidbit IDs that are due
-   */
-  static async getDueTidbits(targetTime = new Date()) {
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const spacedRepKeys = allKeys.filter(key => key.startsWith(STORAGE_PREFIX));
-      
-      const dueTidbits = [];
-      
-      for (const key of spacedRepKeys) {
-        try {
-          const data = await AsyncStorage.getItem(key);
-          if (data) {
-            const state = JSON.parse(data);
-            
-            // Check if tidbit is due
-            if (state.nextDue) {
-              const nextDueDate = new Date(state.nextDue);
-              if (nextDueDate <= targetTime) {
-                dueTidbits.push(state.tidbitId);
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Error parsing state for key ${key}:`, error);
-        }
-      }
-      
-      return dueTidbits;
-    } catch (error) {
-      console.error('Error getting due tidbits:', error);
-      return [];
-    }
+  static getDueTidbits(targetTime) {
+    return CardLearningService.getDueContentIds(targetTime);
   }
 
-  /**
-   * Get all tidbits that have a nextDue scheduled (even if in the future)
-   * @returns {Promise<string[]>} Array of tidbit IDs that are scheduled
-   */
-  static async getScheduledTidbits() {
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const spacedRepKeys = allKeys.filter(key => key.startsWith(STORAGE_PREFIX));
-      
-      const scheduledTidbits = [];
-      
-      for (const key of spacedRepKeys) {
-        try {
-          const data = await AsyncStorage.getItem(key);
-          if (data) {
-            const state = JSON.parse(data);
-            
-            // Check if tidbit has a nextDue set
-            if (state.nextDue) {
-              scheduledTidbits.push(state.tidbitId);
-            }
-          }
-        } catch (error) {
-          console.error(`Error parsing state for key ${key}:`, error);
-        }
-      }
-      
-      return scheduledTidbits;
-    } catch (error) {
-      console.error('Error getting scheduled tidbits:', error);
-      return [];
-    }
+  static getScheduledTidbits() {
+    return CardLearningService.getScheduledContentIds();
   }
 
-  /**
-   * Get all saved tidbits
-   * @returns {Promise<string[]>} Array of tidbit IDs that are saved
-   */
-  static async getSavedTidbits() {
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const spacedRepKeys = allKeys.filter(key => key.startsWith(STORAGE_PREFIX));
-      
-      const savedTidbits = [];
-      
-      for (const key of spacedRepKeys) {
-        try {
-          const data = await AsyncStorage.getItem(key);
-          if (data) {
-            const state = JSON.parse(data);
-            if (state.saved === true) {
-              // Extract tidbitId from state or from the key itself
-              const tidbitId = state.tidbitId || key.replace(STORAGE_PREFIX, '');
-              if (tidbitId) {
-                savedTidbits.push(tidbitId);
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Error parsing state for key ${key}:`, error);
-        }
-      }
-      
-      return savedTidbits;
-    } catch (error) {
-      console.error('Error getting saved tidbits:', error);
-      return [];
-    }
+  static getSavedTidbits() {
+    return CardLearningService.getSavedContentIds();
   }
 
-  /**
-   * Get all mastered tidbits
-   * @returns {Promise<string[]>} Array of tidbit IDs that are mastered
-   */
-  static async getMasteredTidbits() {
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const spacedRepKeys = allKeys.filter(key => key.startsWith(STORAGE_PREFIX));
-      
-      const masteredTidbits = [];
-      
-      for (const key of spacedRepKeys) {
-        try {
-          const data = await AsyncStorage.getItem(key);
-          if (data) {
-            const state = JSON.parse(data);
-            if (state.masteryLevel === 'mastered') {
-              // Extract tidbitId from state or from the key itself
-              const tidbitId = state.tidbitId || key.replace(STORAGE_PREFIX, '');
-              if (tidbitId) {
-                masteredTidbits.push(tidbitId);
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Error parsing state for key ${key}:`, error);
-        }
-      }
-      
-      return masteredTidbits;
-    } catch (error) {
-      console.error('Error getting mastered tidbits:', error);
-      return [];
-    }
+  static getMasteredTidbits() {
+    return CardLearningService.getMasteredContentIds();
   }
 
-  /**
-   * Update nextDue time for a tidbit
-   * @param {string} tidbitId - The tidbit ID
-   * @param {number} hoursFromNow - Hours from now to set nextDue
-   */
   static async updateNextDue(tidbitId, hoursFromNow) {
-    const state = await this.getTidbitState(tidbitId);
-    if (!state) {
-      console.warn(`Cannot update nextDue: tidbit ${tidbitId} has no state`);
-      return;
-    }
-
-    const nextDueDate = new Date(Date.now() + hoursFromNow * 60 * 60 * 1000);
-    state.nextDue = nextDueDate.toISOString();
-    await this.saveTidbitState(tidbitId, state);
+    const state = await CardLearningService.getState(tidbitId);
+    if (!state) return;
+    const due = new Date(Date.now() + hoursFromNow * 60 * 60 * 1000);
+    state.dueAt = due.toISOString();
+    return CardLearningService.saveState(state);
   }
 
-  /**
-   * Clear all learning state (for testing/debugging)
-   */
-  static async clearAllState() {
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const spacedRepKeys = allKeys.filter(key => key.startsWith(STORAGE_PREFIX));
-      await AsyncStorage.multiRemove(spacedRepKeys);
-      console.log(`Cleared ${spacedRepKeys.length} tidbit states`);
-    } catch (error) {
-      console.error('Error clearing all state:', error);
-    }
+  static clearAllState() {
+    return CardLearningService.clearAllState();
   }
 }
 
 export { SpacedRepetitionService };
-

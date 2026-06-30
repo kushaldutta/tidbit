@@ -149,7 +149,7 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
     try {
       // Record feedback
       console.log(`[SPACED_REP] Recording feedback: tidbitId=${tidbitId}, action=${serviceAction}`);
-      await SpacedRepetitionService.recordFeedback(tidbitId, serviceAction);
+      await SpacedRepetitionService.recordFeedback(tidbitId, serviceAction, tidbitWithId.category);
       
       // Log the updated state
       const updatedState = await SpacedRepetitionService.getTidbitState(tidbitId);

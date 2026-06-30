@@ -46,6 +46,9 @@ import AIGenerationScreen from './src/screens/AIGenerationScreen';
 import SnapPageScreen from './src/screens/SnapPageScreen';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import ThemePickerScreen from './src/screens/ThemePickerScreen';
+import ReviewQueueScreen from './src/screens/ReviewQueueScreen';
+import ReviewSessionScreen from './src/screens/ReviewSessionScreen';
+import InsightsScreen from './src/screens/InsightsScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
 import { StorageService } from './src/services/StorageService';
@@ -342,6 +345,8 @@ export default function App() {
         EntitlementService.init().catch(() => {});
         const userId = AuthService.getUserId();
         if (userId) EntitlementService.identifyUser(userId).catch(() => {});
+        const { CardLearningService } = require('./src/services/CardLearningService');
+        CardLearningService.initForUser().catch(() => {});
         await SyncService.onAuthenticated();
         const [hasProfile, onboardingDone] = await Promise.all([
           ProfileService.hasCompletedProfile(),
@@ -800,6 +805,9 @@ export default function App() {
         <Stack.Screen name="AIGeneration" component={AIGenerationScreen} options={{ headerShown: false }} />
         <Stack.Screen name="SnapPage" component={SnapPageScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ThemePicker" component={ThemePickerScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ReviewQueue" component={ReviewQueueScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="ReviewSession" component={ReviewSessionScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Insights" component={InsightsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ModerationReports" component={ModerationReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>

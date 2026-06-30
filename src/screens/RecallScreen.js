@@ -13,9 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Speech from 'expo-speech';
-import { StudyDeckService } from '../services/StudyDeckService';
+import { QueueService } from '../services/QueueService';
 import { RecallService } from '../services/RecallService';
 import { SameBoatService } from '../services/SameBoatService';
+import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
 
 // Default: show definition, user types the term. Future: user-selectable direction.
@@ -83,7 +84,7 @@ function DiffDisplay({ diff }) {
 
 export default function RecallScreen({ route, navigation }) {
   const { theme } = useTheme();
-  const { deckId, deckTitle, studyScope } = route.params;
+  const { deckId, deckTitle, studyScope, startCardId, categoryId } = route.params;
 
   const [cards, setCards] = useState([]);
   const [index, setIndex] = useState(0);
@@ -99,12 +100,15 @@ export default function RecallScreen({ route, navigation }) {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    StudyDeckService.loadStudyCards(deckId, studyScope).then((c) => {
-      const shuffled = [...c].sort(() => Math.random() - 0.5);
-      setCards(shuffled);
+    QueueService.buildCardsForLearnMode(deckId, studyScope, {
+      mode: 'recall',
+      startCardId: startCardId || null,
+      categoryId: categoryId || null,
+    }).then((c) => {
+      setCards(c);
       setLoading(false);
     });
-  }, [deckId, studyScope]);
+  }, [deckId, studyScope, startCardId, categoryId]);
 
   const currentCard = cards[index];
 
@@ -153,6 +157,12 @@ export default function RecallScreen({ route, navigation }) {
 
     // Record attempt
     await SameBoatService.recordAttempt(currentCard.id, result.isCorrect, 'recall');
+    await CardLearningService.recordReview(currentCard.id, {
+      wasCorrect: result.isCorrect,
+      mode: 'recall',
+      confidence: result.isCorrect ? 3 : 1,
+      categoryId: categoryId || null,
+    });
 
     // Fetch Same-Boat stat
     const stat = await SameBoatService.getCardStat(currentCard.id);
@@ -206,6 +216,12 @@ export default function RecallScreen({ route, navigation }) {
 
     // Re-record the attempt with corrected value (replaces the original in aggregate stats)
     await SameBoatService.recordAttempt(currentCard.id, flippedCorrect, 'recall_override');
+    await CardLearningService.recordReview(currentCard.id, {
+      wasCorrect: flippedCorrect,
+      mode: 'recall_override',
+      confidence: flippedCorrect ? 3 : 1,
+      categoryId: categoryId || null,
+    });
 
     // Hide Same-Boat stat — don't show it after an override
     setSameBoatStat(null);

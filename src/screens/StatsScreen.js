@@ -5,12 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from '../services/AuthService';
-import PremiumGate from '../components/PremiumGate';
 import { useTheme } from '../context/ThemeContext';
 
 function pct(n, total) {
@@ -72,7 +72,7 @@ function MasteryBar({ label, value, total, color, styles }) {
   );
 }
 
-function AnalyticsContent() {
+function AnalyticsContent({ navigation }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -263,6 +263,16 @@ function AnalyticsContent() {
           </StatCard>
         )}
 
+        <TouchableOpacity
+          style={styles.insightsCta}
+          onPress={() => navigation.navigate('Insights')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.insightsCtaTitle}>Study Insights</Text>
+          <Text style={styles.insightsCtaSub}>Exam readiness & weak spots — Premium</Text>
+          <Text style={styles.insightsCtaArrow}>›</Text>
+        </TouchableOpacity>
+
         <StatCard title="🤖 AI Generations" styles={styles}>
           <Text style={styles.aiUsageText}>
             {s.aiGenerations} deck{s.aiGenerations !== 1 ? 's' : ''} generated with AI (all time)
@@ -274,11 +284,7 @@ function AnalyticsContent() {
 }
 
 export default function StatsScreen({ navigation }) {
-  return (
-    <PremiumGate navigation={navigation} feature="Analytics">
-      <AnalyticsContent />
-    </PremiumGate>
-  );
+  return <AnalyticsContent navigation={navigation} />;
 }
 
 const makeStyles = (theme) => StyleSheet.create({
@@ -351,4 +357,16 @@ const makeStyles = (theme) => StyleSheet.create({
   emptyNote: { fontSize: 13, color: theme.textSecondary, fontStyle: 'italic', textAlign: 'center' },
   aiUsageText: { fontSize: 15, color: theme.text, fontWeight: '500' },
   barLabel: { fontSize: 10, color: theme.textSecondary, marginTop: 4, textAlign: 'center' },
+  insightsCta: {
+    backgroundColor: theme.primary,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  insightsCtaTitle: { fontSize: 16, fontWeight: '800', color: '#fff', width: '100%' },
+  insightsCtaSub: { fontSize: 13, color: '#c7d2fe', flex: 1, marginTop: 4 },
+  insightsCtaArrow: { fontSize: 24, color: '#c7d2fe', fontWeight: '700' },
 });

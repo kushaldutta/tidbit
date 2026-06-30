@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeckService } from '../services/DeckService';
 import { SameBoatService } from '../services/SameBoatService';
+import { CardLearningService } from '../services/CardLearningService';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -107,6 +108,11 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
 
     // Record the attempt
     await SameBoatService.recordAttempt(currentCard.id, knew, 'group_study');
+    await CardLearningService.recordReview(currentCard.id, {
+      wasCorrect: knew,
+      mode: 'group_study',
+      action: knew ? 'knew' : 'didnt_know',
+    });
     setResults((prev) => [...prev, { cardId: currentCard.id, knew }]);
 
     const next = index + 1;

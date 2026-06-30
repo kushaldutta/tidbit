@@ -28,14 +28,16 @@ function shuffle(arr) {
 
 class QuizService {
   /**
-   * Build a shuffled array of quiz questions from a card list.
-   * `cards` should be the full list from DeckService.listCards(deckId).
-   * Returns an empty array if there are fewer than 2 cards.
+   * Build quiz questions from a card list.
+   * @param {object[]} cards
+   * @param {{ preserveOrder?: boolean }} options — set preserveOrder when session order matters (e.g. Review Queue)
    */
-  static buildQuestions(cards) {
-    if (!cards || cards.length < 2) return [];
+  static buildQuestions(cards, { preserveOrder = false } = {}) {
+    if (!cards?.length) return [];
 
-    return shuffle(cards).map((card) => {
+    const orderedCards = preserveOrder ? cards : shuffle(cards);
+
+    return orderedCards.map((card) => {
       // All other cards are distractor candidates
       const pool = cards
         .filter((c) => c.id !== card.id && c.back?.trim())

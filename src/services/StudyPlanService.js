@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SpacedRepetitionService } from './SpacedRepetitionService';
+import { CardLearningService } from './CardLearningService';
 import { ContentService } from './ContentService';
 import { StorageService } from './StorageService';
 import { ClassService } from './ClassService';
+import { QueueService } from './QueueService';
 
 const STORAGE_KEY = 'daily_study_plan';
 const PLAN_CONFIG = {
@@ -93,51 +94,25 @@ class StudyPlanService {
         return null;
       }
 
-      // 1. Get due tidbits (from spaced repetition)
-      const dueTidbitIds = await SpacedRepetitionService.getDueTidbits();
-      const dueTidbits = [];
-      
-      // Filter due tidbits by selected categories
-      for (const tidbitId of dueTidbitIds) {
-        const tidbit = await ContentService.getTidbitById(tidbitId, false);
-        if (tidbit && selectedCategories.includes(tidbit.category)) {
-          dueTidbits.push(tidbit);
-        }
-      }
-      
-      console.log(`[STUDY_PLAN] Found ${dueTidbits.length} due tidbits in selected categories`);
+      const queue = await QueueService.buildQueue({
+        categoryIds: selectedCategories,
+        limit: PLAN_CONFIG.DEFAULT_TOTAL,
+        includeNew: true,
+        newRatio: 1 - PLAN_CONFIG.DUE_RATIO,
+      });
 
-      // 2. Get new tidbits (not seen before)
-      const newTidbits = await this.getNewTidbits(selectedCategories);
-      console.log(`[STUDY_PLAN] Found ${newTidbits.length} new tidbits available`);
+      const selectedDue = queue.due;
+      const selectedNew = queue.fresh;
+      const planTidbits = queue.combined;
+      const actualTotal = planTidbits.length;
 
-      // 3. Calculate mix (60% due, 40% new)
-      const totalCount = PLAN_CONFIG.DEFAULT_TOTAL;
-      const dueCount = Math.min(
-        dueTidbits.length,
-        Math.ceil(totalCount * PLAN_CONFIG.DUE_RATIO)
-      );
-      const newCount = Math.min(
-        newTidbits.length,
-        totalCount - dueCount
-      );
-      
-      // If we don't have enough due tidbits, fill with new ones
-      const actualNewCount = Math.min(newCount, totalCount - dueCount);
-      const actualTotal = dueCount + actualNewCount;
-
-      // 4. Select random subset
-      const selectedDue = shuffleArray(dueTidbits).slice(0, dueCount);
-      const selectedNew = shuffleArray(newTidbits).slice(0, actualNewCount);
-
-      // 5. Mix them together (shuffle order)
-      const planTidbits = shuffleArray([...selectedDue, ...selectedNew]);
+      console.log(`[STUDY_PLAN] Queue: ${selectedDue.length} due + ${selectedNew.length} new`);
 
       // 6. Estimate time (assume ~1 min per tidbit)
       const estimatedMinutes = actualTotal * PLAN_CONFIG.MINUTES_PER_TIDBIT;
 
       const plan = {
-        tidbits: planTidbits,
+        tidbits: planTidbits.map((t) => ContentService.ensureTidbitHasId(t)),
         dueCount: selectedDue.length,
         newCount: selectedNew.length,
         totalCount: planTidbits.length,
@@ -182,8 +157,8 @@ class StudyPlanService {
       const newTidbits = [];
       for (const tidbit of allTidbits) {
         if (tidbit.id) {
-          const state = await SpacedRepetitionService.getTidbitState(tidbit.id);
-          if (!state) {
+          const hasState = await CardLearningService.hasState(tidbit.id);
+          if (!hasState) {
             // No state = never seen before = new tidbit
             newTidbits.push(tidbit);
           }
@@ -214,37 +189,17 @@ class StudyPlanService {
         return [];
       }
 
-      // 1. Get due tidbits
-      const dueTidbitIds = await SpacedRepetitionService.getDueTidbits();
-      const dueTidbits = [];
-
-      for (const tidbitId of dueTidbitIds) {
-        const tidbit = await ContentService.getTidbitById(tidbitId, false);
-        if (tidbit && selectedCategories.includes(tidbit.category)) {
-          dueTidbits.push(tidbit);
-        }
-      }
-
-      // 2. Get new tidbits (filtered to selected categories)
-      const newTidbits = await this.getNewTidbits(selectedCategories);
-
-      // 3. Calculate mix
       const targetTotal = totalCount || PLAN_CONFIG.DEFAULT_TOTAL;
-      const dueCount = Math.min(
-        dueTidbits.length,
-        Math.ceil(targetTotal * PLAN_CONFIG.DUE_RATIO)
-      );
-      const newCount = Math.min(
-        newTidbits.length,
-        targetTotal - dueCount
-      );
+      const queue = await QueueService.buildQueue({
+        categoryIds: selectedCategories,
+        limit: targetTotal,
+        includeNew: true,
+        newRatio: 1 - PLAN_CONFIG.DUE_RATIO,
+      });
 
-      const actualNewCount = Math.min(newCount, targetTotal - dueCount);
-
-      const selectedDue = shuffleArray(dueTidbits).slice(0, dueCount);
-      const selectedNew = shuffleArray(newTidbits).slice(0, actualNewCount);
-
-      const sessionTidbits = shuffleArray([...selectedDue, ...selectedNew]);
+      const sessionTidbits = queue.combined.map((t) => ContentService.ensureTidbitHasId(t));
+      const selectedDue = queue.due;
+      const selectedNew = queue.fresh;
 
       console.log(`[STUDY_PLAN] Generated session tidbits: ${selectedDue.length} due + ${selectedNew.length} new (total ${sessionTidbits.length})`);
       return sessionTidbits;

@@ -10,9 +10,10 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StudyDeckService } from '../services/StudyDeckService';
+import { QueueService } from '../services/QueueService';
 import { QuizService } from '../services/QuizService';
 import { SameBoatService } from '../services/SameBoatService';
+import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -85,7 +86,7 @@ function ConfidenceSlider({ value, onChange }) {
 
 export default function QuizScreen({ route, navigation }) {
   const { theme } = useTheme();
-  const { deckId, deckTitle, studyScope } = route.params;
+  const { deckId, deckTitle, studyScope, startCardId, categoryId } = route.params;
 
   const [questions, setQuestions] = useState([]);
   const [index, setIndex] = useState(0);
@@ -99,11 +100,15 @@ export default function QuizScreen({ route, navigation }) {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    StudyDeckService.loadStudyCards(deckId, studyScope).then((cards) => {
-      setQuestions(QuizService.buildQuestions(cards));
+    QueueService.buildCardsForLearnMode(deckId, studyScope, {
+      mode: 'quiz',
+      startCardId: startCardId || null,
+      categoryId: categoryId || null,
+    }).then((cards) => {
+      setQuestions(QuizService.buildQuestions(cards, { preserveOrder: !!startCardId }));
       setLoading(false);
     });
-  }, [deckId, studyScope]);
+  }, [deckId, studyScope, startCardId, categoryId]);
 
   const currentQ = questions[index];
 
@@ -123,6 +128,12 @@ export default function QuizScreen({ route, navigation }) {
 
     // Record attempt with confidence
     await SameBoatService.recordAttempt(currentQ.cardId, wasCorrect, 'quiz');
+    await CardLearningService.recordReview(currentQ.cardId, {
+      wasCorrect,
+      mode: 'quiz',
+      confidence,
+      categoryId: categoryId || null,
+    });
     // Also write confidence to card_attempts via a direct update isn't possible
     // after insert — the confidence is passed as part of the insert in a future
     // SameBoatService upgrade; for now it's stored in the local result only.
@@ -165,7 +176,7 @@ export default function QuizScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.center}>
         <Text style={styles.emptyEmoji}>📭</Text>
-        <Text style={styles.emptyText}>Need at least 2 cards to quiz.</Text>
+        <Text style={styles.emptyText}>No cards available for this review session.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
         </TouchableOpacity>

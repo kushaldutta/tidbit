@@ -772,6 +772,41 @@ function notificationPayloadFromPoolItem(item) {
   };
 }
 
+/** Prefer due cards from user_card_state; fall back to random pool item. */
+async function pickNotificationPoolItem(availableTidbits, userId) {
+  if (!availableTidbits?.length) return null;
+  if (!supabase || !userId) {
+    return availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+  }
+
+  try {
+    const cardIds = availableTidbits.map((t) => t.id).filter(Boolean);
+    if (!cardIds.length) {
+      return availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+    }
+
+    const nowIso = new Date().toISOString();
+    const { data: dueRows } = await supabase
+      .from('user_card_state')
+      .select('card_id, due_at')
+      .eq('user_id', userId)
+      .in('card_id', cardIds)
+      .lte('due_at', nowIso)
+      .order('due_at', { ascending: true })
+      .limit(20);
+
+    if (dueRows?.length) {
+      const pick = dueRows[Math.floor(Math.random() * dueRows.length)];
+      const match = availableTidbits.find((t) => t.id === pick.card_id);
+      if (match) return match;
+    }
+  } catch (err) {
+    console.warn('[SCHEDULER] due-first pick failed:', err.message);
+  }
+
+  return availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+}
+
 async function getMonthlyUsage(userId) {
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
@@ -1227,7 +1262,7 @@ async function sendScheduledNotifications() {
         continue;
       }
       
-      const randomItem = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+      const randomItem = await pickNotificationPoolItem(availableTidbits, device.user_id);
       const randomTidbit = notificationPayloadFromPoolItem(randomItem);
       console.log(`[SCHEDULER]   - Selected tidbit from: ${randomTidbit.category}`);
       
@@ -1406,7 +1441,7 @@ async function sendBedtimeBriefs() {
       const availableTidbits = buildNotificationPool(tidbitsData, selectedCategories, deckCards);
       if (availableTidbits.length === 0) continue;
 
-      const randomItem = availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+      const randomItem = await pickNotificationPoolItem(availableTidbits, device.user_id);
       const tidbit = notificationPayloadFromPoolItem(randomItem);
 
       messages.push({

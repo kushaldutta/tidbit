@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StudyPlanService } from '../services/StudyPlanService';
+import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
 
 export default function StudyModeScreen({ navigation }) {
@@ -10,6 +11,11 @@ export default function StudyModeScreen({ navigation }) {
   const styles = makeStyles(theme);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const [dueCount, setDueCount] = useState(0);
+
+  useEffect(() => {
+    CardLearningService.getTotalDueCount().then(setDueCount);
+  }, []);
 
   const startSession = async (durationMinutes) => {
     try {
@@ -61,6 +67,21 @@ export default function StudyModeScreen({ navigation }) {
           <Text style={styles.learnBtnArrow}>›</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.reviewBtn}
+        onPress={() => navigation.navigate('ReviewQueue')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.reviewBtnEmoji}>📋</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.reviewBtnLabel}>Review Queue</Text>
+          <Text style={styles.reviewBtnSub}>
+            {dueCount > 0 ? `${dueCount} due now` : 'Nothing due — nice work'}
+          </Text>
+        </View>
+        <Text style={styles.learnBtnArrow}>›</Text>
+      </TouchableOpacity>
 
       <Text style={styles.focusedHeader}>Focused Sessions</Text>
       <Text style={styles.focusedSub}>
@@ -244,4 +265,17 @@ const makeStyles = (theme) => StyleSheet.create({
   myDecksLabel: { fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 2 },
   myDecksSub: { fontSize: 13, color: theme.textSecondary },
   myDecksArrow: { fontSize: 24, color: theme.textSecondary, fontWeight: '700' },
+  reviewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1.5,
+    borderColor: theme.primaryLight || '#e5e7eb',
+  },
+  reviewBtnEmoji: { fontSize: 26, marginRight: 12 },
+  reviewBtnLabel: { fontSize: 16, fontWeight: '800', color: theme.text },
+  reviewBtnSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
 });

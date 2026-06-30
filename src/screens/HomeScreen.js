@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
-import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
+import { CardLearningService } from '../services/CardLearningService';
 import { StudyPlanService } from '../services/StudyPlanService';
 import StudyPlanCard from '../components/StudyPlanCard';
 import CategoryProgressPreview from '../components/CategoryProgressPreview';
@@ -37,6 +37,7 @@ export default function HomeScreen({ navigation }) {
   const [studyPlan, setStudyPlan] = useState(null);
   const [studyPlanLoading, setStudyPlanLoading] = useState(true);
   const [categoryProgress, setCategoryProgress] = useState([]);
+  const [dueCount, setDueCount] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -205,15 +206,17 @@ export default function HomeScreen({ navigation }) {
 
     setStats({ tidbitsSeen, dailyTidbits, learningStreak, todayAccuracy });
     setSelectedCategories(validCategories);
+    const due = await CardLearningService.getTotalDueCount();
+    setDueCount(due);
   };
 
   const handleGetTidbitNow = async () => {
     try {
-      const tidbit = await ContentService.getSmartTidbit();
+      const tidbit = await ContentService.getDiscoveryTidbit();
       if (tidbit) {
         const tidbitWithId = ContentService.ensureTidbitHasId({ ...tidbit });
         if (tidbitWithId.id) {
-          await SpacedRepetitionService.markTidbitAsShown(tidbitWithId.id);
+          await CardLearningService.markTidbitAsShown(tidbitWithId.id);
         }
         DeviceEventEmitter.emit('showTidbitNow', tidbitWithId);
       } else {
@@ -263,6 +266,23 @@ export default function HomeScreen({ navigation }) {
         onPress={handleStartStudySession}
         isLoading={studyPlanLoading}
       />
+
+      <TouchableOpacity
+        style={styles.reviewQueueCard}
+        onPress={() => navigation.navigate('ReviewQueue')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.reviewQueueEmoji}>📋</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.reviewQueueTitle}>Review Queue</Text>
+          <Text style={styles.reviewQueueSub}>
+            {dueCount > 0
+              ? `${dueCount} card${dueCount !== 1 ? 's' : ''} due for review`
+              : 'All caught up — no reviews due'}
+          </Text>
+        </View>
+        <Text style={styles.reviewQueueChevron}>›</Text>
+      </TouchableOpacity>
 
       <CategoryProgressPreview
         items={categoryProgress}
@@ -542,5 +562,22 @@ const makeStyles = (theme) => StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
   },
+  reviewQueueCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  reviewQueueEmoji: { fontSize: 28, marginRight: 12 },
+  reviewQueueTitle: { fontSize: 16, fontWeight: '800', color: theme.text },
+  reviewQueueSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+  reviewQueueChevron: { fontSize: 24, color: theme.textSecondary, fontWeight: '700' },
 });
 
