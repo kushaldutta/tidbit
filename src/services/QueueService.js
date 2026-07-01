@@ -363,6 +363,34 @@ class QueueService {
     return 'recall';
   }
 
+  static _sessionItemForCard(card, stage, categoryId, distractorPool) {
+    const itemMode = this.modeForStage(stage);
+    if (itemMode === 'quiz') {
+      const pool = [card, ...distractorPool.filter((c) => c.id !== card.id)];
+      const questions = QuizService.buildQuestions(pool, { preserveOrder: true });
+      if (!questions[0]) return null;
+      return { card, mode: 'quiz', stage, question: questions[0], categoryId };
+    }
+    return { card, mode: 'recall', stage, categoryId };
+  }
+
+  /** Interleave due items across classes so one deck does not dominate. */
+  static _roundRobinPickDueItems(groups, limit) {
+    const buckets = groups.map((g) => ({
+      categoryId: g.categoryId,
+      items: [...g.items],
+    }));
+    const selected = [];
+    while (selected.length < limit && buckets.some((b) => b.items.length > 0)) {
+      for (const bucket of buckets) {
+        if (selected.length >= limit) break;
+        const item = bucket.items.shift();
+        if (item) selected.push({ ...item, categoryId: bucket.categoryId });
+      }
+    }
+    return selected;
+  }
+
   static async buildReviewSessionItems(
     deckId,
     studyScope,
@@ -382,16 +410,49 @@ class QueueService {
     for (const card of cards) {
       const state = CardLearningService.getEffectiveStateFromMap(card, resolvedCategoryId, stateMap);
       const stage = effectiveStage(state);
-      const itemMode = this.modeForStage(stage);
+      const item = this._sessionItemForCard(card, stage, resolvedCategoryId, distractorPool);
+      if (item) items.push(item);
+    }
 
-      if (itemMode === 'quiz') {
-        const pool = [card, ...distractorPool.filter((c) => c.id !== card.id)];
-        const questions = QuizService.buildQuestions(pool, { preserveOrder: true });
-        if (!questions[0]) continue;
-        items.push({ card, mode: 'quiz', stage, question: questions[0] });
-      } else {
-        items.push({ card, mode: 'recall', stage });
+    return items;
+  }
+
+  /** Up to `limit` due cards mixed across enrolled classes (round-robin by class). */
+  static async buildMixedReviewSessionItems(
+    categoryIds = null,
+    { limit = LEARN_SESSION_CARD_LIMIT } = {},
+  ) {
+    const groups = await this.getReviewQueueGrouped(categoryIds);
+    if (!groups.length) return [];
+
+    const picked = this._roundRobinPickDueItems(groups, limit);
+    const categoriesNeeded = [...new Set(picked.map((e) => e.categoryId))];
+    const poolByCategory = new Map();
+
+    await Promise.all(
+      categoriesNeeded.map(async (cat) => {
+        const deckId = await ContentService.getPresetDeckIdForSlug(cat);
+        if (!deckId) return;
+        const studyScope = await StudyDeckService.resolveStudyScope(deckId);
+        const cards = await StudyDeckService.loadStudyCards(deckId, studyScope);
+        poolByCategory.set(cat, cards);
+      }),
+    );
+
+    const items = [];
+    for (const entry of picked) {
+      const pool = poolByCategory.get(entry.categoryId);
+      if (!pool?.length) continue;
+      let card = pool.find((c) => c.id === entry.tidbit.id);
+      if (!card) {
+        card = pool.find((c) => {
+          const hash = CardLearningService.legacyHashForCard(c, entry.categoryId);
+          return hash === entry.tidbit.id;
+        });
       }
+      if (!card) continue;
+      const item = this._sessionItemForCard(card, entry.stage, entry.categoryId, pool);
+      if (item) items.push(item);
     }
 
     return items;

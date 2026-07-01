@@ -31,7 +31,14 @@ function getRecallAnswer(card) {
 export default function ReviewSessionScreen({ route, navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const { deckId, deckTitle, studyScope, startCardId, categoryId } = route.params;
+  const {
+    deckId,
+    deckTitle,
+    studyScope,
+    startCardId,
+    categoryId,
+    mixedReview = false,
+  } = route.params || {};
 
   const [items, setItems] = useState([]);
   const [index, setIndex] = useState(0);
@@ -48,14 +55,17 @@ export default function ReviewSessionScreen({ route, navigation }) {
   const [recallResult, setRecallResult] = useState(null);
 
   useEffect(() => {
-    QueueService.buildReviewSessionItems(deckId, studyScope, {
-      startCardId: startCardId || null,
-      categoryId: categoryId || null,
-    }).then((sessionItems) => {
+    const loader = mixedReview
+      ? QueueService.buildMixedReviewSessionItems()
+      : QueueService.buildReviewSessionItems(deckId, studyScope, {
+          startCardId: startCardId || null,
+          categoryId: categoryId || null,
+        });
+    loader.then((sessionItems) => {
       setItems(sessionItems);
       setLoading(false);
     });
-  }, [deckId, studyScope, startCardId, categoryId]);
+  }, [deckId, studyScope, startCardId, categoryId, mixedReview]);
 
   const current = items[index];
   const answered = current?.mode === 'quiz' ? quizResult !== null : recallResult !== null;
@@ -98,7 +108,7 @@ export default function ReviewSessionScreen({ route, navigation }) {
       wasCorrect,
       mode: 'quiz',
       confidence,
-      categoryId: categoryId || null,
+      categoryId: current.categoryId || categoryId || null,
     });
   };
 
@@ -120,7 +130,7 @@ export default function ReviewSessionScreen({ route, navigation }) {
       wasCorrect: result.isCorrect,
       mode: 'recall',
       confidence: result.isCorrect ? 3 : 1,
-      categoryId: categoryId || null,
+      categoryId: current.categoryId || categoryId || null,
     });
   };
 
