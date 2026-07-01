@@ -772,39 +772,145 @@ function notificationPayloadFromPoolItem(item) {
   };
 }
 
-/** Prefer due cards from user_card_state; fall back to random pool item. */
-async function pickNotificationPoolItem(availableTidbits, userId) {
-  if (!availableTidbits?.length) return null;
-  if (!supabase || !userId) {
-    return availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
-  }
+function poolItemKey(item) {
+  return item.id || generateTidbitId(item.text, item.category);
+}
+
+/** Passive exposure: don't resend the same tidbit within this window. */
+const NOTIFICATION_RECENT_COOLDOWN_MS = 48 * 60 * 60 * 1000;
+const NOTIFICATION_RECENT_MAX_ENTRIES = 40;
+/** After post–"I knew it" delay before verification quiz (matches app). */
+const INTRODUCED_QUIZ_DELAY_MS = 60 * 60 * 1000;
+
+function pruneRecentSends(recentSends, cooldownMs = NOTIFICATION_RECENT_COOLDOWN_MS) {
+  const cutoff = Date.now() - cooldownMs;
+  return (recentSends || []).filter((e) => e?.id && new Date(e.sentAt).getTime() > cutoff);
+}
+
+function isRecentlySent(item, recentSends) {
+  const key = poolItemKey(item);
+  return recentSends.some((e) => e.id === key);
+}
+
+function appendRecentSend(recentSends, tidbitId) {
+  const pruned = pruneRecentSends(recentSends);
+  const next = [
+    { id: tidbitId, sentAt: new Date().toISOString() },
+    ...pruned.filter((e) => e.id !== tidbitId),
+  ];
+  return next.slice(0, NOTIFICATION_RECENT_MAX_ENTRIES);
+}
+
+function recordNotificationSend(device, tidbitId) {
+  if (!supabase || !device?.id || !tidbitId) return;
+  const recent = appendRecentSend(device.recent_notification_sends || [], tidbitId);
+  device.recent_notification_sends = recent;
+  supabase
+    .from('device_tokens')
+    .update({ recent_notification_sends: recent })
+    .eq('id', device.id)
+    .then(() => {})
+    .catch((err) => console.warn('[SCHEDULER] failed to record recent send:', err.message));
+}
+
+function isCardDue(state, now = new Date()) {
+  if (!state?.due_at) return false;
+  return new Date(state.due_at) <= now;
+}
+
+function isIntroducedQuizReady(state, now = new Date()) {
+  if (state?.stage !== 'introduced') return false;
+  if (!state.last_review_at) return true;
+  const eligibleAt = new Date(state.last_review_at).getTime() + INTRODUCED_QUIZ_DELAY_MS;
+  return now.getTime() >= eligibleAt;
+}
+
+/** Cards that belong in Review Queue — excluded from passive notifications. */
+function isReviewQueueEligibleState(state, now = new Date()) {
+  if (!state) return false;
+  if (state.stage === 'introduced') return isIntroducedQuizReady(state, now);
+  return isCardDue(state, now);
+}
+
+function isDiscoveryEligibleItem(item, stateByCardId, now = new Date()) {
+  if (!item.id) return true;
+  const state = stateByCardId.get(item.id);
+  if (!state || state.stage === 'new') return true;
+  if (state.stage === 'introduced') return false;
+  if (isReviewQueueEligibleState(state, now)) return false;
+  return true;
+}
+
+async function fetchUserCardStatesForPool(userId, availableTidbits) {
+  const stateByCardId = new Map();
+  if (!supabase || !userId) return stateByCardId;
+
+  const cardIds = availableTidbits.map((t) => t.id).filter(Boolean);
+  if (!cardIds.length) return stateByCardId;
 
   try {
-    const cardIds = availableTidbits.map((t) => t.id).filter(Boolean);
-    if (!cardIds.length) {
-      return availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
-    }
-
-    const nowIso = new Date().toISOString();
-    const { data: dueRows } = await supabase
-      .from('user_card_state')
-      .select('card_id, due_at')
-      .eq('user_id', userId)
-      .in('card_id', cardIds)
-      .lte('due_at', nowIso)
-      .order('due_at', { ascending: true })
-      .limit(20);
-
-    if (dueRows?.length) {
-      const pick = dueRows[Math.floor(Math.random() * dueRows.length)];
-      const match = availableTidbits.find((t) => t.id === pick.card_id);
-      if (match) return match;
+    for (let i = 0; i < cardIds.length; i += 100) {
+      const chunk = cardIds.slice(i, i + 100);
+      const { data } = await supabase
+        .from('user_card_state')
+        .select('card_id, stage, due_at, last_review_at')
+        .eq('user_id', userId)
+        .in('card_id', chunk);
+      for (const row of data || []) {
+        stateByCardId.set(row.card_id, row);
+      }
     }
   } catch (err) {
-    console.warn('[SCHEDULER] due-first pick failed:', err.message);
+    console.warn('[SCHEDULER] card state fetch failed:', err.message);
   }
 
-  return availableTidbits[Math.floor(Math.random() * availableTidbits.length)];
+  return stateByCardId;
+}
+
+function pickRandomFromPool(pool) {
+  if (!pool?.length) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/**
+ * Discovery-style notification pick — prefers unseen cards, excludes review-queue
+ * items, and avoids repeating the same tidbit within 48h.
+ */
+async function pickDiscoveryNotificationItem(availableTidbits, userId, recentSends = []) {
+  if (!availableTidbits?.length) return null;
+
+  const prunedRecent = pruneRecentSends(recentSends);
+  const now = new Date();
+  const stateByCardId = await fetchUserCardStatesForPool(userId, availableTidbits);
+
+  const unseen = [];
+  const seenNotDue = [];
+
+  for (const item of availableTidbits) {
+    if (isRecentlySent(item, prunedRecent)) continue;
+    if (!isDiscoveryEligibleItem(item, stateByCardId, now)) continue;
+
+    const state = item.id ? stateByCardId.get(item.id) : null;
+    if (!state || state.stage === 'new') unseen.push(item);
+    else seenNotDue.push(item);
+  }
+
+  let pick = pickRandomFromPool(unseen) || pickRandomFromPool(seenNotDue);
+
+  if (!pick) {
+    const discoveryEligible = availableTidbits.filter((item) =>
+      isDiscoveryEligibleItem(item, stateByCardId, now),
+    );
+    pick = pickRandomFromPool(discoveryEligible);
+  }
+
+  if (!pick) {
+    const shortRecent = pruneRecentSends(recentSends, 6 * 60 * 60 * 1000);
+    const notVeryRecent = availableTidbits.filter((item) => !isRecentlySent(item, shortRecent));
+    pick = pickRandomFromPool(notVeryRecent) || pickRandomFromPool(availableTidbits);
+  }
+
+  return pick;
 }
 
 async function getMonthlyUsage(userId) {
@@ -1262,11 +1368,21 @@ async function sendScheduledNotifications() {
         continue;
       }
       
-      const randomItem = await pickNotificationPoolItem(availableTidbits, device.user_id);
+      const recentSends = device.recent_notification_sends || [];
+      const randomItem = await pickDiscoveryNotificationItem(
+        availableTidbits,
+        device.user_id,
+        recentSends,
+      );
+      if (!randomItem) {
+        console.log('[SCHEDULER]   - SKIPPING: No discovery-eligible tidbit available');
+        continue;
+      }
       const randomTidbit = notificationPayloadFromPoolItem(randomItem);
-      console.log(`[SCHEDULER]   - Selected tidbit from: ${randomTidbit.category}`);
+      console.log(`[SCHEDULER]   - Selected discovery tidbit from: ${randomTidbit.category}`);
       
       const tidbitId = randomTidbit.id;
+      recordNotificationSend(device, tidbitId);
       
       // Create notification message
       const message = {
@@ -1441,8 +1557,15 @@ async function sendBedtimeBriefs() {
       const availableTidbits = buildNotificationPool(tidbitsData, selectedCategories, deckCards);
       if (availableTidbits.length === 0) continue;
 
-      const randomItem = await pickNotificationPoolItem(availableTidbits, device.user_id);
+      const recentSends = device.recent_notification_sends || [];
+      const randomItem = await pickDiscoveryNotificationItem(
+        availableTidbits,
+        device.user_id,
+        recentSends,
+      );
+      if (!randomItem) continue;
       const tidbit = notificationPayloadFromPoolItem(randomItem);
+      recordNotificationSend(device, tidbit.id);
 
       messages.push({
         to: device.token,
