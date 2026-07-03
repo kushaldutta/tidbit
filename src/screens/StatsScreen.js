@@ -268,9 +268,13 @@ function AnalyticsContent({ navigation }) {
           onPress={() => navigation.navigate('Insights')}
           activeOpacity={0.85}
         >
-          <Text style={styles.insightsCtaTitle}>Study Insights</Text>
-          <Text style={styles.insightsCtaSub}>Exam readiness & weak spots — Premium</Text>
-          <Text style={styles.insightsCtaArrow}>›</Text>
+          <View style={styles.insightsCtaBody}>
+            <View style={styles.insightsCtaTitleRow}>
+              <Text style={styles.insightsCtaTitle}>Study Insights</Text>
+              <Text style={styles.insightsCtaArrow}>›</Text>
+            </View>
+            <Text style={styles.insightsCtaSub}>Exam readiness & weak spots — Premium</Text>
+          </View>
         </TouchableOpacity>
 
         <StatCard title="🤖 AI Generations" styles={styles}>
@@ -362,11 +366,19 @@ const makeStyles = (theme) => StyleSheet.create({
     borderRadius: 16,
     padding: 18,
     marginBottom: 14,
+  },
+  insightsCtaBody: { flex: 1 },
+  insightsCtaTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
   },
-  insightsCtaTitle: { fontSize: 16, fontWeight: '800', color: '#fff', width: '100%' },
-  insightsCtaSub: { fontSize: 13, color: '#c7d2fe', flex: 1, marginTop: 4 },
-  insightsCtaArrow: { fontSize: 24, color: '#c7d2fe', fontWeight: '700' },
+  insightsCtaTitle: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  insightsCtaSub: { fontSize: 13, color: '#c7d2fe', marginTop: 4 },
+  insightsCtaArrow: {
+    fontSize: 20,
+    color: '#c7d2fe',
+    fontWeight: '700',
+    marginLeft: 6,
+    lineHeight: 20,
+  },
 });
