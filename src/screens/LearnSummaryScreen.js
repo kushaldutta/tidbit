@@ -56,7 +56,7 @@ export default function LearnSummaryScreen({ route, navigation }) {
 
         {/* Actions */}
         <View style={styles.actions}>
-          {deckId && (
+          {deckId && mode !== 'review' && (
             <>
               <TouchableOpacity
                 style={[styles.actionBtn, { borderColor: cfg.color }]}

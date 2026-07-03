@@ -187,20 +187,16 @@ class QueueService {
 
     dueCards.sort((a, b) => a.urgency - b.urgency);
 
-    // Review Queue tap: due cards only, tapped card first — never mix in new cards
-    if (startCardId) {
-      const pinned = resolvePinnedCard(cards, startCardId, resolvedCategoryId);
+    // Review mode: due cards only — never mix in new cards.
+    // startCardId pins a specific card first (legacy per-card tap path).
+    if (mode === 'review') {
       let ordered = dueCards.map((d) => d.card);
-
-      if (pinned) {
-        ordered = [pinned, ...ordered.filter((c) => c.id !== pinned.id)];
+      if (startCardId) {
+        const pinned = resolvePinnedCard(cards, startCardId, resolvedCategoryId);
+        if (pinned) ordered = [pinned, ...ordered.filter((c) => c.id !== pinned.id)];
+        if (ordered.length === 0 && pinned) return [pinned];
       }
-
-      if (ordered.length > 0) {
-        return ordered.slice(0, Math.min(limit, ordered.length));
-      }
-      if (pinned) return [pinned];
-      return [];
+      return ordered.slice(0, limit);
     }
 
     const dueLimit = Math.min(dueCards.length, Math.ceil(limit * 0.7));
@@ -391,26 +387,92 @@ class QueueService {
     return selected;
   }
 
+  /**
+   * Load all cards for a deck without any section-scope filter.
+   * Used as distractor pool — we want the full deck, not just the user's current scope.
+   */
+  static async _loadFullDeckCards(deckId, categoryId) {
+    // Category-based virtual deck (bundled JSON content)
+    if (categoryId && ContentService.parseCategoryDeckId(deckId)) {
+      return ContentService.getStudyCardsForCategory(categoryId);
+    }
+    if (deckId && ContentService.parseCategoryDeckId(deckId)) {
+      const catId = ContentService.parseCategoryDeckId(deckId);
+      return ContentService.getStudyCardsForCategory(catId);
+    }
+    // Preset / user deck — fetch all cards, no section filter
+    try {
+      const cards = await DeckService.listCards(deckId);
+      return cards.map((c) => ({
+        id: c.id,
+        front: (c.front || '').trim(),
+        back: (c.back || '').trim(),
+        deck_id: deckId,
+        section_id: c.section_id,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Synthesise a minimal card object from a tidbit when the card isn't in the pool. */
+  static _cardFromTidbit(tidbit, deckId) {
+    return {
+      id: tidbit.id,
+      front: (tidbit.term || tidbit.text || '').trim(),
+      back: (tidbit.text || '').trim(),
+      deck_id: deckId,
+    };
+  }
+
+  /** Find a card in pool by UUID or legacy hash. */
+  static _findCardInPool(pool, tidbitId, categoryId) {
+    const byId = pool.find((c) => c.id === tidbitId);
+    if (byId) return byId;
+    return pool.find((c) => {
+      const hash = CardLearningService.legacyHashForCard(c, categoryId);
+      return hash === tidbitId;
+    }) || null;
+  }
+
+  /**
+   * Build session items for a single-class review.
+   * Derives the due-card list directly from the queue groups (same source as the
+   * queue screen) so there is no double-lookup / scope-filter mismatch.
+   */
   static async buildReviewSessionItems(
     deckId,
     studyScope,
     { limit = LEARN_SESSION_CARD_LIMIT, startCardId = null, categoryId = null } = {},
   ) {
     const resolvedCategoryId = categoryId || await categoryIdForDeck(deckId);
-    const cards = await this.buildCardsForLearnMode(deckId, studyScope, {
-      mode: 'review',
-      limit,
-      startCardId,
-      categoryId: resolvedCategoryId,
-    });
-    const distractorPool = await StudyDeckService.loadStudyCards(deckId, studyScope);
-    const stateMap = await CardLearningService.getStateMap();
-    const items = [];
 
-    for (const card of cards) {
-      const state = CardLearningService.getEffectiveStateFromMap(card, resolvedCategoryId, stateMap);
-      const stage = effectiveStage(state);
-      const item = this._sessionItemForCard(card, stage, resolvedCategoryId, distractorPool);
+    // Pull due items from the queue — same set the queue screen shows.
+    const groups = await this.getReviewQueueGrouped(
+      resolvedCategoryId ? [resolvedCategoryId] : null,
+    );
+    const group = groups.find((g) => g.categoryId === resolvedCategoryId);
+    let queueItems = group ? [...group.items] : [];
+
+    if (startCardId) {
+      const pinnedIdx = queueItems.findIndex((item) => item.tidbit.id === startCardId);
+      if (pinnedIdx > 0) {
+        const [pinned] = queueItems.splice(pinnedIdx, 1);
+        queueItems = [pinned, ...queueItems];
+      }
+    }
+
+    queueItems = queueItems.slice(0, limit);
+    if (!queueItems.length) return [];
+
+    // Full deck cards (no scope filter) — needed for MC distractor pool.
+    const distractorPool = await this._loadFullDeckCards(deckId, resolvedCategoryId);
+
+    const items = [];
+    for (const qItem of queueItems) {
+      const card = this._findCardInPool(distractorPool, qItem.tidbit.id, resolvedCategoryId)
+        || this._cardFromTidbit(qItem.tidbit, deckId);
+      const item = this._sessionItemForCard(card, qItem.stage, resolvedCategoryId, distractorPool);
       if (item) items.push(item);
     }
 
@@ -427,30 +489,27 @@ class QueueService {
 
     const picked = this._roundRobinPickDueItems(groups, limit);
     const categoriesNeeded = [...new Set(picked.map((e) => e.categoryId))];
-    const poolByCategory = new Map();
 
+    // Load full deck cards per category (no scope filter) for distractor pools.
+    const poolByCategory = new Map();
     await Promise.all(
       categoriesNeeded.map(async (cat) => {
-        const deckId = await ContentService.getPresetDeckIdForSlug(cat);
-        if (!deckId) return;
-        const studyScope = await StudyDeckService.resolveStudyScope(deckId);
-        const cards = await StudyDeckService.loadStudyCards(deckId, studyScope);
-        poolByCategory.set(cat, cards);
+        const presetDeckId = await ContentService.getPresetDeckIdForSlug(cat);
+        const cards = await this._loadFullDeckCards(
+          presetDeckId || ContentService.categoryDeckId(cat),
+          cat,
+        );
+        poolByCategory.set(cat, { deckId: presetDeckId, cards });
       }),
     );
 
     const items = [];
     for (const entry of picked) {
-      const pool = poolByCategory.get(entry.categoryId);
-      if (!pool?.length) continue;
-      let card = pool.find((c) => c.id === entry.tidbit.id);
-      if (!card) {
-        card = pool.find((c) => {
-          const hash = CardLearningService.legacyHashForCard(c, entry.categoryId);
-          return hash === entry.tidbit.id;
-        });
-      }
-      if (!card) continue;
+      const poolEntry = poolByCategory.get(entry.categoryId);
+      if (!poolEntry) continue;
+      const { deckId: entryDeckId, cards: pool } = poolEntry;
+      const card = this._findCardInPool(pool, entry.tidbit.id, entry.categoryId)
+        || this._cardFromTidbit(entry.tidbit, entryDeckId || entry.categoryId);
       const item = this._sessionItemForCard(card, entry.stage, entry.categoryId, pool);
       if (item) items.push(item);
     }
