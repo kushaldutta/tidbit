@@ -62,6 +62,11 @@ class StudyPlanService {
         
         // If plan is from today and has content (or is completed), return it
         if (isToday(plan.date) && (plan.totalCount > 0 || plan.completed)) {
+          // Self-heal: ad-hoc sessions used to overwrite completedCount on finished plans
+          if (plan.completed && plan.completedCount < plan.totalCount) {
+            plan.completedCount = plan.totalCount;
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+          }
           console.log('[STUDY_PLAN] Returning existing plan for today');
           return plan;
         }
@@ -216,13 +221,12 @@ class StudyPlanService {
   static async markPlanCompleted(completedCount) {
     try {
       const plan = await this.getDailyPlan();
-      if (plan) {
-        plan.completed = true;
-        plan.completedCount = completedCount;
-        plan.completedAt = new Date().toISOString();
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
-        console.log(`[STUDY_PLAN] Marked plan as completed: ${completedCount}/${plan.totalCount} tidbits`);
-      }
+      if (!plan || plan.completed) return;
+      plan.completed = true;
+      plan.completedCount = completedCount;
+      plan.completedAt = new Date().toISOString();
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+      console.log(`[STUDY_PLAN] Marked plan as completed: ${completedCount}/${plan.totalCount} tidbits`);
     } catch (error) {
       console.error('[STUDY_PLAN] Error marking plan as completed:', error);
     }
@@ -235,15 +239,13 @@ class StudyPlanService {
   static async updatePlanProgress(completedCount) {
     try {
       const plan = await this.getDailyPlan();
-      if (plan) {
-        plan.completedCount = completedCount;
-        // Mark as completed if all tidbits are done
-        if (completedCount >= plan.totalCount) {
-          plan.completed = true;
-          plan.completedAt = new Date().toISOString();
-        }
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+      if (!plan || plan.completed) return;
+      plan.completedCount = completedCount;
+      if (completedCount >= plan.totalCount) {
+        plan.completed = true;
+        plan.completedAt = new Date().toISOString();
       }
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
     } catch (error) {
       console.error('[STUDY_PLAN] Error updating plan progress:', error);
     }

@@ -29,7 +29,7 @@ function formatCategoryName(category) {
 export default function StudySessionScreen({ route, navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const { tidbits: initialTidbits } = route.params || {};
+  const { tidbits: initialTidbits, fromDailyPlan = false } = route.params || {};
   const [currentTidbit, setCurrentTidbit] = useState(null);
   const [sessionStats, setSessionStats] = useState(null);
   const [isComplete, setIsComplete] = useState(false);
@@ -133,8 +133,10 @@ export default function StudySessionScreen({ route, navigation }) {
 
       if (updatedSession) {
         setSessionStats(updatedSession.stats);
-        
-        await StudyPlanService.updatePlanProgress(updatedSession.stats.completed);
+
+        if (fromDailyPlan) {
+          await StudyPlanService.updatePlanProgress(updatedSession.stats.completed);
+        }
       }
 
       if (action === 'knew' || action === 'didnt') {
@@ -161,8 +163,10 @@ export default function StudySessionScreen({ route, navigation }) {
     try {
       const finalSession = await StudySessionService.endSession();
       if (finalSession) {
-        await StudyPlanService.markPlanCompleted(finalSession.stats.completed);
-        
+        if (fromDailyPlan) {
+          await StudyPlanService.markPlanCompleted(finalSession.stats.completed);
+        }
+
         setIsComplete(true);
         setShowSummary(true);
         

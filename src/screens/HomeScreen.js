@@ -88,7 +88,7 @@ export default function HomeScreen({ navigation }) {
     }
 
     try {
-      navigation.navigate('StudySession', { tidbits: studyPlan.tidbits });
+      navigation.navigate('StudySession', { tidbits: studyPlan.tidbits, fromDailyPlan: true });
     } catch (error) {
       console.error('Error starting study session:', error);
     }
