@@ -235,13 +235,13 @@ class QueueService {
   static async _buildReviewQueueGrouped(categories) {
     if (!categories.length) return [];
 
-    const [stateMap, presetEntries] = await Promise.all([
+    // Batched lookup (1 query for all uncached slugs) instead of one Supabase
+    // round trip per enrolled class — also warms the cache that loadEligibleCards
+    // below relies on via ContentService.getPresetDeckIdForSlug.
+    const [stateMap, presetDeckByCategory] = await Promise.all([
       CardLearningService.getStateMap(),
-      Promise.all(
-        categories.map(async (cat) => [cat, await ContentService.getPresetDeckIdForSlug(cat)]),
-      ),
+      ContentService.getPresetDeckIdsForSlugs(categories),
     ]);
-    const presetDeckByCategory = Object.fromEntries(presetEntries);
 
     const queueStates = [...stateMap.values()].filter((s) =>
       CardLearningService.isReviewQueueEligible(s),

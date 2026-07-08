@@ -94,25 +94,29 @@ function AnalyticsContent({ navigation }) {
 
     try {
       setLoading(true);
-      const { data: userStats } = await supabase
-        .from('user_stats')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const { data: attempts } = await supabase
-        .from('card_attempts')
-        .select('was_correct, source, attempted_at')
-        .eq('user_id', userId)
-        .gte('attempted_at', thirtyDaysAgo.toISOString())
-        .order('attempted_at', { ascending: false });
 
-      const { count: aiCount } = await supabase
-        .from('ai_generation_log')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+      // Run all three independent queries concurrently instead of one after
+      // another — cuts load time roughly to the slowest single query instead
+      // of the sum of all three.
+      const [{ data: userStats }, { data: attempts }, { count: aiCount }] = await Promise.all([
+        supabase
+          .from('user_stats')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle(),
+        supabase
+          .from('card_attempts')
+          .select('was_correct, source, attempted_at')
+          .eq('user_id', userId)
+          .gte('attempted_at', thirtyDaysAgo.toISOString())
+          .order('attempted_at', { ascending: false }),
+        supabase
+          .from('ai_generation_log')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId),
+      ]);
 
       const allAttempts = attempts || [];
       const correct = allAttempts.filter(a => a.was_correct).length;

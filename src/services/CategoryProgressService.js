@@ -1,10 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { StorageService } from './StorageService';
 import { ContentService } from './ContentService';
 import { ClassService } from './ClassService';
-import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
-
-const STORAGE_PREFIX = 'spaced_repetition_';
+import { StorageService } from './StorageService';
 
 function safePercent(numerator, denominator) {
   if (!denominator || denominator <= 0) return 0;
@@ -14,29 +10,11 @@ function safePercent(numerator, denominator) {
 /**
  * CategoryProgressService
  * Computes per-category learning stats using:
- * - total tidbits per category (from ContentService)
- * - spaced repetition states stored in AsyncStorage
+ * - total cards per category (same source QueueService uses for the Review Queue —
+ *   preset deck cards within the user's study scope, or bundled tidbits as a fallback)
+ * - card learning states from CardLearningService (local AsyncStorage cache)
  */
 class CategoryProgressService {
-  /** Tidbit count from bundled/server cache, or preset deck cards when cache is stale. */
-  static async getCategoryContentCount(categoryId) {
-    const tidbitCount = ContentService.getTidbitsByCategory(categoryId).length;
-    if (tidbitCount > 0) return tidbitCount;
-
-    if (!SUPABASE_CONFIGURED) return 0;
-    try {
-      const { data } = await supabase
-        .from('decks')
-        .select('card_count')
-        .eq('slug', categoryId)
-        .is('owner_id', null)
-        .maybeSingle();
-      return data?.card_count || 0;
-    } catch {
-      return 0;
-    }
-  }
-
   /**
    * Progress for enrolled classes (source of truth for the Home progress UI).
    * Unlike selectedCategories, this is not affected by notification opt-outs.
@@ -65,73 +43,66 @@ class CategoryProgressService {
    */
   static async getCategoriesProgress(categories) {
     try {
-      const categoryIds = (categories || []).filter(Boolean);
+      const categoryIds = [...new Set((categories || []).filter(Boolean))];
       if (categoryIds.length === 0) return [];
 
-      // Initialize per-category buckets
+      const { QueueService } = require('./QueueService');
+      const { CardLearningService } = require('./CardLearningService');
+
+      // Same card source the Review Queue uses (preset deck cards within study
+      // scope, or bundled tidbits as a fallback) — keeps totals consistent
+      // with what the user actually sees to review.
+      const cardsByCategory = await Promise.all(
+        categoryIds.map(async (categoryId) => ({
+          categoryId,
+          cards: await QueueService.loadCardsForCategory(categoryId),
+        })),
+      );
+
       const statsByCategory = {};
-      for (const categoryId of categoryIds) {
-        const total = await this.getCategoryContentCount(categoryId);
+      const categoryByCardId = new Map();
+      for (const { categoryId, cards } of cardsByCategory) {
         statsByCategory[categoryId] = {
           categoryId,
           name: ContentService.formatCategoryName(categoryId),
-          total,
+          total: cards.length,
           seen: 0,
           learning: 0,
           mastered: 0,
           due: 0,
         };
-      }
-
-      // Pull all spaced repetition states
-      const allKeys = await AsyncStorage.getAllKeys();
-      const spacedRepKeys = allKeys.filter((k) => k.startsWith(STORAGE_PREFIX));
-
-      const now = new Date();
-
-      for (const key of spacedRepKeys) {
-        try {
-          const raw = await AsyncStorage.getItem(key);
-          if (!raw) continue;
-          const state = JSON.parse(raw);
-          const tidbitId = state?.tidbitId || key.replace(STORAGE_PREFIX, '');
-          if (!tidbitId) continue;
-
-          // Derive category from tidbitId by looking it up (costly) — avoid doing that here.
-          // Instead, infer category by regenerating id? Not possible without text/category.
-          // So we only count states when we can map to a category via ContentService.getTidbitById.
-          const tidbit = await ContentService.getTidbitById(tidbitId, false);
-          if (!tidbit?.category) continue;
-
-          const cat = tidbit.category;
-          if (!statsByCategory[cat]) continue; // not selected / not tracked
-
-          statsByCategory[cat].seen += 1;
-
-          if (state?.masteryLevel === 'mastered') {
-            statsByCategory[cat].mastered += 1;
-          } else if (state?.masteryLevel === 'learning' || state?.nextDue) {
-            statsByCategory[cat].learning += 1;
-          }
-
-          if (state?.nextDue) {
-            const nextDueDate = new Date(state.nextDue);
-            if (nextDueDate <= now) {
-              statsByCategory[cat].due += 1;
-            }
-          }
-        } catch (e) {
-          // ignore bad entries
+        for (const card of cards) {
+          if (card?.id) categoryByCardId.set(card.id, categoryId);
         }
       }
 
-      // Finalize percents + sorting helpers
-      const result = Object.values(statsByCategory).map((s) => ({
+      // One multiGet across all local learning state — no per-key round trips.
+      const states = await CardLearningService.getAllLocalStates();
+      const now = new Date();
+
+      for (const state of states) {
+        const categoryId = categoryByCardId.get(state.contentId);
+        if (!categoryId) continue; // state for a card outside these categories' current scope
+        const bucket = statsByCategory[categoryId];
+        if (!bucket) continue;
+
+        bucket.seen += 1;
+
+        if (state.stage === 'mastered' || state.isMastered) {
+          bucket.mastered += 1;
+        } else if (state.stage && state.stage !== 'new') {
+          bucket.learning += 1;
+        }
+
+        if (CardLearningService.isReviewQueueEligible(state, now)) {
+          bucket.due += 1;
+        }
+      }
+
+      return Object.values(statsByCategory).map((s) => ({
         ...s,
         masteryPercent: safePercent(s.mastered, s.total),
       }));
-
-      return result;
     } catch (error) {
       console.error('[CATEGORY_PROGRESS] Error computing progress:', error);
       return [];
@@ -145,15 +116,15 @@ class CategoryProgressService {
    */
   static async getCategoryProgress(categoryId) {
     if (!categoryId) return null;
-    
+
     const results = await this.getCategoriesProgress([categoryId]);
     if (results.length === 0) return null;
-    
+
     const progress = results[0];
-    
+
     // Add description if available
     progress.description = ContentService.getCategoryDescription(categoryId);
-    
+
     return progress;
   }
 
@@ -173,5 +144,3 @@ class CategoryProgressService {
 }
 
 export { CategoryProgressService };
-
-

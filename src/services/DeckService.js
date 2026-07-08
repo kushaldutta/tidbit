@@ -14,6 +14,17 @@ import { ClassService } from './ClassService';
 class DeckService {
   static MAX_CARDS_PER_DECK = 200;
 
+  // Short-lived full-deck cards cache (unfiltered listCards calls only).
+  // Several call sites (study scope resolution, review queue, notification
+  // prefs) each fetch the full card list for the same deck within a single
+  // screen load — this collapses those into one round trip.
+  static _cardsCache = new Map(); // deckId -> { at, cards }
+  static CARDS_CACHE_MS = 15000;
+
+  static invalidateCardsCache(deckId) {
+    this._cardsCache.delete(deckId);
+  }
+
   static async listMyDecks() {
     if (!SUPABASE_CONFIGURED) return [];
     const userId = AuthService.getUserId();
@@ -214,8 +225,19 @@ class DeckService {
 
   // -- Cards --
 
-  static async listCards(deckId, { sectionIds = null } = {}) {
+  static async listCards(deckId, { sectionIds = null, bypassCache = false } = {}) {
     if (!SUPABASE_CONFIGURED || !deckId) return [];
+
+    // Only cache the common unfiltered case (full deck) — section-filtered
+    // queries stay live since they're comparatively rare.
+    const cacheable = !sectionIds?.length;
+    if (cacheable && !bypassCache) {
+      const cached = this._cardsCache.get(deckId);
+      if (cached && Date.now() - cached.at < this.CARDS_CACHE_MS) {
+        return cached.cards;
+      }
+    }
+
     let query = supabase
       .from('cards')
       .select('id, deck_id, front, back, card_type, meta, position, section_id, updated_at')
@@ -230,7 +252,11 @@ class DeckService {
       console.error('[DECK] listCards:', error);
       return [];
     }
-    return data || [];
+    const result = data || [];
+    if (cacheable) {
+      this._cardsCache.set(deckId, { at: Date.now(), cards: result });
+    }
+    return result;
   }
 
   static filterCardsBySections(cards, scope) {
@@ -370,6 +396,7 @@ class DeckService {
       .select()
       .single();
     if (error) throw error;
+    this.invalidateCardsCache(deckId);
     return data;
   }
 
@@ -390,13 +417,20 @@ class DeckService {
       .select()
       .single();
     if (error) throw error;
+    if (data?.deck_id) this.invalidateCardsCache(data.deck_id);
     return data;
   }
 
   static async deleteCard(cardId) {
     if (!SUPABASE_CONFIGURED) throw new Error('Supabase not configured');
+    const { data: existing } = await supabase
+      .from('cards')
+      .select('deck_id')
+      .eq('id', cardId)
+      .maybeSingle();
     const { error } = await supabase.from('cards').delete().eq('id', cardId);
     if (error) throw error;
+    if (existing?.deck_id) this.invalidateCardsCache(existing.deck_id);
   }
 
   static async bulkAddCards(deckId, cards) {
@@ -425,6 +459,7 @@ class DeckService {
       .insert(rows)
       .select();
     if (error) throw error;
+    this.invalidateCardsCache(deckId);
     return data || [];
   }
 

@@ -11,12 +11,24 @@ class StudyDeckService {
     const saved = await StorageService.getStudyScopeForDeck(deckId);
     if (saved) return saved;
 
-    const sections = await DeckService.listSectionsWithCounts(deckId);
-    const activeSections = sections.filter((s) => s.cardCount > 0);
+    // Sections + cards fetched in parallel (rather than via listSectionsWithCounts,
+    // which internally re-fetches the same card list) since DeckService.listCards
+    // is cached, the cards result here is also reused by loadStudyCards below.
+    const [sections, cards] = await Promise.all([
+      DeckService.listSections(deckId),
+      DeckService.listCards(deckId),
+    ]);
+    if (!sections.length) return null;
+
+    const cardCountBySection = {};
+    let hasUncategorized = false;
+    for (const c of cards) {
+      if (c.section_id) cardCountBySection[c.section_id] = (cardCountBySection[c.section_id] || 0) + 1;
+      else hasUncategorized = true;
+    }
+    const activeSections = sections.filter((s) => (cardCountBySection[s.id] || 0) > 0);
     if (!activeSections.length) return null;
 
-    const cards = await DeckService.listCards(deckId);
-    const hasUncategorized = cards.some((c) => !c.section_id);
     const notifPref = await NotificationDeckService.getDeckSectionPref(deckId);
     if (notifPref !== null) {
       return {

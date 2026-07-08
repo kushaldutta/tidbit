@@ -409,8 +409,14 @@ class ContentService {
     return StorageService.getSelectedCategories();
   }
 
+  /** slug -> deck id | null. Preset deck slugs never change once seeded, so this never expires. */
+  static _presetDeckIdCache = new Map();
+
   static async getPresetDeckIdForSlug(categorySlug) {
     if (!categorySlug) return null;
+    if (this._presetDeckIdCache.has(categorySlug)) {
+      return this._presetDeckIdCache.get(categorySlug);
+    }
     try {
       const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
       if (!SUPABASE_CONFIGURED) return null;
@@ -420,10 +426,60 @@ class ContentService {
         .eq('slug', categorySlug)
         .is('owner_id', null)
         .maybeSingle();
-      return data?.id || null;
+      const id = data?.id || null;
+      this._presetDeckIdCache.set(categorySlug, id);
+      return id;
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Batched preset-deck-id lookup — one query for every slug not already cached,
+   * instead of one round trip per category (used by the Review Queue).
+   * @returns {Promise<Object>} map of categorySlug -> deckId | null
+   */
+  static async getPresetDeckIdsForSlugs(categorySlugs) {
+    const slugs = [...new Set((categorySlugs || []).filter(Boolean))];
+    const result = {};
+    const uncached = [];
+    for (const slug of slugs) {
+      if (this._presetDeckIdCache.has(slug)) {
+        result[slug] = this._presetDeckIdCache.get(slug);
+      } else {
+        uncached.push(slug);
+      }
+    }
+    if (!uncached.length) return result;
+
+    try {
+      const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
+      if (!SUPABASE_CONFIGURED) {
+        uncached.forEach((slug) => { result[slug] = null; });
+        return result;
+      }
+      const { data } = await supabase
+        .from('decks')
+        .select('id, slug')
+        .in('slug', uncached)
+        .is('owner_id', null);
+
+      const found = new Set();
+      for (const row of data || []) {
+        this._presetDeckIdCache.set(row.slug, row.id);
+        result[row.slug] = row.id;
+        found.add(row.slug);
+      }
+      for (const slug of uncached) {
+        if (!found.has(slug)) {
+          this._presetDeckIdCache.set(slug, null);
+          result[slug] = null;
+        }
+      }
+    } catch {
+      uncached.forEach((slug) => { result[slug] = null; });
+    }
+    return result;
   }
 
   static async getCardAsTidbit(cardId) {
