@@ -2,7 +2,7 @@
   "expo": {
     "name": "Tidbit",
     "slug": "tidbit",
-    "version": "2.3.1",
+    "version": "2.3.2",
     "scheme": "tidbit",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
