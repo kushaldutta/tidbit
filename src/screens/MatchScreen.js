@@ -15,7 +15,7 @@
  *
  * We cap at 8 pairs per round so the screen stays usable.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StudyDeckService } from '../services/StudyDeckService';
+import { GameScoreService } from '../services/GameScoreService';
+import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
 
 const MAX_PAIRS = 8;
@@ -109,12 +111,15 @@ export default function MatchScreen({ route, navigation }) {
   const [selectedTerm, setSelectedTerm] = useState(null);
   const [matchedCount, setMatchedCount] = useState(0);
   const [mistakes, setMistakes] = useState(0);
-  const [startTime] = useState(Date.now());
   const [elapsed, setElapsed] = useState(0);
   const [done, setDone] = useState(false);
   const [round, setRound] = useState(0); // used to restart
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [loadingLb, setLoadingLb] = useState(false);
+  const [personalBest, setPersonalBest] = useState(null);
 
   const timerRef = useRef(null);
+  const roundStartRef = useRef(Date.now());
 
   useEffect(() => {
     StudyDeckService.loadStudyCards(deckId, studyScope).then((cards) => {
@@ -141,15 +146,30 @@ export default function MatchScreen({ route, navigation }) {
     setMatchedCount(0);
     setMistakes(0);
     setDone(false);
-    // Timer
+    setLeaderboard([]);
+    // Reset per-round timer
+    roundStartRef.current = Date.now();
     clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+      setElapsed(Math.floor((Date.now() - roundStartRef.current) / 1000));
     }, 1000);
   }, [allCards, round]);
 
   useEffect(() => {
-    if (done) clearInterval(timerRef.current);
+    if (done) {
+      clearInterval(timerRef.current);
+      // Save score + load leaderboard
+      GameScoreService.saveMatchScore(deckId, totalPairs, elapsed, mistakes);
+      setLoadingLb(true);
+      Promise.all([
+        GameScoreService.getMatchLeaderboard(deckId),
+        GameScoreService.getMyMatchBest(deckId),
+      ]).then(([lb, pb]) => {
+        setLeaderboard(lb);
+        setPersonalBest(pb);
+        setLoadingLb(false);
+      }).catch(() => setLoadingLb(false));
+    }
     return () => clearInterval(timerRef.current);
   }, [done]);
 
@@ -190,6 +210,8 @@ export default function MatchScreen({ route, navigation }) {
       setSelectedTerm(null);
       const newCount = matchedCount + 1;
       setMatchedCount(newCount);
+      // Matching a pair = successful recognition — update spaced repetition
+      CardLearningService.recordReview(id, { wasCorrect: true, mode: 'match' });
       if (newCount >= totalPairs) {
         setDone(true);
       }
@@ -254,12 +276,21 @@ export default function MatchScreen({ route, navigation }) {
       </View>
 
       {done ? (
-        <View style={styles.doneWrap}>
+        <ScrollView contentContainerStyle={styles.doneScroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.doneEmoji}>🎉</Text>
           <Text style={styles.doneTitle}>All matched!</Text>
           <Text style={styles.doneSub}>
-            Time: {formatTime(elapsed)}  ·  Misses: {mistakes}
+            {formatTime(elapsed)}  ·  {mistakes === 0 ? 'Perfect!' : `${mistakes} miss${mistakes !== 1 ? 'es' : ''}`}
           </Text>
+
+          {personalBest && (
+            <View style={styles.pbRow}>
+              <Text style={styles.pbText}>
+                🏆 Personal best: {formatTime(personalBest.elapsed_seconds)} · {personalBest.mistakes} miss{personalBest.mistakes !== 1 ? 'es' : ''}
+              </Text>
+            </View>
+          )}
+
           <TouchableOpacity
             style={styles.playAgainBtn}
             onPress={() => setRound((r) => r + 1)}
@@ -281,7 +312,31 @@ export default function MatchScreen({ route, navigation }) {
           >
             <Text style={styles.doneBtnText}>See results →</Text>
           </TouchableOpacity>
-        </View>
+
+          {/* Leaderboard */}
+          <View style={styles.lbCard}>
+            <Text style={styles.lbTitle}>🏅 Top scores — {deckTitle}</Text>
+            {loadingLb ? (
+              <ActivityIndicator color="#6366f1" style={{ marginVertical: 12 }} />
+            ) : leaderboard.length === 0 ? (
+              <Text style={styles.lbEmpty}>No scores yet — you're first!</Text>
+            ) : (
+              leaderboard.map((entry, i) => (
+                <View key={entry.userId} style={[styles.lbRow, entry.isMe && styles.lbRowMe]}>
+                  <Text style={styles.lbRank}>
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+                  </Text>
+                  <Text style={[styles.lbName, entry.isMe && styles.lbNameMe]} numberOfLines={1}>
+                    {entry.displayName}
+                  </Text>
+                  <Text style={[styles.lbScore, entry.isMe && styles.lbScoreMe]}>
+                    {formatTime(entry.elapsedSeconds)} · {entry.mistakes}✗
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
           <View style={styles.columns}>
@@ -348,20 +403,38 @@ const styles = StyleSheet.create({
   },
   tileText: { fontSize: 13, fontWeight: '600', color: '#111827', lineHeight: 18, textAlign: 'center' },
 
-  doneWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-  doneEmoji: { fontSize: 56, marginBottom: 16 },
-  doneTitle: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 8 },
-  doneSub: { fontSize: 15, color: '#6b7280', marginBottom: 32 },
+  doneScroll: { padding: 28, paddingBottom: 60, alignItems: 'center' },
+  doneEmoji: { fontSize: 56, marginBottom: 12 },
+  doneTitle: { fontSize: 28, fontWeight: '800', color: '#111827', marginBottom: 6 },
+  doneSub: { fontSize: 15, color: '#6b7280', marginBottom: 16 },
+  pbRow: {
+    backgroundColor: '#fffbeb', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
+    marginBottom: 20,
+  },
+  pbText: { fontSize: 13, fontWeight: '600', color: '#92400e' },
   playAgainBtn: {
     backgroundColor: '#eef2ff', borderRadius: 16, paddingVertical: 14,
-    paddingHorizontal: 32, marginBottom: 14, width: '100%', alignItems: 'center',
+    paddingHorizontal: 32, marginBottom: 12, width: '100%', alignItems: 'center',
   },
   playAgainText: { color: '#6366f1', fontWeight: '700', fontSize: 16 },
   doneBtn: {
     backgroundColor: '#6366f1', borderRadius: 16, paddingVertical: 14,
-    paddingHorizontal: 32, width: '100%', alignItems: 'center',
+    paddingHorizontal: 32, width: '100%', alignItems: 'center', marginBottom: 24,
   },
   doneBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  lbCard: {
+    width: '100%', backgroundColor: '#fff', borderRadius: 16,
+    overflow: 'hidden', borderWidth: 1, borderColor: '#e5e7eb',
+  },
+  lbTitle: { fontSize: 14, fontWeight: '800', color: '#111827', padding: 14, borderBottomWidth: 1, borderBottomColor: '#f3f4f6' },
+  lbEmpty: { fontSize: 13, color: '#9ca3af', padding: 16, textAlign: 'center' },
+  lbRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: '#f9fafb' },
+  lbRowMe: { backgroundColor: '#eef2ff' },
+  lbRank: { width: 32, fontSize: 15, fontWeight: '700', color: '#374151' },
+  lbName: { flex: 1, fontSize: 14, fontWeight: '500', color: '#111827' },
+  lbNameMe: { fontWeight: '800', color: '#6366f1' },
+  lbScore: { fontSize: 13, fontWeight: '600', color: '#374151' },
+  lbScoreMe: { color: '#6366f1' },
 
   emptyEmoji: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 16, color: '#6b7280', marginBottom: 16 },

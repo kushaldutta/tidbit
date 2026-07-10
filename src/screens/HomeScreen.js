@@ -38,6 +38,7 @@ export default function HomeScreen({ navigation }) {
   const [studyPlanLoading, setStudyPlanLoading] = useState(true);
   const [categoryProgress, setCategoryProgress] = useState([]);
   const [dueCount, setDueCount] = useState(0);
+  const [challengeClasses, setChallengeClasses] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -113,9 +114,13 @@ export default function HomeScreen({ navigation }) {
     const classIds = await ClassService.getMyClassIds();
     await ClassService.ensureCategoriesSyncedToEnrollments();
     if (classIds.length > 0) {
-      ClassService.getClassesByIds(classIds).then(setEnrolledClasses).catch(() => setEnrolledClasses([]));
+      ClassService.getClassesByIds(classIds).then((classes) => {
+        setEnrolledClasses(classes);
+        setChallengeClasses(classes.filter((c) => ClassService.hasTidbitContent(c.id)));
+      }).catch(() => { setEnrolledClasses([]); setChallengeClasses([]); });
     } else {
       setEnrolledClasses([]);
+      setChallengeClasses([]);
     }
 
     const tidbitsSeen = await StorageService.getTidbitsSeen();
@@ -283,6 +288,34 @@ export default function HomeScreen({ navigation }) {
         </View>
         <Text style={styles.reviewQueueChevron}>›</Text>
       </TouchableOpacity>
+
+      {challengeClasses.length > 0 && (
+        <View style={styles.challengeSection}>
+          <Text style={styles.sectionTitle}>Daily Challenge</Text>
+          {challengeClasses.slice(0, 3).map((cls) => {
+            const categorySlug = ClassService.getCategoryForClass(cls.id);
+            if (!categorySlug) return null;
+            return (
+              <TouchableOpacity
+                key={cls.id}
+                style={styles.challengeCard}
+                onPress={() => navigation.navigate('DailyChallenge', {
+                  categorySlug,
+                  categoryName: cls.code,
+                })}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.challengeEmoji}>⚡</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.challengeTitle}>{cls.code} Challenge</Text>
+                  <Text style={styles.challengeSub}>10 questions · same for everyone today</Text>
+                </View>
+                <Text style={styles.challengeChevron}>›</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       <CategoryProgressPreview
         items={categoryProgress}
@@ -579,5 +612,21 @@ const makeStyles = (theme) => StyleSheet.create({
   reviewQueueTitle: { fontSize: 16, fontWeight: '800', color: theme.text },
   reviewQueueSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
   reviewQueueChevron: { fontSize: 24, color: theme.textSecondary, fontWeight: '700' },
+
+  challengeSection: { marginBottom: 16 },
+  challengeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.primaryLight || '#eef2ff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: theme.accent || '#a5b4fc',
+  },
+  challengeEmoji: { fontSize: 28, marginRight: 12 },
+  challengeTitle: { fontSize: 15, fontWeight: '800', color: theme.primary },
+  challengeSub: { fontSize: 12, color: theme.primary, marginTop: 2, opacity: 0.75 },
+  challengeChevron: { fontSize: 24, color: theme.primary, fontWeight: '700' },
 });
 

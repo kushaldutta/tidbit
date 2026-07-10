@@ -28,6 +28,7 @@ import { ReportService } from '../services/ReportService';
 import { BlockService } from '../services/BlockService';
 import { DeckVoteService } from '../services/DeckVoteService';
 import { DeckService } from '../services/DeckService';
+import { ClassService } from '../services/ClassService';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -554,6 +555,29 @@ export default function GroupScreen({ route, navigation }) {
         )}
       </View>
 
+      {/* Daily Challenge */}
+      {ClassService.hasTidbitContent(classId) && (() => {
+        const categorySlug = ClassService.getCategoryForClass(classId);
+        if (!categorySlug) return null;
+        return (
+          <TouchableOpacity
+            style={styles.challengeCard}
+            onPress={() => navigation.navigate('DailyChallenge', {
+              categorySlug,
+              categoryName: title || code,
+            })}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.challengeEmoji}>⚡</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.challengeTitle}>Daily Challenge</Text>
+              <Text style={styles.challengeSub}>10 questions · same for everyone today</Text>
+            </View>
+            <Text style={styles.challengeChevron}>›</Text>
+          </TouchableOpacity>
+        );
+      })()}
+
       {/* Shared Decks */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Shared Decks</Text>
@@ -946,4 +970,20 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   postBtnDisabled: { backgroundColor: '#c7d2fe' },
   postBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  challengeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.primaryLight || '#eef2ff',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: theme.accent || '#a5b4fc',
+  },
+  challengeEmoji: { fontSize: 28, marginRight: 12 },
+  challengeTitle: { fontSize: 15, fontWeight: '800', color: theme.primary },
+  challengeSub: { fontSize: 12, color: theme.primary, marginTop: 2, opacity: 0.75 },
+  challengeChevron: { fontSize: 24, color: theme.primary, fontWeight: '700' },
 });

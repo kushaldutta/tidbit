@@ -134,11 +134,13 @@ export function advanceStage(currentStage, { wasCorrect, mode }) {
   if (mode === 'notification' || mode === 'session' || mode === 'group_study') {
     return idx === 0 ? 'introduced' : STAGES[idx];
   }
-  if (mode === 'quiz') {
+  if (mode === 'quiz' || mode === 'match' || mode === 'speed_run') {
+    // Recognition-level modes: push toward recognition, then one step at a time
     if (idx <= 1) return 'recognition';
     return STAGES[Math.min(idx + 1, STAGES.length - 1)];
   }
-  if (mode === 'recall' || mode === 'recall_override') {
+  if (mode === 'recall' || mode === 'recall_override' || mode === 'daily_challenge') {
+    // Full recall: jump straight to recall stage if not already past it
     return idx <= 2 ? 'recall' : STAGES[Math.max(idx, 3)];
   }
   return STAGES[Math.min(idx + 1, STAGES.length - 1)];

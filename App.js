@@ -48,6 +48,8 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import ThemePickerScreen from './src/screens/ThemePickerScreen';
 import ReviewQueueScreen from './src/screens/ReviewQueueScreen';
 import ReviewSessionScreen from './src/screens/ReviewSessionScreen';
+import DailyChallengeScreen from './src/screens/DailyChallengeScreen';
+import SpeedRunScreen from './src/screens/SpeedRunScreen';
 import InsightsScreen from './src/screens/InsightsScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
@@ -808,6 +810,8 @@ export default function App() {
         <Stack.Screen name="ReviewQueue" component={ReviewQueueScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ReviewSession" component={ReviewSessionScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Insights" component={InsightsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="DailyChallenge" component={DailyChallengeScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="SpeedRun" component={SpeedRunScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ModerationReports" component={ModerationReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>

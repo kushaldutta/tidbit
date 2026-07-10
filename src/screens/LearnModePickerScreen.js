@@ -45,9 +45,18 @@ const MODES = [
     id: 'Match',
     emoji: '🧩',
     title: 'Match',
-    subtitle: 'Tap-to-pair game · race the clock',
+    subtitle: 'Tap-to-pair game · race the clock · leaderboard',
     color: '#f59e0b',
     bg: '#fffbeb',
+    minCards: 2,
+  },
+  {
+    id: 'SpeedRun',
+    emoji: '⚡',
+    title: 'Speed Run',
+    subtitle: '60 or 90s blitz · how many can you get?',
+    color: '#ef4444',
+    bg: '#fef2f2',
     minCards: 2,
   },
 ];
@@ -423,6 +432,7 @@ export default function LearnModePickerScreen({ route, navigation }) {
             <Text style={styles.tipText}>• <Text style={{ fontWeight: '700' }}>Quiz</Text> — great first pass, builds recognition</Text>
             <Text style={styles.tipText}>• <Text style={{ fontWeight: '700' }}>Recall</Text> — harder, but better for long-term retention</Text>
             <Text style={styles.tipText}>• <Text style={{ fontWeight: '700' }}>Match</Text> — warm-up or review, good for speed</Text>
+            <Text style={styles.tipText}>• <Text style={{ fontWeight: '700' }}>Speed Run</Text> — compete against classmates, type fast</Text>
           </View>
         </ScrollView>
       )}
