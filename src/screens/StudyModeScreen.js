@@ -62,7 +62,19 @@ export default function StudyModeScreen({ navigation }) {
           <Text style={styles.learnBtnEmoji}>🎯</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.learnBtnLabel}>Start Learning</Text>
-            <Text style={styles.learnBtnSub}>Quiz · Recall · Match</Text>
+            <Text style={styles.learnBtnSub}>Quiz · Recall · Match · Speed Run</Text>
+          </View>
+          <Text style={styles.learnBtnArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.learnBtn, { marginTop: 12, borderColor: '#f59e0b' }]}
+          onPress={() => navigation.navigate('Games')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.learnBtnEmoji}>🎮</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.learnBtnLabel}>Games</Text>
+            <Text style={styles.learnBtnSub}>Daily Challenge · Speed Duel · Runner</Text>
           </View>
           <Text style={styles.learnBtnArrow}>›</Text>
         </TouchableOpacity>

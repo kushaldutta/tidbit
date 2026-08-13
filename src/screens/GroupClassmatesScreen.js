@@ -16,6 +16,7 @@ import { GroupService } from '../services/GroupService';
 import { BlockService } from '../services/BlockService';
 import { BuddyService } from '../services/BuddyService';
 import { AuthService } from '../services/AuthService';
+import { ClassService } from '../services/ClassService';
 
 function Avatar({ name, size = 44 }) {
   const initials = name
@@ -42,7 +43,7 @@ function Avatar({ name, size = 44 }) {
 export default function GroupClassmatesScreen({ route, navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const { classId, code, title } = route.params;
+  const { classId, code, title, duelMode = false } = route.params;
   const myUserId = AuthService.getUserId();
 
   const [classmates, setClassmates] = useState([]);
@@ -125,31 +126,44 @@ export default function GroupClassmatesScreen({ route, navigation }) {
           ) : null}
         </View>
         {!isMe && (
-          <TouchableOpacity
-            style={[
-              styles.buddyBtn,
-              status === 'buddies' && styles.buddyBtnActive,
-              buddyButtonDisabled(status) && styles.buddyBtnDisabled,
-            ]}
-            onPress={() => {
-              if (status === 'none') handleSendRequest(item);
-              else if (status === 'request_received') {
-                // Navigate to handle pending request (could open a modal or pending screen)
-                Alert.alert(
-                  `Buddy request from ${item.display_name}`,
-                  'You have an incoming buddy request from this classmate. Go to your buddy requests to accept.',
-                  [{ text: 'OK' }]
-                );
-              }
-            }}
-            disabled={buddyButtonDisabled(status) || isSending}
-          >
-            {isSending
-              ? <ActivityIndicator size="small" color={status === 'buddies' ? '#fff' : theme.accent} />
-              : <Text style={[styles.buddyBtnText, status === 'buddies' && styles.buddyBtnTextActive]}>
-                  {buddyButtonLabel(status)}
-                </Text>}
-          </TouchableOpacity>
+          <View style={styles.rowActions}>
+            {(duelMode || ClassService.hasTidbitContent(classId)) && (
+              <TouchableOpacity
+                style={styles.duelBtn}
+                onPress={() => navigation.navigate('SpeedDuel', {
+                  classId,
+                  opponentId: item.id,
+                  opponentName: item.display_name || 'Classmate',
+                })}
+              >
+                <Text style={styles.duelBtnText}>⚔️ Duel</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.buddyBtn,
+                status === 'buddies' && styles.buddyBtnActive,
+                buddyButtonDisabled(status) && styles.buddyBtnDisabled,
+              ]}
+              onPress={() => {
+                if (status === 'none') handleSendRequest(item);
+                else if (status === 'request_received') {
+                  Alert.alert(
+                    `Buddy request from ${item.display_name}`,
+                    'You have an incoming buddy request from this classmate. Go to your buddy requests to accept.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              }}
+              disabled={buddyButtonDisabled(status) || isSending}
+            >
+              {isSending
+                ? <ActivityIndicator size="small" color={status === 'buddies' ? '#fff' : theme.accent} />
+                : <Text style={[styles.buddyBtnText, status === 'buddies' && styles.buddyBtnTextActive]}>
+                    {buddyButtonLabel(status)}
+                  </Text>}
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     );
@@ -162,7 +176,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <View style={styles.headerMeta}>
-          <Text style={styles.headerTitle}>Classmates</Text>
+          <Text style={styles.headerTitle}>{duelMode ? 'Speed Duel' : 'Classmates'}</Text>
           <Text style={styles.headerSub} numberOfLines={1}>
             {code}{title ? ` · ${title}` : ''}
           </Text>
@@ -172,7 +186,9 @@ export default function GroupClassmatesScreen({ route, navigation }) {
 
       <View style={styles.hint}>
         <Text style={styles.hintText}>
-          Add up to 3 study buddies per class for shared streaks and nudges.
+          {duelMode
+            ? 'Pick a classmate — same 10 cards, definition → term, fastest accurate run wins.'
+            : 'Add up to 3 study buddies per class for shared streaks and nudges.'}
         </Text>
       </View>
 
@@ -236,6 +252,15 @@ const makeStyles = (theme) => StyleSheet.create({
   rowMeta: { flex: 1 },
   rowName: { fontSize: 16, fontWeight: '600', color: theme.text },
   rowYear: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  duelBtn: {
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  duelBtnText: { fontSize: 13, fontWeight: '700', color: '#d97706' },
 
   buddyBtn: {
     borderWidth: 1.5,
