@@ -63,13 +63,65 @@ class SameBoatService {
         .select('user_id')
         .eq('class_id', classId);
       if (error || !data) return 0;
-      // Exclude the current user from the count
       const myId = AuthService.getUserId();
       return data.filter((r) => r.user_id !== myId).length;
     } catch (e) {
       console.warn('[SameBoat] getLiveCount error:', e.message);
       return 0;
     }
+  }
+
+  /**
+   * Fetch the list of classmates currently studying (last 5 minutes),
+   * enriched with display names from migration 037's updated view.
+   * Returns an array of { userId, displayName } excluding the current user.
+   */
+  static async getLiveUsers(classId) {
+    if (!SUPABASE_CONFIGURED) return [];
+    try {
+      const { data, error } = await supabase
+        .from('class_live_presence')
+        .select('user_id, display_name')
+        .eq('class_id', classId);
+      if (error || !data) return [];
+      const myId = AuthService.getUserId();
+      return data
+        .filter((r) => r.user_id !== myId)
+        .map((r) => ({ userId: r.user_id, displayName: r.display_name || 'Tidbit User' }));
+    } catch (e) {
+      console.warn('[SameBoat] getLiveUsers error:', e.message);
+      return [];
+    }
+  }
+
+  /**
+   * Subscribe to live-presence changes for a class via Supabase Realtime.
+   * card_attempts inserts/updates trigger the view to refresh — we listen
+   * to the card_attempts table and debounce the callback.
+   * Returns an unsubscribe function.
+   */
+  static subscribeToPresence(classId, onUpdate) {
+    if (!SUPABASE_CONFIGURED) return () => {};
+
+    let timer = null;
+    const debounced = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; onUpdate(); }, 800);
+    };
+
+    const channel = supabase
+      .channel(`presence:class:${classId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'card_attempts' },
+        debounced,
+      )
+      .subscribe();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
   }
 
   /**

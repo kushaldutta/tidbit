@@ -50,6 +50,7 @@ import ReviewQueueScreen from './src/screens/ReviewQueueScreen';
 import ReviewSessionScreen from './src/screens/ReviewSessionScreen';
 import DailyChallengeScreen from './src/screens/DailyChallengeScreen';
 import SpeedRunScreen from './src/screens/SpeedRunScreen';
+import GroupChallengeScreen from './src/screens/GroupChallengeScreen';
 import InsightsScreen from './src/screens/InsightsScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
@@ -812,6 +813,7 @@ export default function App() {
         <Stack.Screen name="Insights" component={InsightsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="DailyChallenge" component={DailyChallengeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="SpeedRun" component={SpeedRunScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="GroupChallenge" component={GroupChallengeScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ModerationReports" component={ModerationReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>

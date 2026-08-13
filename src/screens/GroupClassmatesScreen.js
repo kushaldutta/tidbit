@@ -7,12 +7,15 @@ import {
   ActivityIndicator,
   RefreshControl,
   FlatList,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { GroupService } from '../services/GroupService';
 import { BlockService } from '../services/BlockService';
+import { BuddyService } from '../services/BuddyService';
+import { AuthService } from '../services/AuthService';
 
 function Avatar({ name, size = 44 }) {
   const initials = name
@@ -40,10 +43,14 @@ export default function GroupClassmatesScreen({ route, navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const { classId, code, title } = route.params;
+  const myUserId = AuthService.getUserId();
 
   const [classmates, setClassmates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Map: userId → 'none' | 'request_sent' | 'request_received' | 'buddies'
+  const [relationships, setRelationships] = useState({});
+  const [sendingRequest, setSendingRequest] = useState(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -53,28 +60,100 @@ export default function GroupClassmatesScreen({ route, navigation }) {
         GroupService.getClassmates(classId),
         BlockService.getBlockedUserIds(),
       ]);
-      setClassmates(BlockService.filterClassmates(cm, blockedIds));
+      const filtered = BlockService.filterClassmates(cm, blockedIds);
+      setClassmates(filtered);
+
+      // Load buddy relationship status for each classmate
+      const statuses = {};
+      await Promise.all(
+        filtered.map(async (c) => {
+          if (c.id !== myUserId) {
+            statuses[c.id] = await BuddyService.getRelationshipStatus(c.id, classId);
+          }
+        })
+      );
+      setRelationships(statuses);
     } catch (e) {
       console.warn('[GroupClassmatesScreen] load error:', e.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [classId]);
+  }, [classId, myUserId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const renderRow = ({ item }) => (
-    <View style={styles.row}>
-      <Avatar name={item.display_name} size={48} />
-      <View style={styles.rowMeta}>
-        <Text style={styles.rowName}>{item.display_name || 'Tidbit User'}</Text>
-        {item.grad_year ? (
-          <Text style={styles.rowYear}>Class of {item.grad_year}</Text>
-        ) : null}
+  const handleSendRequest = async (classmate) => {
+    setSendingRequest(classmate.id);
+    try {
+      await BuddyService.sendRequest(classmate.id, classId);
+      setRelationships((prev) => ({ ...prev, [classmate.id]: 'request_sent' }));
+      Alert.alert('Buddy request sent!', `${classmate.display_name || 'Tidbit User'} will see your request.`);
+    } catch (e) {
+      Alert.alert('Could not send request', e.message || 'Try again.');
+    } finally {
+      setSendingRequest(null);
+    }
+  };
+
+  const buddyButtonLabel = (status) => {
+    switch (status) {
+      case 'buddies': return '🤝 Buddies';
+      case 'request_sent': return 'Requested';
+      case 'request_received': return 'Respond ›';
+      default: return '+ Buddy';
+    }
+  };
+
+  const buddyButtonDisabled = (status) => status === 'buddies' || status === 'request_sent';
+
+  const renderRow = ({ item }) => {
+    const isMe = item.id === myUserId;
+    const status = relationships[item.id] || 'none';
+    const isSending = sendingRequest === item.id;
+
+    return (
+      <View style={styles.row}>
+        <Avatar name={item.display_name} size={48} />
+        <View style={styles.rowMeta}>
+          <Text style={styles.rowName}>
+            {item.display_name || 'Tidbit User'}
+            {isMe ? ' (you)' : ''}
+          </Text>
+          {item.grad_year ? (
+            <Text style={styles.rowYear}>Class of {item.grad_year}</Text>
+          ) : null}
+        </View>
+        {!isMe && (
+          <TouchableOpacity
+            style={[
+              styles.buddyBtn,
+              status === 'buddies' && styles.buddyBtnActive,
+              buddyButtonDisabled(status) && styles.buddyBtnDisabled,
+            ]}
+            onPress={() => {
+              if (status === 'none') handleSendRequest(item);
+              else if (status === 'request_received') {
+                // Navigate to handle pending request (could open a modal or pending screen)
+                Alert.alert(
+                  `Buddy request from ${item.display_name}`,
+                  'You have an incoming buddy request from this classmate. Go to your buddy requests to accept.',
+                  [{ text: 'OK' }]
+                );
+              }
+            }}
+            disabled={buddyButtonDisabled(status) || isSending}
+          >
+            {isSending
+              ? <ActivityIndicator size="small" color={status === 'buddies' ? '#fff' : theme.accent} />
+              : <Text style={[styles.buddyBtnText, status === 'buddies' && styles.buddyBtnTextActive]}>
+                  {buddyButtonLabel(status)}
+                </Text>}
+          </TouchableOpacity>
+        )}
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -89,6 +168,12 @@ export default function GroupClassmatesScreen({ route, navigation }) {
           </Text>
         </View>
         <View style={{ width: 56 }} />
+      </View>
+
+      <View style={styles.hint}>
+        <Text style={styles.hintText}>
+          Add up to 3 study buddies per class for shared streaks and nudges.
+        </Text>
       </View>
 
       {loading ? (
@@ -130,6 +215,14 @@ const makeStyles = (theme) => StyleSheet.create({
   headerMeta: { flex: 1, alignItems: 'center' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: theme.text },
   headerSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  hint: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: theme.card,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.border,
+  },
+  hintText: { fontSize: 13, color: theme.textSecondary, textAlign: 'center' },
   listContent: { padding: 16, paddingBottom: 32 },
   row: {
     flexDirection: 'row',
@@ -143,6 +236,26 @@ const makeStyles = (theme) => StyleSheet.create({
   rowMeta: { flex: 1 },
   rowName: { fontSize: 16, fontWeight: '600', color: theme.text },
   rowYear: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+
+  buddyBtn: {
+    borderWidth: 1.5,
+    borderColor: theme.accent,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    minWidth: 76,
+    alignItems: 'center',
+  },
+  buddyBtnActive: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  buddyBtnDisabled: {
+    opacity: 0.6,
+  },
+  buddyBtnText: { fontSize: 13, fontWeight: '700', color: theme.accent },
+  buddyBtnTextActive: { color: '#fff' },
+
   empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 24 },
   emptyEmoji: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 6 },

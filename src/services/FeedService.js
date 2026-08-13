@@ -39,6 +39,11 @@ class FeedService {
       { event: '*', schema: 'public', table: 'reactions' },
       notify,
     );
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'feed_comments' },
+      notify,
+    );
 
     channel.subscribe((status, err) => {
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -65,7 +70,7 @@ class FeedService {
     const { data, error } = await supabase
       .from('feed_posts')
       .select(`
-        id, post_type, payload, created_at, author_id, group_id,
+        id, post_type, payload, created_at, author_id, group_id, comment_count,
         profiles!author_id(display_name, grad_year),
         reactions(kind, user_id)
       `)
@@ -85,6 +90,7 @@ class FeedService {
       createdAt: p.created_at,
       authorId: p.author_id,
       groupId: p.group_id,
+      commentCount: p.comment_count ?? 0,
       authorName: p.profiles?.display_name || 'Tidbit User',
       authorYear: p.profiles?.grad_year || null,
       reactions: p.reactions || [],
@@ -148,7 +154,7 @@ class FeedService {
     const { data: posts, error: pErr } = await supabase
       .from('feed_posts')
       .select(`
-        id, post_type, payload, created_at, group_id, author_id,
+        id, post_type, payload, created_at, group_id, author_id, comment_count,
         profiles!author_id(display_name, grad_year),
         reactions(kind, user_id)
       `)
@@ -173,10 +179,10 @@ class FeedService {
         groupCode: groupInfo[p.group_id]?.code || '',
         groupTitle: groupInfo[p.group_id]?.title || '',
         classId: groupInfo[p.group_id]?.classId || '',
-        // Hide identity for anonymous posts
         authorName: isDumbQ ? null : (p.profiles?.display_name || 'Tidbit User'),
         authorYear: isDumbQ ? null : (p.profiles?.grad_year || null),
         reactions: p.reactions || [],
+        commentCount: p.comment_count ?? 0,
       };
     });
   }

@@ -24,11 +24,14 @@ import { ModerationService } from '../services/ModerationService';
 import ModerationReasonModal from '../components/ModerationReasonModal';
 import ReportContentModal from '../components/ReportContentModal';
 import SharedDeckRow from '../components/SharedDeckRow';
+import CommentThread from '../components/CommentThread';
 import { ReportService } from '../services/ReportService';
 import { BlockService } from '../services/BlockService';
 import { DeckVoteService } from '../services/DeckVoteService';
 import { DeckService } from '../services/DeckService';
 import { ClassService } from '../services/ClassService';
+import { BuddyService } from '../services/BuddyService';
+import { GroupChallengeService } from '../services/GroupChallengeService';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -206,6 +209,12 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
           );
         })}
       </View>
+
+      <CommentThread
+        postId={post.id}
+        commentCount={post.commentCount ?? 0}
+        isModerator={isModerator}
+      />
     </View>
   );
 }
@@ -222,6 +231,10 @@ export default function GroupScreen({ route, navigation }) {
   const [decks, setDecks] = useState([]);
   const [posts, setPosts] = useState([]);
   const [liveCount, setLiveCount] = useState(0);
+  const [liveUsers, setLiveUsers] = useState([]);
+  const [myBuddies, setMyBuddies] = useState([]);
+  const [activeChallenge, setActiveChallenge] = useState(null);
+  const [challengeProgress, setChallengeProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [draftText, setDraftText] = useState('');
@@ -244,17 +257,28 @@ export default function GroupScreen({ route, navigation }) {
     if (isRefresh) setRefreshing(true);
     else if (!silent) setLoading(true);
     try {
-      const [cm, dk, ps, live, blockedIds] = await Promise.all([
+      const [cm, dk, ps, liveUsersData, blockedIds, buddies, challenge] = await Promise.all([
         GroupService.getClassmates(classId),
         GroupService.getGroupDecks(groupId),
         FeedService.getGroupPosts(groupId),
-        SameBoatService.getLiveCount(classId),
+        SameBoatService.getLiveUsers(classId),
         BlockService.getBlockedUserIds(),
+        BuddyService.getMyBuddies(classId),
+        GroupChallengeService.getActiveChallengeForGroup(groupId),
       ]);
       setClassmates(BlockService.filterClassmates(cm, blockedIds));
       setDecks(BlockService.filterDecks(dk, blockedIds));
       setPosts(BlockService.filterPosts(ps, blockedIds));
-      setLiveCount(live);
+      setLiveUsers(liveUsersData);
+      setLiveCount(liveUsersData.length);
+      setMyBuddies(buddies);
+      setActiveChallenge(challenge);
+      if (challenge) {
+        const progress = await GroupChallengeService.getChallengeProgress(challenge.id);
+        setChallengeProgress(progress);
+      } else {
+        setChallengeProgress(null);
+      }
     } catch (e) {
       console.warn('[GroupScreen] load error:', e.message);
     } finally {
@@ -272,12 +296,20 @@ export default function GroupScreen({ route, navigation }) {
   );
 
   useEffect(() => {
-    const unsubscribe = FeedService.subscribeToFeedUpdates(
+    const unsubscribeFeed = FeedService.subscribeToFeedUpdates(
       () => load(false, true),
       { groupId },
     );
-    return unsubscribe;
-  }, [groupId, load]);
+    const unsubscribePresence = SameBoatService.subscribeToPresence(classId, async () => {
+      const users = await SameBoatService.getLiveUsers(classId);
+      setLiveUsers(users);
+      setLiveCount(users.length);
+    });
+    return () => {
+      unsubscribeFeed();
+      unsubscribePresence();
+    };
+  }, [groupId, classId, load]);
 
   const handlePost = async () => {
     const text = draftText.trim();
@@ -555,6 +587,61 @@ export default function GroupScreen({ route, navigation }) {
         )}
       </View>
 
+      {/* Studying Now — realtime presence with avatars */}
+      {liveUsers.length > 0 && (
+        <View style={styles.studyingNowBar}>
+          <View style={styles.livePulse} />
+          <View style={styles.liveAvatarStack}>
+            {liveUsers.slice(0, 4).map((u) => (
+              <View key={u.userId} style={styles.liveAvatarWrap}>
+                <Avatar name={u.displayName} size={26} />
+              </View>
+            ))}
+          </View>
+          <Text style={styles.studyingNowText}>
+            {liveUsers.length === 1
+              ? `${liveUsers[0].displayName} is studying now`
+              : liveUsers.length <= 3
+                ? `${liveUsers.map((u) => u.displayName.split(' ')[0]).join(', ')} are studying`
+                : `${liveUsers.length} classmates studying now`}
+          </Text>
+        </View>
+      )}
+
+      {/* Study Buddies */}
+      {myBuddies.length > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Study Buddies</Text>
+            <TouchableOpacity onPress={openAllClassmates} activeOpacity={0.7}>
+              <Text style={styles.viewAllLink}>Add buddy</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.classmateRow}>
+            {myBuddies.filter((b) => b.classId === classId).map((buddy) => (
+              <View key={buddy.pairId} style={styles.buddyCard}>
+                <Avatar name={buddy.buddyName} size={44} />
+                <Text style={styles.classmateName} numberOfLines={1}>
+                  {buddy.buddyName.split(' ')[0]}
+                </Text>
+                {buddy.sharedStreak > 0 && (
+                  <Text style={styles.buddyStreak}>🔥 {buddy.sharedStreak}</Text>
+                )}
+                <TouchableOpacity
+                  style={styles.nudgeBtn}
+                  onPress={async () => {
+                    const sent = await BuddyService.nudgeBuddy(buddy.pairId);
+                    if (!sent) Alert.alert('Already nudged', 'You can nudge once per hour.');
+                  }}
+                >
+                  <Text style={styles.nudgeBtnText}>Nudge</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* Daily Challenge */}
       {ClassService.hasTidbitContent(classId) && (() => {
         const categorySlug = ClassService.getCategoryForClass(classId);
@@ -577,6 +664,52 @@ export default function GroupScreen({ route, navigation }) {
           </TouchableOpacity>
         );
       })()}
+
+      {/* Group Challenge */}
+      {activeChallenge && (
+        <TouchableOpacity
+          style={styles.groupChallengeCard}
+          onPress={() => navigation.navigate('GroupChallenge', { groupId, classId, classCode: code, classTitle: title })}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.challengeEmoji}>🏆</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.challengeTitle}>{activeChallenge.title}</Text>
+            {challengeProgress ? (
+              <View style={styles.miniProgressWrap}>
+                <View style={styles.miniProgressTrack}>
+                  <View
+                    style={[
+                      styles.miniProgressFill,
+                      { width: `${Math.min(challengeProgress.pctComplete, 100)}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.miniProgressLabel}>
+                  {challengeProgress.pctComplete}% — {challengeProgress.totalProgress}/{activeChallenge.goalValue}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.challengeSub}>Class challenge · tap to see progress</Text>
+            )}
+          </View>
+          <Text style={styles.challengeChevron}>›</Text>
+        </TouchableOpacity>
+      )}
+      {!activeChallenge && (
+        <TouchableOpacity
+          style={[styles.groupChallengeCard, styles.groupChallengeCardEmpty]}
+          onPress={() => navigation.navigate('GroupChallenge', { groupId, classId, classCode: code, classTitle: title })}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.challengeEmoji}>🏆</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.challengeTitle}>Class Challenges</Text>
+            <Text style={styles.challengeSub}>Create a collective study goal</Text>
+          </View>
+          <Text style={styles.challengeChevron}>›</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Shared Decks */}
       <View style={styles.section}>
@@ -986,4 +1119,71 @@ const makeStyles = (theme) => StyleSheet.create({
   challengeTitle: { fontSize: 15, fontWeight: '800', color: theme.primary },
   challengeSub: { fontSize: 12, color: theme.primary, marginTop: 2, opacity: 0.75 },
   challengeChevron: { fontSize: 24, color: theme.primary, fontWeight: '700' },
+
+  // ── group challenge card ─────────────────────────────────────────────────
+  groupChallengeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#fcd34d',
+  },
+  groupChallengeCardEmpty: {
+    opacity: 0.75,
+    borderStyle: 'dashed',
+  },
+  miniProgressWrap: { marginTop: 4, gap: 3 },
+  miniProgressTrack: {
+    height: 5,
+    backgroundColor: '#fde68a',
+    borderRadius: 3,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  miniProgressFill: {
+    height: 5,
+    backgroundColor: '#f59e0b',
+    borderRadius: 3,
+  },
+  miniProgressLabel: { fontSize: 11, color: '#92400e' },
+
+  // ── studying now bar ─────────────────────────────────────────────────────
+  studyingNowBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  livePulse: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#22c55e',
+  },
+  liveAvatarStack: { flexDirection: 'row' },
+  liveAvatarWrap: { marginRight: -6, borderRadius: 13, borderWidth: 1.5, borderColor: '#f0fdf4' },
+  studyingNowText: { fontSize: 13, color: '#166534', fontWeight: '600', flex: 1 },
+
+  // ── study buddies ────────────────────────────────────────────────────────
+  buddyCard: { alignItems: 'center', width: 72, gap: 3 },
+  buddyStreak: { fontSize: 11, color: '#f97316', fontWeight: '700' },
+  nudgeBtn: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 2,
+  },
+  nudgeBtnText: { fontSize: 11, color: '#374151', fontWeight: '600' },
 });

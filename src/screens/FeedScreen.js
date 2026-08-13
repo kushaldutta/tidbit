@@ -24,6 +24,7 @@ import { AuthService } from '../services/AuthService';
 import { ModerationService } from '../services/ModerationService';
 import ModerationReasonModal from '../components/ModerationReasonModal';
 import ReportContentModal from '../components/ReportContentModal';
+import CommentThread from '../components/CommentThread';
 import { ReportService } from '../services/ReportService';
 import { BlockService } from '../services/BlockService';
 import { useTheme } from '../context/ThemeContext';
@@ -229,6 +230,12 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
           );
         })}
       </View>
+
+      <CommentThread
+        postId={post.id}
+        commentCount={post.commentCount ?? 0}
+        isModerator={isModerator}
+      />
     </View>
   );
 }
