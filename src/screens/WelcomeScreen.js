@@ -12,11 +12,10 @@ export default function WelcomeScreen({ navigation }) {
       <View style={styles.content}>
         <Text style={styles.title}>Tidbit</Text>
         <Text style={styles.tagline}>
-          Learn tiny things daily
+          Study with your class
         </Text>
         <Text style={styles.description}>
-          Discover fascinating facts and insights delivered to you throughout the day. 
-          Build knowledge effortlessly, one tidbit at a time.
+          Course-native flashcards, a daily class challenge, and classmates who are actually in the same lecture. Compete, collaborate, and cram smart.
         </Text>
         <TouchableOpacity 
           style={styles.button}

@@ -7,9 +7,9 @@
  * Scoring (per spec):
  *   Recall correct → 3 pts   Quiz correct → 1 pt   Wrong → 0
  *
- * Coin awards (end-of-day, once per challenge):
- *   Participation (all 10 answered) → 5 coins
- *   Rank #1  → 50  |  Rank #2–3 → 30  |  Rank #4–10 → 10
+ * Coin awards (once per challenge):
+ *   Participation (all 10 answered) → 5 coins, claimed on complete
+ *   Rank #1  → 50  |  Rank #2–3 → 30  |  Rank #4–10 → 10  (next UTC day)
  */
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
@@ -21,7 +21,7 @@ export const CHALLENGE_QUESTION_COUNT = 10;
 export const RECALL_POINTS = 3;
 export const QUIZ_POINTS = 1;
 
-const COIN_PARTICIPATION = 5;
+export const COIN_PARTICIPATION = 5;
 const COIN_RANK = [50, 30, 30, 10, 10, 10, 10, 10, 10, 10]; // index 0 = rank 1
 
 // ─── Deterministic seeded shuffle ────────────────────────────
@@ -47,7 +47,13 @@ function seededShuffle(arr, seed) {
 }
 
 function todayUTC() {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayUTC() {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
 }
 
 // ─── Card loading ─────────────────────────────────────────────
@@ -97,6 +103,7 @@ class DailyChallengeService {
       .maybeSingle();
 
     if (existing) {
+      this.claimAnyPendingCoins(categorySlug).catch(() => {});
       return {
         id: existing.id,
         categorySlug: existing.category_slug,
@@ -131,6 +138,9 @@ class DailyChallengeService {
       .maybeSingle();
 
     if (!row) return null;
+
+    this.claimAnyPendingCoins(categorySlug).catch(() => {});
+
     return {
       id: row.id,
       categorySlug: row.category_slug,
@@ -298,39 +308,66 @@ class DailyChallengeService {
   // ─── Coin awards ──────────────────────────────────────────────
 
   /**
-   * Claim participation + rank coins for a completed challenge.
-   * Safe to call multiple times — RPC deduplicates.
+   * Participation coins if this challenge is complete. Safe to call anytime
+   * (idempotent). Returns true only when coins were newly credited.
+   * Rank coins wait until the UTC day closes (claimed on next open).
    */
   static async tryClaimRewards(challengeId) {
-    if (!SUPABASE_CONFIGURED) return;
-    const userId = AuthService.getUserId();
-    if (!userId) return;
-
-    // Participation coins
-    await CoinService.credit(
+    if (!SUPABASE_CONFIGURED || !challengeId) return false;
+    const myRun = await this.getMyRun(challengeId);
+    if (!myRun.completed) return false;
+    return CoinService.credit(
       COIN_PARTICIPATION,
       'daily_challenge_participation',
       challengeId,
       'Completed daily challenge',
     );
+  }
 
-    // Rank coins — compute rank from leaderboard
+  /** Yesterday's rank coins + today's participation, if earned. */
+  static async claimAnyPendingCoins(categorySlug) {
+    if (!SUPABASE_CONFIGURED || !categorySlug) return;
+    await this.claimPendingRankRewards(categorySlug);
+    const { data: ch } = await supabase
+      .from('daily_challenges')
+      .select('id')
+      .eq('category_slug', categorySlug)
+      .eq('challenge_date', todayUTC())
+      .maybeSingle();
+    if (ch?.id) await this.tryClaimRewards(ch.id);
+  }
+
+  static async claimPendingRankRewards(categorySlug) {
+    if (!SUPABASE_CONFIGURED || !categorySlug) return false;
+    const userId = AuthService.getUserId();
+    if (!userId) return false;
+
+    const { data: ch } = await supabase
+      .from('daily_challenges')
+      .select('id')
+      .eq('category_slug', categorySlug)
+      .eq('challenge_date', yesterdayUTC())
+      .maybeSingle();
+    if (!ch) return false;
+
+    const myRun = await this.getMyRun(ch.id);
+    if (!myRun?.completed) return false;
+
     try {
-      const leaderboard = await this.getLeaderboard(challengeId, 10);
+      const leaderboard = await this.getLeaderboard(ch.id, 10);
       const rankIndex = leaderboard.findIndex((r) => r.userId === userId);
-      if (rankIndex >= 0 && rankIndex < COIN_RANK.length) {
-        const rankCoins = COIN_RANK[rankIndex];
-        if (rankCoins > 0) {
-          await CoinService.credit(
-            rankCoins,
-            'daily_challenge_rank',
-            `${challengeId}:rank`,
-            `Daily challenge rank #${rankIndex + 1}`,
-          );
-        }
-      }
+      if (rankIndex < 0 || rankIndex >= COIN_RANK.length) return false;
+      const rankCoins = COIN_RANK[rankIndex];
+      if (!rankCoins) return false;
+      return CoinService.credit(
+        rankCoins,
+        'daily_challenge_rank',
+        `${ch.id}:rank`,
+        `Daily challenge rank #${rankIndex + 1}`,
+      );
     } catch (err) {
-      console.warn('[DailyChallenge] tryClaimRewards rank failed:', err.message);
+      console.warn('[DailyChallenge] claimPendingRankRewards failed:', err.message);
+      return false;
     }
   }
 }

@@ -17,11 +17,14 @@ import {
   CHALLENGE_QUESTION_COUNT,
   RECALL_POINTS,
   QUIZ_POINTS,
+  COIN_PARTICIPATION,
 } from '../services/DailyChallengeService';
+import { CoinService } from '../services/CoinService';
 import { QuizService } from '../services/QuizService';
 import { RecallService } from '../services/RecallService';
 import { AuthService } from '../services/AuthService';
 import { CardLearningService } from '../services/CardLearningService';
+import CoinBalanceChip from '../components/CoinBalanceChip';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -107,6 +110,12 @@ export default function DailyChallengeScreen({ route, navigation }) {
         setTotalPoints(myRun.totalPoints);
         setAnswers(myRun.entries);
         setPhase('summary');
+        const awarded = await DailyChallengeService.tryClaimRewards(ch.id);
+        const already = await CoinService.alreadyCredited(
+          'daily_challenge_participation',
+          ch.id,
+        );
+        if (!cancelled) setCoinsAwarded(awarded || already ? COIN_PARTICIPATION : 0);
         loadLeaderboard(ch.id);
         return;
       }
@@ -224,13 +233,12 @@ export default function DailyChallengeScreen({ route, navigation }) {
     if (next >= cards.length) {
       // All answered — claim rewards and show summary
       setPhase('summary');
-      let earned = 0;
-      const before = await DailyChallengeService.getMyRun(challenge.id);
-      await DailyChallengeService.tryClaimRewards(challenge.id);
-      const after = await DailyChallengeService.getMyRun(challenge.id);
-      earned = Math.max(0, (after.totalPoints ?? 0) - (before.totalPoints ?? 0));
-      // Simpler: just use COIN_PARTICIPATION as a floor for display
-      setCoinsAwarded(5);
+      const awarded = await DailyChallengeService.tryClaimRewards(challenge.id);
+      const already = await CoinService.alreadyCredited(
+        'daily_challenge_participation',
+        challenge.id,
+      );
+      setCoinsAwarded(awarded || already ? COIN_PARTICIPATION : 0);
       loadLeaderboard(challenge.id);
     } else {
       setQuestionIndex(next);
@@ -278,7 +286,7 @@ export default function DailyChallengeScreen({ route, navigation }) {
             <Text style={styles.exitText}>✕ Done</Text>
           </TouchableOpacity>
           <Text style={styles.topTitle}>{categoryName} Challenge</Text>
-          <View style={{ width: 60 }} />
+          <CoinBalanceChip navigation={navigation} />
         </View>
 
         <ScrollView contentContainerStyle={styles.summaryScroll}>
@@ -292,7 +300,10 @@ export default function DailyChallengeScreen({ route, navigation }) {
 
           {coinsAwarded > 0 && (
             <View style={styles.coinBanner}>
-              <Text style={styles.coinBannerText}>🪙 +{coinsAwarded} Study Coins earned!</Text>
+              <Text style={styles.coinBannerText}>🪙 +{coinsAwarded} Study Coins</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('CoinWallet')}>
+                <Text style={styles.coinBannerLink}>See your pile ›</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -348,7 +359,7 @@ export default function DailyChallengeScreen({ route, navigation }) {
           </View>
         </View>
         <View style={styles.pointsBadge}>
-          <Text style={styles.pointsText}>🪙 {totalPoints}</Text>
+          <Text style={styles.pointsText}>{totalPoints} pts</Text>
         </View>
       </View>
 
@@ -616,6 +627,7 @@ const makeStyles = (theme) => StyleSheet.create({
     marginBottom: 20,
   },
   coinBannerText: { fontSize: 16, fontWeight: '700', color: '#92400e' },
+  coinBannerLink: { fontSize: 13, fontWeight: '700', color: '#b45309', marginTop: 6 },
   leaderboardCard: {
     backgroundColor: theme.card,
     borderRadius: 16,

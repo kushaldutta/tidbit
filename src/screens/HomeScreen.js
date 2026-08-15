@@ -19,7 +19,11 @@ import { CategoryProgressService } from '../services/CategoryProgressService';
 import { GroupService } from '../services/GroupService';
 import { ClassService } from '../services/ClassService';
 import { AuthService } from '../services/AuthService';
+import { SameBoatService } from '../services/SameBoatService';
+import { InsightsService } from '../services/InsightsService';
+import { DailyChallengeService } from '../services/DailyChallengeService';
 import { useTheme } from '../context/ThemeContext';
+import CoinBalanceChip from '../components/CoinBalanceChip';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -39,6 +43,8 @@ export default function HomeScreen({ navigation }) {
   const [categoryProgress, setCategoryProgress] = useState([]);
   const [dueCount, setDueCount] = useState(0);
   const [challengeClasses, setChallengeClasses] = useState([]);
+  const [homeInsight, setHomeInsight] = useState(null);
+  const [upcomingExam, setUpcomingExam] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -117,6 +123,10 @@ export default function HomeScreen({ navigation }) {
       ClassService.getClassesByIds(classIds).then((classes) => {
         setEnrolledClasses(classes);
         setChallengeClasses(classes.filter((c) => ClassService.hasTidbitContent(c.id)));
+        classes.forEach((c) => {
+          const slug = ClassService.getCategoryForClass(c.id);
+          if (slug) DailyChallengeService.claimAnyPendingCoins(slug).catch(() => {});
+        });
       }).catch(() => { setEnrolledClasses([]); setChallengeClasses([]); });
     } else {
       setEnrolledClasses([]);
@@ -213,6 +223,10 @@ export default function HomeScreen({ navigation }) {
     setSelectedCategories(validCategories);
     const due = await CardLearningService.getTotalDueCount();
     setDueCount(due);
+    SameBoatService.getHomeInsight().then(setHomeInsight).catch(() => {});
+    InsightsService.getUpcomingExams().then((exams) => {
+      setUpcomingExam(exams[0] || null);
+    }).catch(() => {});
   };
 
   const handleGetTidbitNow = async () => {
@@ -239,32 +253,77 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Tidbit</Text>
-        <Text style={styles.subtitle}>Learn something new with every unlock</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Tidbit</Text>
+          <Text style={styles.subtitle}>Study with your class</Text>
+        </View>
+        <CoinBalanceChip navigation={navigation} />
       </View>
 
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.tidbitsSeen}</Text>
-          <Text style={styles.statLabel}>Total Tidbits</Text>
+          <Text style={styles.statNumber}>{dueCount}</Text>
+          <Text style={styles.statLabel}>Due</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.dailyTidbits}</Text>
-          <Text style={styles.statLabel}>Today</Text>
+          <Text style={styles.statNumber}>{stats.learningStreak}d</Text>
+          <Text style={styles.statLabel}>Streak</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statNumber}>
             {stats.todayAccuracy !== null && stats.todayAccuracy !== undefined
               ? `${stats.todayAccuracy}%`
-              : `${stats.learningStreak}d`}
+              : '—'}
           </Text>
-          <Text style={styles.statLabel}>
-            {stats.todayAccuracy !== null && stats.todayAccuracy !== undefined
-              ? 'Accuracy'
-              : 'Streak'}
-          </Text>
+          <Text style={styles.statLabel}>Accuracy</Text>
         </View>
       </View>
+
+      {upcomingExam && (
+        <TouchableOpacity
+          style={styles.examBanner}
+          onPress={() => navigation.navigate('Insights')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.examBannerEmoji}>📅</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.examBannerTitle}>
+              {upcomingExam.name} {upcomingExam.label}
+            </Text>
+            <Text style={styles.examBannerSub}>
+              {upcomingExam.daysLeft < 0
+                ? 'Passed — set your next exam in Insights'
+                : upcomingExam.daysLeft === 0
+                  ? 'Today'
+                  : `${upcomingExam.daysLeft} day${upcomingExam.daysLeft === 1 ? '' : 's'} left`}
+            </Text>
+          </View>
+          <Text style={styles.reviewQueueChevron}>›</Text>
+        </TouchableOpacity>
+      )}
+
+      {homeInsight && (
+        <TouchableOpacity
+          style={styles.insightCard}
+          onPress={() => navigation.navigate('ReviewQueue')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.insightEmoji}>🛟</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.insightKicker}>
+              {homeInsight.belowClass
+                ? `${homeInsight.classCode} · you're behind the class`
+                : `${homeInsight.classCode} struggles with`}
+            </Text>
+            <Text style={styles.insightTerm} numberOfLines={2}>{homeInsight.term}</Text>
+            <Text style={styles.insightSub}>
+              Class {homeInsight.classPct}% correct
+              {homeInsight.yourPct != null ? ` · you ${homeInsight.yourPct}%` : ''}
+            </Text>
+          </View>
+          <Text style={styles.reviewQueueChevron}>›</Text>
+        </TouchableOpacity>
+      )}
 
       <StudyPlanCard
         plan={studyPlan}
@@ -435,7 +494,10 @@ const makeStyles = (theme) => StyleSheet.create({
     padding: 20,
   },
   header: {
-    marginBottom: 32,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    gap: 12,
   },
   title: {
     fontSize: 42,
@@ -612,6 +674,34 @@ const makeStyles = (theme) => StyleSheet.create({
   reviewQueueTitle: { fontSize: 16, fontWeight: '800', color: theme.text },
   reviewQueueSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
   reviewQueueChevron: { fontSize: 24, color: theme.textSecondary, fontWeight: '700' },
+
+  examBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: theme.accent || '#c7d2fe',
+  },
+  examBannerEmoji: { fontSize: 24, marginRight: 12 },
+  examBannerTitle: { fontSize: 15, fontWeight: '800', color: theme.text },
+  examBannerSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+  insightCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff7ed',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: '#fdba74',
+  },
+  insightEmoji: { fontSize: 24, marginRight: 12 },
+  insightKicker: { fontSize: 11, fontWeight: '800', color: '#9a3412', letterSpacing: 0.3, textTransform: 'uppercase' },
+  insightTerm: { fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 2 },
+  insightSub: { fontSize: 12, color: '#9a3412', marginTop: 2 },
 
   challengeSection: { marginBottom: 16 },
   challengeCard: {

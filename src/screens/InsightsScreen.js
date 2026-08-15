@@ -10,12 +10,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import PremiumGate from '../components/PremiumGate';
+import ExamDateModal from '../components/ExamDateModal';
 import { InsightsService } from '../services/InsightsService';
 import { ContentService } from '../services/ContentService';
 import { useTheme } from '../context/ThemeContext';
 
-function ReadinessCard({ item, styles }) {
+function ReadinessCard({ item, styles, onPressExam }) {
   const color = item.score >= 75 ? '#16a34a' : item.score >= 50 ? '#ca8a04' : '#dc2626';
+  const days = item.examDate
+    ? Math.ceil((new Date(`${item.examDate}T12:00:00`) - Date.now()) / 86400000)
+    : null;
   return (
     <View style={styles.readinessCard}>
       <View style={styles.readinessHeader}>
@@ -26,11 +30,17 @@ function ReadinessCard({ item, styles }) {
         {item.masteryPct}% recall-ready · {item.overdue} overdue
         {item.accuracy7d != null ? ` · ${item.accuracy7d}% accuracy (7d)` : ''}
       </Text>
-      {item.examDate && (
-        <Text style={styles.examLine}>
-          {item.examLabel || 'Exam'}: {new Date(item.examDate).toLocaleDateString()}
-        </Text>
-      )}
+      <TouchableOpacity onPress={onPressExam} activeOpacity={0.8}>
+        {item.examDate ? (
+          <Text style={styles.examLine}>
+            {item.examLabel || 'Exam'} {new Date(`${item.examDate}T12:00:00`).toLocaleDateString()}
+            {days != null ? ` · ${days < 0 ? 'passed' : days === 0 ? 'today' : `${days}d left`}` : ''}
+            {'  '}Edit
+          </Text>
+        ) : (
+          <Text style={styles.examLine}>+ Set exam date</Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 }
@@ -41,9 +51,10 @@ function InsightsContent({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [readiness, setReadiness] = useState([]);
   const [weakSpots, setWeakSpots] = useState([]);
+  const [examTarget, setExamTarget] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const [r, w] = await Promise.all([
         InsightsService.getAllReadiness(),
@@ -84,13 +95,18 @@ function InsightsContent({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.sectionTitle}>Exam Readiness</Text>
         <Text style={styles.sectionSub}>
-          How prepared you are based on mastery, overdue reviews, and recent accuracy.
+          How prepared you are based on mastery, overdue reviews, recent accuracy, and days until your exam.
         </Text>
         {readiness.length === 0 ? (
           <Text style={styles.empty}>Enroll in a class to see readiness scores.</Text>
         ) : (
           readiness.map((item) => (
-            <ReadinessCard key={item.categoryId} item={item} styles={styles} />
+            <ReadinessCard
+              key={item.categoryId}
+              item={item}
+              styles={styles}
+              onPressExam={() => setExamTarget(item)}
+            />
           ))
         )}
 
@@ -126,6 +142,15 @@ function InsightsContent({ navigation }) {
           <Text style={styles.queueBtnText}>Open Review Queue</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <ExamDateModal
+        visible={!!examTarget}
+        onClose={() => setExamTarget(null)}
+        categoryId={examTarget?.categoryId}
+        classCode={examTarget?.name}
+        current={examTarget?.examDate ? { date: examTarget.examDate, label: examTarget.examLabel } : null}
+        onSaved={() => load(false)}
+      />
     </SafeAreaView>
   );
 }

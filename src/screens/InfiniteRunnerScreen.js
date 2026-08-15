@@ -290,7 +290,9 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
             {correct} dodge{correct === 1 ? '' : 's'} · {result?.reason === 'wrong' ? 'wrong term' : 'too slow'}
           </Text>
           {result?.coins > 0 && (
-            <Text style={styles.coinLine}>🪙 +{result.coins} Study Coins</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('CoinWallet')}>
+              <Text style={styles.coinLine}>🪙 +{result.coins} Study Coins · see your pile ›</Text>
+            </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.goBtn} onPress={startRun} activeOpacity={0.85}>
             <Text style={styles.goBtnText}>Run again</Text>

@@ -8,12 +8,16 @@ import {
   Dimensions,
   ScrollView,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { StudySessionService } from '../services/StudySessionService';
 import { StudyPlanService } from '../services/StudyPlanService';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
+import { RecallService } from '../services/RecallService';
 import { useTheme } from '../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
@@ -35,6 +39,8 @@ export default function StudySessionScreen({ route, navigation }) {
   const [isComplete, setIsComplete] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
+  const [userAnswer, setUserAnswer] = useState('');
+  const [recallResult, setRecallResult] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const flipAnim = useRef(new Animated.Value(0)).current;
 
@@ -85,6 +91,8 @@ export default function StudySessionScreen({ route, navigation }) {
         const tidbitWithId = ContentService.ensureTidbitHasId(tidbit);
         setCurrentTidbit(tidbitWithId);
         setIsFlipped(false);
+        setUserAnswer('');
+        setRecallResult(null);
         flipAnim.setValue(0);
       } else {
         // No more tidbits, session complete
@@ -93,6 +101,20 @@ export default function StudySessionScreen({ route, navigation }) {
     } catch (error) {
       console.error('[STUDY_SESSION] Error loading next tidbit:', error);
     }
+  };
+
+  const handleRecallSubmit = () => {
+    if (!currentTidbit?.term || !userAnswer.trim() || recallResult) return;
+    const graded = RecallService.grade(userAnswer.trim(), currentTidbit.term);
+    setRecallResult(graded);
+    Haptics.notificationAsync(
+      graded.isCorrect
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error,
+    ).catch(() => {});
+    setTimeout(() => {
+      handleTidbitAction(graded.isCorrect ? 'knew' : 'didnt');
+    }, 900);
   };
 
   const handleFlip = () => {
@@ -223,6 +245,10 @@ export default function StudySessionScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {/* Header with progress */}
         <View style={styles.header}>
@@ -261,6 +287,10 @@ export default function StudySessionScreen({ route, navigation }) {
               flipAnim={flipAnim}
               onFlip={handleFlip}
               onAction={handleTidbitAction}
+              userAnswer={userAnswer}
+              onChangeAnswer={setUserAnswer}
+              recallResult={recallResult}
+              onRecallSubmit={handleRecallSubmit}
               styles={styles}
             />
           ) : (
@@ -270,13 +300,69 @@ export default function StudySessionScreen({ route, navigation }) {
           )}
         </ScrollView>
       </Animated.View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 // Study Tidbit Card Component
-function StudyTidbitCard({ tidbit, isFlipped, flipAnim, onFlip, onAction, styles }) {
+function StudyTidbitCard({
+  tidbit,
+  isFlipped,
+  flipAnim,
+  onFlip,
+  onAction,
+  userAnswer,
+  onChangeAnswer,
+  recallResult,
+  onRecallSubmit,
+  styles,
+}) {
   const categoryName = formatCategoryName(tidbit.category);
+  const useRecall = Boolean(tidbit.term);
+
+  if (useRecall) {
+    return (
+      <View style={styles.cardContainer}>
+        <View style={[styles.card, styles.cardFront]}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.categoryLabel}>{categoryName}</Text>
+          </View>
+          <Text style={styles.defLabel}>DEFINITION</Text>
+          <Text style={styles.tidbitText}>{tidbit.text}</Text>
+          {recallResult ? (
+            <Text style={recallResult.isCorrect ? styles.recallOk : styles.recallBad}>
+              {recallResult.isCorrect
+                ? `Got it · ${tidbit.term}`
+                : `Answer: ${tidbit.term}`}
+            </Text>
+          ) : (
+            <>
+              <TextInput
+                style={styles.recallInput}
+                placeholder="Type the term…"
+                placeholderTextColor="#9ca3af"
+                value={userAnswer}
+                onChangeText={onChangeAnswer}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={onRecallSubmit}
+              />
+              <TouchableOpacity
+                style={[styles.lockBtn, !userAnswer.trim() && styles.lockBtnDisabled]}
+                onPress={onRecallSubmit}
+                disabled={!userAnswer.trim()}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.lockBtnText}>Lock in</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   const frontOpacity = flipAnim.interpolate({
     inputRange: [0, 1],
@@ -477,6 +563,35 @@ const makeStyles = (theme) => StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
   },
+  defLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    color: theme.textSecondary,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  recallInput: {
+    borderWidth: 1.5,
+    borderColor: theme.primaryLight,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 18,
+    color: theme.text,
+    backgroundColor: theme.background,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  lockBtn: {
+    backgroundColor: theme.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  lockBtnDisabled: { opacity: 0.4 },
+  lockBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  recallOk: { color: '#16a34a', fontWeight: '800', fontSize: 16, textAlign: 'center', marginTop: 12 },
+  recallBad: { color: '#dc2626', fontWeight: '800', fontSize: 16, textAlign: 'center', marginTop: 12 },
   termText: {
     fontSize: 26,
     lineHeight: 34,

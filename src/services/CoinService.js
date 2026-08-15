@@ -8,6 +8,7 @@
  * The balance is cached locally so Home shows it without a round-trip.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 
@@ -67,6 +68,7 @@ class CoinService {
 
   static invalidateCache() {
     this._cache = null;
+    AsyncStorage.removeItem(CACHE_KEY).catch(() => {});
   }
 
   // ─── Credit ─────────────────────────────────────────────────
@@ -90,13 +92,13 @@ class CoinService {
       });
       if (error) throw error;
       if (data) {
-        // Optimistically update cache
-        const current = await this.getBalance();
-        await this._writeCache(current + amount);
+        this.invalidateCache();
+        const fresh = await this.getBalance({ bypassCache: true });
+        DeviceEventEmitter.emit('coinsUpdated', fresh);
       }
       return !!data;
     } catch (err) {
-      console.warn('[CoinService] credit failed:', err.message);
+      console.warn('[CoinService] credit failed:', err.message, err.code || '');
       return false;
     }
   }

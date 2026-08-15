@@ -51,25 +51,35 @@ export default function GroupClassmatesScreen({ route, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   // Map: userId → 'none' | 'request_sent' | 'request_received' | 'buddies'
   const [relationships, setRelationships] = useState({});
+  const [incomingByUser, setIncomingByUser] = useState({});
   const [sendingRequest, setSendingRequest] = useState(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [cm, blockedIds] = await Promise.all([
+      const [cm, blockedIds, pending] = await Promise.all([
         GroupService.getClassmates(classId),
         BlockService.getBlockedUserIds(),
+        BuddyService.getPendingRequests(),
       ]);
       const filtered = BlockService.filterClassmates(cm, blockedIds);
       setClassmates(filtered);
+
+      const incoming = {};
+      for (const req of pending) {
+        if (req.classId === classId) incoming[req.requesterId] = req.id;
+      }
+      setIncomingByUser(incoming);
 
       // Load buddy relationship status for each classmate
       const statuses = {};
       await Promise.all(
         filtered.map(async (c) => {
           if (c.id !== myUserId) {
-            statuses[c.id] = await BuddyService.getRelationshipStatus(c.id, classId);
+            statuses[c.id] = incoming[c.id]
+              ? 'request_received'
+              : await BuddyService.getRelationshipStatus(c.id, classId);
           }
         })
       );
@@ -83,6 +93,58 @@ export default function GroupClassmatesScreen({ route, navigation }) {
   }, [classId, myUserId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const handleRespond = async (classmate) => {
+    let requestId = incomingByUser[classmate.id];
+    if (!requestId) {
+      const pending = await BuddyService.getPendingRequests();
+      requestId = pending.find((r) => r.requesterId === classmate.id && r.classId === classId)?.id;
+    }
+    if (!requestId) {
+      Alert.alert('Request not found', 'Pull to refresh and try again.');
+      return;
+    }
+    Alert.alert(
+      `Buddy request from ${classmate.display_name || 'Tidbit User'}`,
+      'Accept to share a streak and nudge each other in this class.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        {
+          text: 'Decline',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await BuddyService.declineRequest(requestId);
+              setRelationships((prev) => ({ ...prev, [classmate.id]: 'none' }));
+              setIncomingByUser((prev) => {
+                const next = { ...prev };
+                delete next[classmate.id];
+                return next;
+              });
+            } catch (e) {
+              Alert.alert('Couldn’t decline', e.message || 'Try again.');
+            }
+          },
+        },
+        {
+          text: 'Accept',
+          onPress: async () => {
+            try {
+              await BuddyService.acceptRequest(requestId);
+              setRelationships((prev) => ({ ...prev, [classmate.id]: 'buddies' }));
+              setIncomingByUser((prev) => {
+                const next = { ...prev };
+                delete next[classmate.id];
+                return next;
+              });
+            } catch (e) {
+              Alert.alert('Couldn’t accept', e.message || 'Try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleSendRequest = async (classmate) => {
     setSendingRequest(classmate.id);
@@ -147,13 +209,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
               ]}
               onPress={() => {
                 if (status === 'none') handleSendRequest(item);
-                else if (status === 'request_received') {
-                  Alert.alert(
-                    `Buddy request from ${item.display_name}`,
-                    'You have an incoming buddy request from this classmate. Go to your buddy requests to accept.',
-                    [{ text: 'OK' }]
-                  );
-                }
+                else if (status === 'request_received') handleRespond(item);
               }}
               disabled={buddyButtonDisabled(status) || isSending}
             >
@@ -188,7 +244,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
         <Text style={styles.hintText}>
           {duelMode
             ? 'Pick a classmate — same 10 cards, definition → term, fastest accurate run wins.'
-            : 'Add up to 3 study buddies per class for shared streaks and nudges.'}
+            : 'Add up to 3 study buddies per class. Incoming requests show as Respond — tap to accept or decline.'}
         </Text>
       </View>
 

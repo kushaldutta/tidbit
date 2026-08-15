@@ -63,11 +63,7 @@ class BuddyService {
 
     const { data, error } = await supabase
       .from('buddy_requests')
-      .select(`
-        id, requester_id, class_id, status, created_at,
-        profiles!requester_id(display_name, grad_year),
-        classes!class_id(code, title)
-      `)
+      .select('id, requester_id, class_id, status, created_at')
       .eq('target_id', myId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
@@ -76,18 +72,34 @@ class BuddyService {
       console.warn('[BuddyService] getPendingRequests error:', error.message);
       return [];
     }
+    if (!data?.length) return [];
 
-    return (data || []).map((r) => ({
-      id: r.id,
-      requesterId: r.requester_id,
-      requesterName: r.profiles?.display_name || 'Tidbit User',
-      requesterYear: r.profiles?.grad_year || null,
-      classId: r.class_id,
-      classCode: r.classes?.code || '',
-      classTitle: r.classes?.title || '',
-      status: r.status,
-      createdAt: r.created_at,
-    }));
+    const requesterIds = [...new Set(data.map((r) => r.requester_id))];
+    const classIds = [...new Set(data.map((r) => r.class_id).filter(Boolean))];
+    const [{ data: profiles }, { data: classes }] = await Promise.all([
+      supabase.from('profiles').select('id, display_name, grad_year').in('id', requesterIds),
+      classIds.length
+        ? supabase.from('classes').select('id, code, title').in('id', classIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+    const nameById = new Map((profiles || []).map((p) => [p.id, p]));
+    const classById = new Map((classes || []).map((c) => [c.id, c]));
+
+    return data.map((r) => {
+      const profile = nameById.get(r.requester_id);
+      const cls = classById.get(r.class_id);
+      return {
+        id: r.id,
+        requesterId: r.requester_id,
+        requesterName: profile?.display_name || 'Tidbit User',
+        requesterYear: profile?.grad_year || null,
+        classId: r.class_id,
+        classCode: cls?.code || '',
+        classTitle: cls?.title || '',
+        status: r.status,
+        createdAt: r.created_at,
+      };
+    });
   }
 
   /**

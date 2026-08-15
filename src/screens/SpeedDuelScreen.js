@@ -180,7 +180,9 @@ export default function SpeedDuelScreen({ route, navigation }) {
             </Text>
           )}
           {outcome?.coins > 0 && (
-            <Text style={styles.coinLine}>🪙 +{outcome.coins} Study Coins</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('CoinWallet')}>
+              <Text style={styles.coinLine}>🪙 +{outcome.coins} Study Coins · see your pile ›</Text>
+            </TouchableOpacity>
           )}
           {phase === 'waiting' && (
             <Text style={styles.muted}>They’ll see this in Games and on the class feed.</Text>

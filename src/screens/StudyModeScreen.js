@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StudyPlanService } from '../services/StudyPlanService';
 import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
+import CoinBalanceChip from '../components/CoinBalanceChip';
 
 export default function StudyModeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -44,7 +45,10 @@ export default function StudyModeScreen({ navigation }) {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
-      <Text style={styles.title}>Study Mode</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Study Mode</Text>
+        <CoinBalanceChip navigation={navigation} />
+      </View>
       <Text style={styles.subtitle}>
         Quiz, recall, and match from your decks, or run a focused review session.
       </Text>
@@ -173,6 +177,13 @@ const makeStyles = (theme) => StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 40,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 4,
   },
   title: {
     fontSize: 32,

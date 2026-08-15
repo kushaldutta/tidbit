@@ -21,20 +21,63 @@ class InsightsService {
     return data?.exam_dates || {};
   }
 
-  static async setExamDate(classId, examDateIso, label = 'Exam') {
+  static examKey(classOrCategoryId) {
+    return ClassService.getCategoryForClass(classOrCategoryId) || classOrCategoryId;
+  }
+
+  static async setExamDate(classOrCategoryId, examDateIso, label = 'Exam') {
     if (!SUPABASE_CONFIGURED) return false;
     const userId = AuthService.getUserId();
     if (!userId) return false;
+    const key = this.examKey(classOrCategoryId);
+    if (!key) return false;
     const current = await this.getExamDates();
     const next = {
       ...current,
-      [classId]: { date: examDateIso, label },
+      [key]: { date: examDateIso, label },
     };
     const { error } = await supabase
       .from('profiles')
       .update({ exam_dates: next, updated_at: new Date().toISOString() })
       .eq('id', userId);
     return !error;
+  }
+
+  static async clearExamDate(classOrCategoryId) {
+    if (!SUPABASE_CONFIGURED) return false;
+    const userId = AuthService.getUserId();
+    if (!userId) return false;
+    const key = this.examKey(classOrCategoryId);
+    const current = await this.getExamDates();
+    if (!current[key]) return true;
+    const next = { ...current };
+    delete next[key];
+    const { error } = await supabase
+      .from('profiles')
+      .update({ exam_dates: next, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+    return !error;
+  }
+
+  static async getUpcomingExams() {
+    const dates = await this.getExamDates();
+    const cats = await ClassService.getEnrollmentCategoryIds();
+    const now = Date.now();
+    return cats
+      .map((cat) => {
+        const info = dates[cat];
+        if (!info?.date) return null;
+        const daysLeft = Math.ceil((new Date(`${info.date}T12:00:00`) - now) / 86400000);
+        return {
+          categoryId: cat,
+          name: ContentService.formatCategoryName(cat),
+          date: info.date,
+          label: info.label || 'Exam',
+          daysLeft,
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.daysLeft - b.daysLeft);
   }
 
   static async getClassReadiness(categoryId) {

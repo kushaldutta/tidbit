@@ -26,8 +26,9 @@ class GroupService {
     // 2. Get corresponding groups
     const { data: groups, error: gErr } = await supabase
       .from('groups')
-      .select('id, class_id')
-      .in('class_id', classIds);
+      .select('id, class_id, section_name')
+      .in('class_id', classIds)
+      .is('section_name', null);
 
     if (gErr || !groups?.length) return [];
 
@@ -181,6 +182,81 @@ class GroupService {
       });
 
     return DeckVoteService.sortDecksByUpvotes(decks);
+  }
+
+  static async listSections(classId) {
+    if (!SUPABASE_CONFIGURED || !classId) return [];
+    const { data, error } = await supabase
+      .from('class_sections')
+      .select('group_id, class_id, section_name, member_count')
+      .eq('class_id', classId)
+      .order('section_name', { ascending: true });
+    if (error) {
+      console.warn('[GroupService] listSections:', error.message);
+      return [];
+    }
+    return (data || []).map((r) => ({
+      groupId: r.group_id,
+      classId: r.class_id,
+      name: r.section_name,
+      memberCount: Number(r.member_count) || 0,
+    }));
+  }
+
+  static async getMySection(classId) {
+    if (!SUPABASE_CONFIGURED || !classId) return null;
+    const userId = AuthService.getUserId();
+    if (!userId) return null;
+    const { data } = await supabase
+      .from('section_memberships')
+      .select('group_id, groups(section_name)')
+      .eq('user_id', userId)
+      .eq('class_id', classId)
+      .maybeSingle();
+    if (!data) return null;
+    return {
+      groupId: data.group_id,
+      name: data.groups?.section_name || 'Section',
+    };
+  }
+
+  static async createSection(classId, sectionName) {
+    if (!SUPABASE_CONFIGURED) return null;
+    const { data, error } = await supabase.rpc('create_section_group', {
+      p_class_id: classId,
+      p_section_name: String(sectionName || '').trim(),
+    });
+    if (error) {
+      console.warn('[GroupService] createSection:', error.message);
+      throw error;
+    }
+    return data;
+  }
+
+  static async joinSection(groupId) {
+    if (!SUPABASE_CONFIGURED || !groupId) return false;
+    const { error } = await supabase.rpc('join_section', { p_group_id: groupId });
+    if (error) {
+      console.warn('[GroupService] joinSection:', error.message);
+      throw error;
+    }
+    return true;
+  }
+
+  static async leaveSection(classId) {
+    if (!SUPABASE_CONFIGURED || !classId) return false;
+    const userId = AuthService.getUserId();
+    if (!userId) return false;
+    const { error } = await supabase
+      .from('section_memberships')
+      .delete()
+      .eq('user_id', userId)
+      .eq('class_id', classId);
+    if (error) {
+      console.warn('[GroupService] leaveSection:', error.message);
+      return false;
+    }
+    return true;
   }
 }
 

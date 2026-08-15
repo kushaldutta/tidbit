@@ -19,6 +19,7 @@ import { GAME_CATALOG, GAME_TYPE } from '../config/gameCatalog';
 import { SpeedDuelService } from '../services/SpeedDuelService';
 import { GroupService } from '../services/GroupService';
 import { ClassService } from '../services/ClassService';
+import CoinBalanceChip from '../components/CoinBalanceChip';
 
 export default function GamesScreen({ navigation }) {
   const { theme } = useTheme();
@@ -130,7 +131,7 @@ export default function GamesScreen({ navigation }) {
           <Text style={styles.back}>← Study</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Games</Text>
-        <View style={{ width: 56 }} />
+        <CoinBalanceChip navigation={navigation} />
       </View>
 
       {loading ? (

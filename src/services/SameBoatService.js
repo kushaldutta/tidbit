@@ -1,5 +1,6 @@
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
+import { ClassService } from './ClassService';
 
 class SameBoatService {
   /**
@@ -158,6 +159,70 @@ class SameBoatService {
       };
     } catch (e) {
       console.warn('[SameBoat] getHardestCard error:', e.message);
+      return null;
+    }
+  }
+
+  /**
+   * One Home insight: a card your class misses, plus your accuracy if you've tried it.
+   */
+  static async getHomeInsight() {
+    if (!SUPABASE_CONFIGURED) return null;
+    try {
+      const classIds = await ClassService.getMyClassIds();
+      if (!classIds.length) return null;
+
+      const candidates = [];
+      for (const classId of classIds) {
+        const slug = ClassService.getCategoryForClass(classId);
+        if (!slug) continue;
+        const { data: deck } = await supabase
+          .from('decks')
+          .select('id')
+          .eq('slug', slug)
+          .is('owner_id', null)
+          .maybeSingle();
+        if (!deck) continue;
+        const hardest = await this.getHardestCard(deck.id, 3);
+        if (!hardest) continue;
+        candidates.push({ classId, slug, ...hardest });
+      }
+      if (!candidates.length) return null;
+      candidates.sort((a, b) => a.pctCorrect - b.pctCorrect);
+      const pick = candidates[0];
+
+      const [{ data: card }, classes] = await Promise.all([
+        supabase.from('cards').select('id, front, back').eq('id', pick.cardId).maybeSingle(),
+        ClassService.getClassesByIds([pick.classId]),
+      ]);
+      if (!card?.front) return null;
+
+      const userId = AuthService.getUserId();
+      let yourPct = null;
+      if (userId) {
+        const { data: mine } = await supabase
+          .from('card_attempts')
+          .select('was_correct')
+          .eq('user_id', userId)
+          .eq('card_id', pick.cardId);
+        if (mine?.length) {
+          yourPct = Math.round((mine.filter((a) => a.was_correct).length / mine.length) * 100);
+        }
+      }
+
+      const classPct = Math.round(pick.pctCorrect);
+      return {
+        cardId: pick.cardId,
+        term: card.front,
+        classCode: classes[0]?.code || pick.slug,
+        classPct,
+        yourPct,
+        attempts: pick.attempts,
+        categorySlug: pick.slug,
+        belowClass: yourPct != null && yourPct < classPct,
+      };
+    } catch (e) {
+      console.warn('[SameBoat] getHomeInsight error:', e.message);
       return null;
     }
   }

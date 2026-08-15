@@ -26,6 +26,7 @@ import { ReportService } from '../services/ReportService';
 import { usePremium } from '../components/PremiumGate';
 import { EntitlementService } from '../services/EntitlementService';
 import { getSchool } from '../config/schools';
+import { CoinService } from '../services/CoinService';
 import * as Notifications from 'expo-notifications';
 import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../constants/legalUrls';
 
@@ -61,17 +62,20 @@ export default function SettingsScreen({ navigation }) {
   const [expandedDeckId, setExpandedDeckId] = useState(null);
   const [accountBusy, setAccountBusy] = useState(false);
   const [pendingReportCount, setPendingReportCount] = useState(0);
+  const [coinBalance, setCoinBalance] = useState(null);
 
   useEffect(() => {
     loadSettings();
     loadSpacedRepStats();
     loadProfile();
+    CoinService.getBalance().then(setCoinBalance).catch(() => {});
     
     // Refresh stats when screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
       loadSpacedRepStats();
       loadProfile();
       loadPendingReportCount();
+      CoinService.getBalance().then(setCoinBalance).catch(() => {});
     });
     
     return unsubscribe;
@@ -479,6 +483,21 @@ export default function SettingsScreen({ navigation }) {
           ) : (
             <Text style={styles.profileSub}>Add your name and school</Text>
           )}
+        </View>
+        <Text style={styles.profileChevron}>›</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.coinRow}
+        onPress={() => navigation.navigate('CoinWallet')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.coinRowEmoji}>🪙</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.coinRowTitle}>
+            {coinBalance == null ? 'Study Coins' : `${coinBalance} Study Coins`}
+          </Text>
+          <Text style={styles.coinRowSub}>Balance, earnings, and what’s coming to the shop</Text>
         </View>
         <Text style={styles.profileChevron}>›</Text>
       </TouchableOpacity>
@@ -1021,7 +1040,7 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.aboutLabel}>Version:</Text> 2.3.1
           </Text>
           <Text style={styles.aboutText}>
-            <Text style={styles.aboutLabel}>Description:</Text> Learn tiny things daily through bite-sized notifications and interactive learning.
+            <Text style={styles.aboutLabel}>Description:</Text> Study with your class — course-native flashcards, daily challenges, and classmates in the same lecture.
           </Text>
           <TouchableOpacity
             onPress={() => Linking.openURL('mailto:kushald@berkeley.edu?subject=Tidbit App Support')}
@@ -1188,10 +1207,24 @@ const makeStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 10,
     borderWidth: 1.5,
     borderColor: theme.primaryLight,
   },
+  coinRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#fffbeb',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#fcd34d',
+  },
+  coinRowEmoji: { fontSize: 26 },
+  coinRowTitle: { fontSize: 15, fontWeight: '800', color: '#92400e' },
+  coinRowSub: { fontSize: 12, color: '#b45309', marginTop: 2 },
   profileAvatar: {
     width: 48,
     height: 48,

@@ -32,6 +32,9 @@ import { DeckService } from '../services/DeckService';
 import { ClassService } from '../services/ClassService';
 import { BuddyService } from '../services/BuddyService';
 import { GroupChallengeService } from '../services/GroupChallengeService';
+import { InsightsService } from '../services/InsightsService';
+import SectionPickerModal from '../components/SectionPickerModal';
+import ExamDateModal from '../components/ExamDateModal';
 import { useTheme } from '../context/ThemeContext';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -244,6 +247,11 @@ export default function GroupScreen({ route, navigation }) {
   const [reportTarget, setReportTarget] = useState(null);
   const [votingDeckId, setVotingDeckId] = useState(null);
   const [savingDeckId, setSavingDeckId] = useState(null);
+  const [mySection, setMySection] = useState(null);
+  const [pendingBuddyReqs, setPendingBuddyReqs] = useState([]);
+  const [sectionPickerOpen, setSectionPickerOpen] = useState(false);
+  const [examInfo, setExamInfo] = useState(null);
+  const [examModalOpen, setExamModalOpen] = useState(false);
   const inputRef = useRef(null);
 
   const sortedDecks = useMemo(
@@ -257,7 +265,7 @@ export default function GroupScreen({ route, navigation }) {
     if (isRefresh) setRefreshing(true);
     else if (!silent) setLoading(true);
     try {
-      const [cm, dk, ps, liveUsersData, blockedIds, buddies, challenge] = await Promise.all([
+      const [cm, dk, ps, liveUsersData, blockedIds, buddies, challenge, section, pendingBuddies] = await Promise.all([
         GroupService.getClassmates(classId),
         GroupService.getGroupDecks(groupId),
         FeedService.getGroupPosts(groupId),
@@ -265,6 +273,8 @@ export default function GroupScreen({ route, navigation }) {
         BlockService.getBlockedUserIds(),
         BuddyService.getMyBuddies(classId),
         GroupChallengeService.getActiveChallengeForGroup(groupId),
+        GroupService.getMySection(classId),
+        BuddyService.getPendingRequests(),
       ]);
       setClassmates(BlockService.filterClassmates(cm, blockedIds));
       setDecks(BlockService.filterDecks(dk, blockedIds));
@@ -273,6 +283,14 @@ export default function GroupScreen({ route, navigation }) {
       setLiveCount(liveUsersData.length);
       setMyBuddies(buddies);
       setActiveChallenge(challenge);
+      setMySection(section);
+      setPendingBuddyReqs((pendingBuddies || []).filter((r) => r.classId === classId));
+      const slug = ClassService.getCategoryForClass(classId);
+      if (slug) {
+        InsightsService.getExamDates().then((dates) => {
+          setExamInfo(dates[slug] || null);
+        }).catch(() => {});
+      }
       if (challenge) {
         const progress = await GroupChallengeService.getChallengeProgress(challenge.id);
         setChallengeProgress(progress);
@@ -454,6 +472,17 @@ export default function GroupScreen({ route, navigation }) {
     navigation.navigate('GroupClassmates', { classId, code, title });
   };
 
+  const handleBuddyRespond = async (req, accept) => {
+    try {
+      if (accept) await BuddyService.acceptRequest(req.id);
+      else await BuddyService.declineRequest(req.id);
+      setPendingBuddyReqs((prev) => prev.filter((r) => r.id !== req.id));
+      if (accept) load(false, true);
+    } catch (e) {
+      Alert.alert(accept ? 'Couldn’t accept' : 'Couldn’t decline', e.message || 'Try again.');
+    }
+  };
+
   const handleReportSubmit = async ({ category, details }) => {
     try {
       if (reportTarget.type === 'post') {
@@ -587,6 +616,40 @@ export default function GroupScreen({ route, navigation }) {
         )}
       </View>
 
+      <TouchableOpacity
+        style={styles.classActionRow}
+        onPress={() => setSectionPickerOpen(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.classActionEmoji}>🏛️</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.classActionTitle}>{mySection ? mySection.name : 'Join a section'}</Text>
+          <Text style={styles.classActionSub}>
+            {mySection ? 'Your discussion section' : 'e.g. CS 61A Section 103'}
+          </Text>
+        </View>
+        <Text style={styles.challengeChevron}>›</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.classActionRow}
+        onPress={() => setExamModalOpen(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.classActionEmoji}>📅</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.classActionTitle}>
+            {examInfo?.date
+              ? `${examInfo.label || 'Exam'} · ${new Date(`${examInfo.date}T12:00:00`).toLocaleDateString()}`
+              : 'Set exam date'}
+          </Text>
+          <Text style={styles.classActionSub}>
+            {examInfo?.date ? 'Countdown on Home and Insights' : 'Midterm or final — readiness counts down'}
+          </Text>
+        </View>
+        <Text style={styles.challengeChevron}>›</Text>
+      </TouchableOpacity>
+
       {/* Studying Now — realtime presence with avatars */}
       {liveUsers.length > 0 && (
         <View style={styles.studyingNowBar}>
@@ -605,6 +668,28 @@ export default function GroupScreen({ route, navigation }) {
                 ? `${liveUsers.map((u) => u.displayName.split(' ')[0]).join(', ')} are studying`
                 : `${liveUsers.length} classmates studying now`}
           </Text>
+        </View>
+      )}
+
+      {/* Incoming buddy requests */}
+      {pendingBuddyReqs.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Buddy requests</Text>
+          {pendingBuddyReqs.map((req) => (
+            <View key={req.id} style={styles.buddyReqRow}>
+              <Avatar name={req.requesterName} size={40} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.buddyReqName}>{req.requesterName}</Text>
+                <Text style={styles.buddyReqSub}>wants to be study buddies</Text>
+              </View>
+              <TouchableOpacity style={styles.buddyDeclineBtn} onPress={() => handleBuddyRespond(req, false)}>
+                <Text style={styles.buddyDeclineText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.buddyAcceptBtn} onPress={() => handleBuddyRespond(req, true)}>
+                <Text style={styles.buddyAcceptText}>Accept</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
       )}
 
@@ -883,6 +968,23 @@ export default function GroupScreen({ route, navigation }) {
         onClose={() => setReportTarget(null)}
         onSubmit={handleReportSubmit}
       />
+
+      <SectionPickerModal
+        visible={sectionPickerOpen}
+        onClose={() => setSectionPickerOpen(false)}
+        classId={classId}
+        classCode={code}
+        onChanged={() => load(false, true)}
+      />
+
+      <ExamDateModal
+        visible={examModalOpen}
+        onClose={() => setExamModalOpen(false)}
+        categoryId={ClassService.getCategoryForClass(classId) || classId}
+        classCode={code}
+        current={examInfo}
+        onSaved={(next) => setExamInfo(next)}
+      />
     </SafeAreaView>
   );
 }
@@ -1120,6 +1222,21 @@ const makeStyles = (theme) => StyleSheet.create({
   challengeSub: { fontSize: 12, color: theme.primary, marginTop: 2, opacity: 0.75 },
   challengeChevron: { fontSize: 24, color: theme.primary, fontWeight: '700' },
 
+  classActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    padding: 14,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.primaryLight || '#e5e7eb',
+  },
+  classActionEmoji: { fontSize: 22, marginRight: 12 },
+  classActionTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+  classActionSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+
   // ── group challenge card ─────────────────────────────────────────────────
   groupChallengeCard: {
     flexDirection: 'row',
@@ -1186,4 +1303,32 @@ const makeStyles = (theme) => StyleSheet.create({
     marginTop: 2,
   },
   nudgeBtnText: { fontSize: 11, color: '#374151', fontWeight: '600' },
+
+  buddyReqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.card,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: theme.accent || '#c7d2fe',
+  },
+  buddyReqName: { fontSize: 15, fontWeight: '700', color: theme.text },
+  buddyReqSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  buddyDeclineBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+  },
+  buddyDeclineText: { fontWeight: '700', color: '#4b5563' },
+  buddyAcceptBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: theme.primary,
+  },
+  buddyAcceptText: { fontWeight: '800', color: '#fff' },
 });

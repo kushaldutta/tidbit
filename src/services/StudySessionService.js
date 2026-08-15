@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SpacedRepetitionService } from './SpacedRepetitionService';
 import { StorageService } from './StorageService';
+import { CardLearningService } from './CardLearningService';
+import { SameBoatService } from './SameBoatService';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 
@@ -76,6 +78,12 @@ class StudySessionService {
 
       // Record feedback with spaced repetition service
       await SpacedRepetitionService.recordFeedback(tidbitId, action);
+
+      if (action === 'knew' || action === 'didnt_know') {
+        const wasCorrect = action === 'knew';
+        CardLearningService.recordReview(tidbitId, { wasCorrect, mode: 'session' }).catch(() => {});
+        SameBoatService.recordAttempt(tidbitId, wasCorrect, 'session').catch(() => {});
+      }
 
       // Update session stats
       if (action === 'knew') {
