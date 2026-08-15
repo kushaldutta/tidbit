@@ -24,6 +24,7 @@ import { InsightsService } from '../services/InsightsService';
 import { DailyChallengeService } from '../services/DailyChallengeService';
 import { useTheme } from '../context/ThemeContext';
 import CoinBalanceChip from '../components/CoinBalanceChip';
+import BuddyRequestsCard from '../components/BuddyRequestsCard';
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -278,6 +279,8 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.statLabel}>Accuracy</Text>
         </View>
       </View>
+
+      <BuddyRequestsCard />
 
       {upcomingExam && (
         <TouchableOpacity

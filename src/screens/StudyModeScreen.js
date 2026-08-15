@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { StudyPlanService } from '../services/StudyPlanService';
 import { CardLearningService } from '../services/CardLearningService';
+import { BuddyService } from '../services/BuddyService';
 import { useTheme } from '../context/ThemeContext';
 import CoinBalanceChip from '../components/CoinBalanceChip';
 
@@ -13,10 +15,14 @@ export default function StudyModeScreen({ navigation }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [dueCount, setDueCount] = useState(0);
+  const [buddyRequestCount, setBuddyRequestCount] = useState(0);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     CardLearningService.getTotalDueCount().then(setDueCount);
-  }, []);
+    BuddyService.getPendingRequests()
+      .then((reqs) => setBuddyRequestCount(reqs.length))
+      .catch(() => {});
+  }, []));
 
   const startSession = async (durationMinutes) => {
     try {
@@ -81,6 +87,28 @@ export default function StudyModeScreen({ navigation }) {
             <Text style={styles.learnBtnSub}>Daily Challenge · Speed Duel · Runner</Text>
           </View>
           <Text style={styles.learnBtnArrow}>›</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.learnBtn, { marginTop: 12 }]}
+          onPress={() => navigation.navigate('BuddyRequests')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.learnBtnEmoji}>🤝</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.learnBtnLabel}>Buddy requests</Text>
+            <Text style={styles.learnBtnSub}>
+              {buddyRequestCount > 0
+                ? `${buddyRequestCount} waiting — accept or decline`
+                : 'Incoming study-buddy invites'}
+            </Text>
+          </View>
+          {buddyRequestCount > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{buddyRequestCount}</Text>
+            </View>
+          ) : (
+            <Text style={styles.learnBtnArrow}>›</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -224,6 +252,16 @@ const makeStyles = (theme) => StyleSheet.create({
   learnBtnLabel: { fontSize: 17, fontWeight: '800', color: theme.primary, marginBottom: 2 },
   learnBtnSub: { fontSize: 13, color: theme.primary },
   learnBtnArrow: { fontSize: 28, color: theme.primary, fontWeight: '700' },
+  badge: {
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: theme.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  badgeText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   focusedHeader: {
     fontSize: 20,
     fontWeight: '800',

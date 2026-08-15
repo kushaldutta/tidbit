@@ -27,6 +27,7 @@ import { usePremium } from '../components/PremiumGate';
 import { EntitlementService } from '../services/EntitlementService';
 import { getSchool } from '../config/schools';
 import { CoinService } from '../services/CoinService';
+import { BuddyService } from '../services/BuddyService';
 import * as Notifications from 'expo-notifications';
 import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../constants/legalUrls';
 
@@ -63,12 +64,16 @@ export default function SettingsScreen({ navigation }) {
   const [accountBusy, setAccountBusy] = useState(false);
   const [pendingReportCount, setPendingReportCount] = useState(0);
   const [coinBalance, setCoinBalance] = useState(null);
+  const [buddyRequestCount, setBuddyRequestCount] = useState(0);
 
   useEffect(() => {
     loadSettings();
     loadSpacedRepStats();
     loadProfile();
     CoinService.getBalance().then(setCoinBalance).catch(() => {});
+    BuddyService.getPendingRequests()
+      .then((reqs) => setBuddyRequestCount(reqs.length))
+      .catch(() => {});
     
     // Refresh stats when screen comes into focus
     const unsubscribe = navigation.addListener('focus', () => {
@@ -76,6 +81,9 @@ export default function SettingsScreen({ navigation }) {
       loadProfile();
       loadPendingReportCount();
       CoinService.getBalance().then(setCoinBalance).catch(() => {});
+      BuddyService.getPendingRequests()
+        .then((reqs) => setBuddyRequestCount(reqs.length))
+        .catch(() => {});
     });
     
     return unsubscribe;
@@ -500,6 +508,29 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.coinRowSub}>Balance, earnings, and what’s coming to the shop</Text>
         </View>
         <Text style={styles.profileChevron}>›</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.buddyRow}
+        onPress={() => navigation.navigate('BuddyRequests')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.buddyRowEmoji}>🤝</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.buddyRowTitle}>Buddy requests</Text>
+          <Text style={styles.buddyRowSub}>
+            {buddyRequestCount > 0
+              ? `${buddyRequestCount} waiting — accept or decline`
+              : 'View incoming study-buddy invites'}
+          </Text>
+        </View>
+        {buddyRequestCount > 0 ? (
+          <View style={styles.buddyBadge}>
+            <Text style={styles.buddyBadgeText}>{buddyRequestCount}</Text>
+          </View>
+        ) : (
+          <Text style={styles.profileChevron}>›</Text>
+        )}
       </TouchableOpacity>
 
       <View style={styles.section}>
@@ -1218,13 +1249,37 @@ const makeStyles = (theme) => StyleSheet.create({
     backgroundColor: '#fffbeb',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 10,
     borderWidth: 1.5,
     borderColor: '#fcd34d',
   },
   coinRowEmoji: { fontSize: 26 },
   coinRowTitle: { fontSize: 15, fontWeight: '800', color: '#92400e' },
   coinRowSub: { fontSize: 12, color: '#b45309', marginTop: 2 },
+  buddyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#eef2ff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1.5,
+    borderColor: '#c7d2fe',
+  },
+  buddyRowEmoji: { fontSize: 26 },
+  buddyRowTitle: { fontSize: 15, fontWeight: '800', color: '#3730a3' },
+  buddyRowSub: { fontSize: 12, color: '#4f46e5', marginTop: 2 },
+  buddyBadge: {
+    minWidth: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  buddyBadgeText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   profileAvatar: {
     width: 48,
     height: 48,

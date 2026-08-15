@@ -56,6 +56,7 @@ import GamesScreen from './src/screens/GamesScreen';
 import SpeedDuelScreen from './src/screens/SpeedDuelScreen';
 import InfiniteRunnerScreen from './src/screens/InfiniteRunnerScreen';
 import CoinWalletScreen from './src/screens/CoinWalletScreen';
+import BuddyRequestsScreen from './src/screens/BuddyRequestsScreen';
 import TidbitModal from './src/components/TidbitModal';
 import { UnlockService } from './src/services/UnlockService';
 import { StorageService } from './src/services/StorageService';
@@ -822,6 +823,7 @@ export default function App() {
         <Stack.Screen name="SpeedDuel" component={SpeedDuelScreen} options={{ headerShown: false }} />
         <Stack.Screen name="InfiniteRunner" component={InfiniteRunnerScreen} options={{ headerShown: false }} />
         <Stack.Screen name="CoinWallet" component={CoinWalletScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="BuddyRequests" component={BuddyRequestsScreen} options={{ headerShown: false }} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
         <Stack.Screen name="ModerationReports" component={ModerationReportsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>

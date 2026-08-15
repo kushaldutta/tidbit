@@ -1,3 +1,4 @@
+import { DeviceEventEmitter } from 'react-native';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 
@@ -34,6 +35,7 @@ class BuddyService {
       p_request_id: requestId,
     });
     if (error) throw error;
+    DeviceEventEmitter.emit('buddyRequestsUpdated');
   }
 
   /**
@@ -51,6 +53,7 @@ class BuddyService {
       .eq('target_id', myId);
 
     if (error) throw error;
+    DeviceEventEmitter.emit('buddyRequestsUpdated');
   }
 
   /**

@@ -20,6 +20,7 @@ import { SpeedDuelService } from '../services/SpeedDuelService';
 import { GroupService } from '../services/GroupService';
 import { ClassService } from '../services/ClassService';
 import CoinBalanceChip from '../components/CoinBalanceChip';
+import BuddyRequestsCard from '../components/BuddyRequestsCard';
 
 export default function GamesScreen({ navigation }) {
   const { theme } = useTheme();
@@ -141,6 +142,8 @@ export default function GamesScreen({ navigation }) {
           contentContainerStyle={styles.scroll}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={theme.primary} />}
         >
+          <BuddyRequestsCard />
+
           {inbox.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Your duels</Text>

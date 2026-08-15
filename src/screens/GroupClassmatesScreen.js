@@ -68,7 +68,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
 
       const incoming = {};
       for (const req of pending) {
-        if (req.classId === classId) incoming[req.requesterId] = req.id;
+        if (String(req.classId) === String(classId)) incoming[req.requesterId] = req.id;
       }
       setIncomingByUser(incoming);
 
@@ -98,7 +98,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
     let requestId = incomingByUser[classmate.id];
     if (!requestId) {
       const pending = await BuddyService.getPendingRequests();
-      requestId = pending.find((r) => r.requesterId === classmate.id && r.classId === classId)?.id;
+      requestId = pending.find((r) => r.requesterId === classmate.id && String(r.classId) === String(classId))?.id;
     }
     if (!requestId) {
       Alert.alert('Request not found', 'Pull to refresh and try again.');
@@ -244,7 +244,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
         <Text style={styles.hintText}>
           {duelMode
             ? 'Pick a classmate — same 10 cards, definition → term, fastest accurate run wins.'
-            : 'Add up to 3 study buddies per class. Incoming requests show as Respond — tap to accept or decline.'}
+            : 'Incoming requests show as Respond — tap to accept or decline.'}
         </Text>
       </View>
 

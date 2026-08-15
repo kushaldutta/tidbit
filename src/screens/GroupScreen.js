@@ -284,7 +284,7 @@ export default function GroupScreen({ route, navigation }) {
       setMyBuddies(buddies);
       setActiveChallenge(challenge);
       setMySection(section);
-      setPendingBuddyReqs((pendingBuddies || []).filter((r) => r.classId === classId));
+      setPendingBuddyReqs((pendingBuddies || []).filter((r) => String(r.classId) === String(classId)));
       const slug = ClassService.getCategoryForClass(classId);
       if (slug) {
         InsightsService.getExamDates().then((dates) => {
