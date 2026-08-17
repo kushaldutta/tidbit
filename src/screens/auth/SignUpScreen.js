@@ -15,10 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthService } from '../../services/AuthService';
 import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../../constants/legalUrls';
+import { useTheme } from '../../context/ThemeContext';
 
 const MIN_PASSWORD = 8;
 
 export default function SignUpScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -96,7 +99,7 @@ export default function SignUpScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
@@ -107,7 +110,7 @@ export default function SignUpScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Password (8+ characters)"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             secureTextEntry
             autoComplete="new-password"
             value={password}
@@ -117,7 +120,7 @@ export default function SignUpScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Confirm password"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             secureTextEntry
             autoComplete="new-password"
             value={confirmPassword}
@@ -190,29 +193,29 @@ export default function SignUpScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.card },
   scroll: { padding: 24, paddingTop: 48, paddingBottom: 48 },
-  title: { fontSize: 32, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  title: { fontSize: 32, fontWeight: '700', color: theme.text, marginBottom: 8 },
   subtitle: {
     fontSize: 15,
-    color: '#6b7280',
+    color: theme.textSecondary,
     marginBottom: 32,
     lineHeight: 22,
   },
   input: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#111827',
+    color: theme.text,
     marginBottom: 12,
   },
   primaryButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -220,37 +223,37 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   secondaryButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
-  secondaryButtonText: { color: '#111827', fontSize: 16, fontWeight: '600' },
+  secondaryButtonText: { color: theme.text, fontSize: 16, fontWeight: '600' },
   appleButton: { height: 50, marginBottom: 12 },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 24,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
   dividerText: {
     marginHorizontal: 12,
-    color: '#9ca3af',
+    color: theme.textMuted,
     fontSize: 13,
     fontWeight: '500',
   },
   legal: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: theme.textMuted,
     textAlign: 'center',
     marginTop: 16,
     lineHeight: 18,
   },
   legalLink: {
-    color: '#6366f1',
+    color: theme.primary,
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
@@ -259,7 +262,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 24,
   },
-  footerMuted: { color: '#6b7280', fontSize: 15 },
-  footerLink: { color: '#6366f1', fontSize: 15, fontWeight: '600' },
+  footerMuted: { color: theme.textSecondary, fontSize: 15 },
+  footerLink: { color: theme.primary, fontSize: 15, fontWeight: '600' },
   disabled: { opacity: 0.6 },
 });

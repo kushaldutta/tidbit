@@ -15,11 +15,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../../services/AuthService';
 import { ProfileService } from '../../services/ProfileService';
 import { SCHOOLS } from '../../config/schools';
+import { useTheme } from '../../context/ThemeContext';
 
 const currentYear = new Date().getFullYear();
 const GRAD_YEARS = Array.from({ length: 8 }, (_, i) => String(currentYear + i));
 
 export default function OnboardingProfileScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [displayName, setDisplayName] = useState('');
   const [schoolId, setSchoolId] = useState(null);
   const [gradYear, setGradYear] = useState(null);
@@ -96,7 +99,7 @@ export default function OnboardingProfileScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="e.g. Kushal D."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             value={displayName}
             onChangeText={setDisplayName}
             editable={!saving}
@@ -170,34 +173,34 @@ export default function OnboardingProfileScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.card },
   scroll: { padding: 24, paddingTop: 48, paddingBottom: 48 },
-  title: { fontSize: 28, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  title: { fontSize: 28, fontWeight: '700', color: theme.text, marginBottom: 8 },
   subtitle: {
     fontSize: 15,
-    color: '#6b7280',
+    color: theme.textSecondary,
     marginBottom: 32,
     lineHeight: 22,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.textSecondary,
     marginBottom: 8,
     marginTop: 16,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#111827',
+    color: theme.text,
   },
   optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   optionChip: {
@@ -205,34 +208,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   optionChipActive: {
-    borderColor: '#6366f1',
-    backgroundColor: '#eef2ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
-  optionChipText: { fontSize: 14, fontWeight: '500', color: '#374151' },
-  optionChipTextActive: { color: '#4338ca', fontWeight: '600' },
+  optionChipText: { fontSize: 14, fontWeight: '500', color: theme.textSecondary },
+  optionChipTextActive: { color: theme.primaryDark, fontWeight: '600' },
   yearGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   yearChip: {
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#fff',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
     minWidth: 70,
     alignItems: 'center',
   },
   yearChipActive: {
-    borderColor: '#6366f1',
-    backgroundColor: '#eef2ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
-  yearChipText: { fontSize: 14, fontWeight: '500', color: '#374151' },
-  yearChipTextActive: { color: '#4338ca', fontWeight: '600' },
+  yearChipText: { fontSize: 14, fontWeight: '500', color: theme.textSecondary },
+  yearChipTextActive: { color: theme.primaryDark, fontWeight: '600' },
   primaryButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

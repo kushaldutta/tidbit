@@ -14,8 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthService } from '../../services/AuthService';
+import { useTheme } from '../../context/ThemeContext';
+import { spacing, radius, type } from '../../theme/tokens';
 
 export default function LoginScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [email, setEmail] = useState(route.params?.email || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -96,7 +100,7 @@ export default function LoginScreen({ route, navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             autoCapitalize="none"
             autoComplete="email"
             keyboardType="email-address"
@@ -107,7 +111,7 @@ export default function LoginScreen({ route, navigation }) {
           <TextInput
             style={styles.input}
             placeholder="Password"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             secureTextEntry
             autoComplete="current-password"
             value={password}
@@ -166,81 +170,79 @@ export default function LoginScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.card },
   scroll: {
-    padding: 24,
+    padding: spacing.xxl,
     paddingTop: 48,
     paddingBottom: 48,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
+    ...type.display,
+    color: theme.text,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#6b7280',
-    marginBottom: 32,
-    lineHeight: 22,
+    ...type.callout,
+    color: theme.textSecondary,
+    marginBottom: spacing.xxxl,
   },
   input: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    borderColor: theme.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#111827',
-    marginBottom: 12,
+    color: theme.text,
+    marginBottom: spacing.md,
   },
   primaryButton: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: theme.primary,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.md,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 12,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   secondaryButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
-  secondaryButtonText: { color: '#111827', fontSize: 16, fontWeight: '600' },
-  appleButton: { height: 50, marginBottom: 12 },
+  secondaryButtonText: { color: theme.text, fontSize: 16, fontWeight: '600' },
+  appleButton: { height: 50, marginBottom: spacing.md },
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: spacing.xl,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#e5e7eb' },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
   dividerText: {
-    marginHorizontal: 12,
-    color: '#9ca3af',
-    fontSize: 13,
+    marginHorizontal: spacing.md,
+    color: theme.textMuted,
+    ...type.caption,
     fontWeight: '500',
   },
   linkMuted: {
-    color: '#6366f1',
+    color: theme.primary,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: 24,
+    marginTop: spacing.xxl,
   },
-  footerMuted: { color: '#6b7280', fontSize: 15 },
-  footerLink: { color: '#6366f1', fontSize: 15, fontWeight: '600' },
+  footerMuted: { color: theme.textSecondary, fontSize: 15 },
+  footerLink: { color: theme.primary, fontSize: 15, fontWeight: '600' },
   disabled: { opacity: 0.6 },
 });

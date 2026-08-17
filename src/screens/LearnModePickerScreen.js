@@ -21,62 +21,71 @@ import { ClassService } from '../services/ClassService';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize, radius } from '../theme/tokens';
 
+/**
+ * `accent` identifies the mode at a glance. It tints the icon only — the card
+ * itself stays on the neutral surface. Four full-bleed pastel cards gave the eye
+ * nowhere to land; a tinted 40pt icon square keeps the colour cue without the shouting.
+ */
 const MODES = [
   {
     id: 'Quiz',
-    emoji: '🧠',
+    icon: 'quiz',
     title: 'Quiz',
     subtitle: 'Multiple choice · rate your confidence',
-    color: '#6366f1',
-    bg: '#eef2ff',
+    accent: '#6366f1',
+    accentBg: '#eef2ff',
     minCards: 2,
   },
   {
     id: 'Recall',
-    emoji: '✏️',
+    icon: 'recall',
     title: 'Recall',
     subtitle: 'Type the term · fuzzy matching · audio mode',
-    color: '#8b5cf6',
-    bg: '#f5f3ff',
+    accent: '#8b5cf6',
+    accentBg: '#f5f3ff',
     minCards: 1,
   },
   {
     id: 'Match',
-    emoji: '🧩',
+    icon: 'match',
     title: 'Match',
     subtitle: 'Tap-to-pair game · race the clock · leaderboard',
-    color: '#f59e0b',
-    bg: '#fffbeb',
+    accent: '#f59e0b',
+    accentBg: '#fffbeb',
     minCards: 2,
   },
   {
     id: 'SpeedRun',
-    emoji: '⚡',
+    icon: 'speedRun',
     title: 'Speed Run',
     subtitle: '60 or 90s blitz · how many can you get?',
-    color: '#ef4444',
-    bg: '#fef2f2',
+    accent: '#ef4444',
+    accentBg: '#fef2f2',
     minCards: 2,
   },
 ];
 
-function ModeCard({ mode, onPress, disabled, styles }) {
+function ModeCard({ mode, onPress, disabled, styles, theme }) {
   return (
     <TouchableOpacity
-      style={[styles.modeCard, { backgroundColor: mode.bg, opacity: disabled ? 0.45 : 1 }]}
+      style={[styles.modeCard, disabled && styles.modeCardDisabled]}
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.8}
     >
       <View style={styles.modeCardLeft}>
-        <Text style={styles.modeEmoji}>{mode.emoji}</Text>
-        <View>
-          <Text style={[styles.modeTitle, { color: mode.color }]}>{mode.title}</Text>
+        <View style={[styles.modeIconWrap, { backgroundColor: mode.accentBg }]}>
+          <Icon name={mode.icon} size={iconSize.lg} color={mode.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.modeTitle}>{mode.title}</Text>
           <Text style={styles.modeSub}>{mode.subtitle}</Text>
         </View>
       </View>
-      <Text style={[styles.modeArrow, { color: mode.color }]}>›</Text>
+      <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -416,6 +425,7 @@ export default function LearnModePickerScreen({ route, navigation }) {
               key={m.id}
               mode={m}
               styles={styles}
+              theme={theme}
               onPress={() => handleModeSelect(m)}
               disabled={scopedCardCount < m.minCards}
             />
@@ -565,13 +575,18 @@ const makeStyles = (theme) => StyleSheet.create({
 
   modeCard: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: 20, padding: 20, marginBottom: 12,
+    backgroundColor: theme.card,
+    borderWidth: 1, borderColor: theme.border,
+    borderRadius: radius.card, padding: 16, marginBottom: 10,
   },
+  modeCardDisabled: { opacity: 0.45 },
   modeCardLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  modeEmoji: { fontSize: 32 },
-  modeTitle: { fontSize: 18, fontWeight: '800', marginBottom: 2 },
+  modeIconWrap: {
+    width: 44, height: 44, borderRadius: radius.md,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modeTitle: { fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 2 },
   modeSub: { fontSize: 13, color: theme.textSecondary, lineHeight: 18 },
-  modeArrow: { fontSize: 28, fontWeight: '700' },
 
   tipsBox: {
     backgroundColor: theme.primaryLight, borderRadius: 16, padding: 16, marginTop: 8,

@@ -58,6 +58,7 @@ import InfiniteRunnerScreen from './src/screens/InfiniteRunnerScreen';
 import CoinWalletScreen from './src/screens/CoinWalletScreen';
 import BuddyRequestsScreen from './src/screens/BuddyRequestsScreen';
 import TidbitModal from './src/components/TidbitModal';
+import Icon from './src/components/Icon';
 import { UnlockService } from './src/services/UnlockService';
 import { StorageService } from './src/services/StorageService';
 import { ContentService } from './src/services/ContentService';
@@ -111,23 +112,23 @@ function MainTabs() {
         },
       }}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="home" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="home" color={color} focused={focused} />
           ),
         }}
       />
-      <Tab.Screen 
-        name="Study" 
+      <Tab.Screen
+        name="Study"
         component={StudyModeScreen}
         options={{
           tabBarLabel: 'Study',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="study" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="study" color={color} focused={focused} />
           ),
         }}
       />
@@ -136,28 +137,28 @@ function MainTabs() {
         component={CategoriesScreen}
         options={{
           tabBarLabel: 'Categories',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="grid" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="categories" color={color} focused={focused} />
           ),
         }}
       />
-      <Tab.Screen 
-        name="Stats" 
+      <Tab.Screen
+        name="Stats"
         component={StatsScreen}
         options={{
           tabBarLabel: 'Stats',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="stats-chart" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="stats" color={color} focused={focused} />
           ),
         }}
       />
-      <Tab.Screen 
-        name="Settings" 
+      <Tab.Screen
+        name="Settings"
         component={SettingsScreen}
         options={{
           tabBarLabel: 'Settings',
-          tabBarIcon: ({ color }) => (
-            <TabIcon name="settings" color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="settings" color={color} focused={focused} />
           ),
         }}
       />
@@ -165,19 +166,10 @@ function MainTabs() {
   );
 }
 
-function TabIcon({ name, color }) {
-  // Simple text-based icons
-  const iconMap = {
-    home: '🏠',
-    study: '📚',
-    grid: '📋',
-    newspaper: '📰',
-    'stats-chart': '📊',
-    settings: '⚙️',
-  };
-  return (
-    <Text style={{ fontSize: 20 }}>{iconMap[name] || '•'}</Text>
-  );
+// Solid glyph when the tab is active, outline when it is not — the standard
+// iOS affordance, and it gives the active tab weight that a tint alone cannot.
+function TabIcon({ name, color, focused }) {
+  return <Icon name={name} size={24} color={color} filled={focused} />;
 }
 
 // Shown to unauthenticated users: splash → login/signup.

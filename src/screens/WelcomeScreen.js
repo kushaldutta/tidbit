@@ -1,8 +1,13 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import { spacing, radius, type, elevation } from '../theme/tokens';
 
 export default function WelcomeScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
+
   const handleGetStarted = () => {
     navigation.navigate('Login');
   };
@@ -10,17 +15,22 @@ export default function WelcomeScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Tidbit</Text>
-        <Text style={styles.tagline}>
-          Study with your class
-        </Text>
+        <View style={styles.hero}>
+          <Text style={styles.title}>Tidbit</Text>
+          <Text style={styles.tagline}>Study with your class</Text>
+        </View>
+
         <Text style={styles.description}>
-          Course-native flashcards, a daily class challenge, and classmates who are actually in the same lecture. Compete, collaborate, and cram smart.
+          Course-native flashcards, a daily class challenge, and classmates who are
+          actually in the same lecture. Compete, collaborate, and cram smart.
         </Text>
-        <TouchableOpacity 
+      </View>
+
+      <View style={styles.footer}>
+        <TouchableOpacity
           style={styles.button}
           onPress={handleGetStarted}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
           <Text style={styles.buttonText}>Get Started</Text>
         </TouchableOpacity>
@@ -29,54 +39,55 @@ export default function WelcomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: spacing.xxxl,
+  },
+  hero: {
+    alignItems: 'center',
+    marginBottom: spacing.xxl,
   },
   title: {
     fontSize: 64,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 16,
+    fontWeight: '700',
+    color: theme.text,
+    marginBottom: spacing.sm,
     textAlign: 'center',
+    // Large display type needs negative tracking or it reads as loose.
+    letterSpacing: -1.5,
   },
   tagline: {
-    fontSize: 24,
-    color: '#6366f1',
-    fontWeight: '600',
-    marginBottom: 24,
+    ...type.title,
+    color: theme.primary,
     textAlign: 'center',
   },
   description: {
-    fontSize: 16,
-    color: '#6b7280',
+    ...type.body,
+    color: theme.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 48,
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.lg,
+  },
+  // Anchoring the CTA to the bottom gives the screen a stable shape and puts the
+  // button in the thumb zone instead of floating mid-screen.
+  footer: {
+    paddingHorizontal: spacing.xxxl,
+    paddingBottom: spacing.xxl,
   },
   button: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 12,
-    minWidth: 200,
+    backgroundColor: theme.primary,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.md,
     alignItems: 'center',
-    shadowColor: '#6366f1',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    ...elevation.raised,
+    shadowColor: theme.primary,
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
   buttonText: {
     color: '#ffffff',
@@ -84,4 +95,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

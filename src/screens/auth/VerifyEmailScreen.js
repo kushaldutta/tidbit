@@ -10,8 +10,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../../services/AuthService';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function VerifyEmailScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const email = route.params?.email || '';
   const [resending, setResending] = useState(false);
 
@@ -75,7 +78,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
           activeOpacity={0.85}
         >
           {resending ? (
-            <ActivityIndicator color="#6366f1" />
+            <ActivityIndicator color={theme.primary} />
           ) : (
             <Text style={styles.secondaryButtonText}>Resend confirmation email</Text>
           )}
@@ -94,8 +97,8 @@ export default function VerifyEmailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.card },
   scroll: {
     padding: 24,
     paddingTop: 48,
@@ -105,26 +108,26 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
-    color: '#6b7280',
+    color: theme.textSecondary,
     marginBottom: 24,
     lineHeight: 22,
   },
-  email: { color: '#111827', fontWeight: '600' },
+  email: { color: theme.text, fontWeight: '600' },
   steps: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
     borderRadius: 12,
     padding: 16,
     marginBottom: 28,
     gap: 8,
   },
-  step: { fontSize: 14, color: '#374151', lineHeight: 20 },
+  step: { fontSize: 14, color: theme.textSecondary, lineHeight: 20 },
   primaryButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -132,21 +135,21 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   secondaryButton: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginBottom: 12,
   },
-  secondaryButtonText: { color: '#6366f1', fontSize: 16, fontWeight: '600' },
+  secondaryButtonText: { color: theme.primary, fontSize: 16, fontWeight: '600' },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 16,
   },
-  footerMuted: { color: '#6b7280', fontSize: 15 },
-  footerLink: { color: '#6366f1', fontSize: 15, fontWeight: '600' },
+  footerMuted: { color: theme.textSecondary, fontSize: 15 },
+  footerLink: { color: theme.primary, fontSize: 15, fontWeight: '600' },
   disabled: { opacity: 0.6 },
 });

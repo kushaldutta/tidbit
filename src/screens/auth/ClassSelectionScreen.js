@@ -13,8 +13,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClassService } from '../../services/ClassService';
 import CatalogSegmentedControl from '../../components/CatalogSegmentedControl';
 import { DEFAULT_SCHOOL_ID, getSchool } from '../../config/schools';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function ClassSelectionScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const preferredSchoolId = route?.params?.schoolId || DEFAULT_SCHOOL_ID;
 
   const [catalogSchoolId, setCatalogSchoolId] = useState(preferredSchoolId);
@@ -181,7 +184,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
         <TextInput
           style={styles.searchInput}
           placeholder={catalogSchool.searchPlaceholder}
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={theme.textMuted}
           value={query}
           onChangeText={setQuery}
           autoCorrect={false}
@@ -200,7 +203,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
 
       {/* List */}
       {loading || catalogLoading ? (
-        <ActivityIndicator style={{ flex: 1 }} color="#6366f1" />
+        <ActivityIndicator style={{ flex: 1 }} color={theme.primary} />
       ) : (
         <FlatList
           data={listData}
@@ -249,39 +252,39 @@ export default function ClassSelectionScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.card },
   header: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 8 },
-  title: { fontSize: 26, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  subtitle: { fontSize: 14, color: '#6b7280', lineHeight: 20 },
+  title: { fontSize: 26, fontWeight: '700', color: theme.text, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: theme.textSecondary, lineHeight: 20 },
   segmentWrap: { paddingHorizontal: 16, paddingBottom: 4 },
 
   searchWrapper: { paddingHorizontal: 16, paddingVertical: 8 },
   searchInput: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.surfaceAlt,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 15,
-    color: '#111827',
+    color: theme.text,
   },
 
   selectedBadge: {
     marginHorizontal: 16,
     marginBottom: 4,
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
     borderRadius: 20,
     paddingVertical: 4,
     paddingHorizontal: 12,
     alignSelf: 'flex-start',
   },
-  selectedBadgeText: { fontSize: 13, color: '#4338ca', fontWeight: '600' },
+  selectedBadgeText: { fontSize: 13, color: theme.primaryDark, fontWeight: '600' },
 
   listContent: { paddingHorizontal: 16, paddingBottom: 8 },
   sectionHeader: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#9ca3af',
+    color: theme.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginTop: 16,
@@ -292,7 +295,7 @@ const styles = StyleSheet.create({
   classRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -301,30 +304,30 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   classRowSelected: {
-    backgroundColor: '#eef2ff',
-    borderColor: '#6366f1',
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
   },
   classInfo: { flex: 1, marginRight: 12 },
   classTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  classCode: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  classCodeSelected: { color: '#4338ca' },
-  classTitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  classCode: { fontSize: 15, fontWeight: '600', color: theme.text },
+  classCodeSelected: { color: theme.primaryDark },
+  classTitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
 
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#d1d5db',
+    borderColor: theme.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxSelected: { backgroundColor: '#6366f1', borderColor: '#6366f1' },
+  checkboxSelected: { backgroundColor: theme.primary, borderColor: theme.primary },
   checkmark: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   emptyText: {
     textAlign: 'center',
-    color: '#9ca3af',
+    color: theme.textMuted,
     marginTop: 40,
     fontSize: 14,
   },
@@ -334,17 +337,17 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: theme.surfaceAlt,
     gap: 8,
   },
   continueButton: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
   },
   continueText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   skipButton: { alignItems: 'center', paddingVertical: 10 },
-  skipText: { color: '#6b7280', fontSize: 15 },
+  skipText: { color: theme.textSecondary, fontSize: 15 },
   disabled: { opacity: 0.6 },
 });

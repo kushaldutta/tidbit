@@ -2,11 +2,40 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from '../services/AuthService';
 import { ProfileService } from '../services/ProfileService';
+import { semantic, neutral } from '../theme/tokens';
 
 const THEME_KEY = '@tidbit:app_theme';
 
+/**
+ * Surface/text tokens shared by every light theme. Screens should read
+ * `theme.border` / `theme.textMuted` rather than hardcoding hexes — that is what
+ * kept the old indigo bleeding through on non-default themes.
+ */
+const LIGHT_SURFACES = {
+  border: neutral[200],
+  borderStrong: neutral[300],
+  textMuted: neutral[400],
+  surfaceAlt: neutral[100],
+  overlay: 'rgba(17, 24, 39, 0.45)',
+  isDark: false,
+};
+
+const DARK_SURFACES = {
+  border: '#2b2840',
+  borderStrong: '#3d3956',
+  textMuted: '#6b7280',
+  surfaceAlt: '#241f38',
+  overlay: 'rgba(0, 0, 0, 0.6)',
+  isDark: true,
+};
+
+/** Every theme gets the same semantic colors — correctness never changes hue. */
+function buildTheme(base, surfaces = LIGHT_SURFACES) {
+  return { ...surfaces, ...semantic, ...base };
+}
+
 export const THEMES = {
-  default: {
+  default: buildTheme({
     id: 'default',
     label: 'Classic',
     emoji: '🟣',
@@ -20,23 +49,35 @@ export const THEMES = {
     textSecondary: '#6b7280',
     tabBar: '#ffffff',
     tabBarActive: '#6366f1',
-  },
-  midnight: {
-    id: 'midnight',
-    label: 'Midnight',
-    emoji: '🌙',
-    primary: '#818cf8',
-    primaryDark: '#6366f1',
-    primaryLight: '#1e1b4b',
-    accent: '#c7d2fe',
-    background: '#0f0e1a',
-    card: '#1a1829',
-    text: '#f1f5f9',
-    textSecondary: '#94a3b8',
-    tabBar: '#1a1829',
-    tabBarActive: '#818cf8',
-  },
-  forest: {
+  }),
+  midnight: buildTheme(
+    {
+      id: 'midnight',
+      label: 'Midnight',
+      emoji: '🌙',
+      primary: '#818cf8',
+      primaryDark: '#6366f1',
+      primaryLight: '#1e1b4b',
+      accent: '#c7d2fe',
+      background: '#0f0e1a',
+      card: '#1a1829',
+      text: '#f1f5f9',
+      textSecondary: '#94a3b8',
+      tabBar: '#1a1829',
+      tabBarActive: '#818cf8',
+      // Semantic colors need more lift against a dark surface.
+      success: '#4ade80',
+      successBg: '#14301f',
+      warning: '#fbbf24',
+      warningBg: '#3a2c0a',
+      danger: '#f87171',
+      dangerBg: '#3b1616',
+      info: '#38bdf8',
+      infoBg: '#0c2b3d',
+    },
+    DARK_SURFACES
+  ),
+  forest: buildTheme({
     id: 'forest',
     label: 'Forest',
     emoji: '🌿',
@@ -50,8 +91,8 @@ export const THEMES = {
     textSecondary: '#6b7280',
     tabBar: '#ffffff',
     tabBarActive: '#16a34a',
-  },
-  sunset: {
+  }),
+  sunset: buildTheme({
     id: 'sunset',
     label: 'Sunset',
     emoji: '🌅',
@@ -65,8 +106,8 @@ export const THEMES = {
     textSecondary: '#6b7280',
     tabBar: '#ffffff',
     tabBarActive: '#f97316',
-  },
-  ocean: {
+  }),
+  ocean: buildTheme({
     id: 'ocean',
     label: 'Ocean',
     emoji: '🌊',
@@ -80,7 +121,7 @@ export const THEMES = {
     textSecondary: '#0369a1',
     tabBar: '#ffffff',
     tabBarActive: '#0ea5e9',
-  },
+  }),
 };
 
 const ThemeContext = createContext({

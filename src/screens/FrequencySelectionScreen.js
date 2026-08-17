@@ -1,15 +1,25 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
+import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { spacing, radius, type, elevation, iconSize } from '../theme/tokens';
 
+/**
+ * `hint` sets expectations up front so the choice isn't abstract.
+ * Counts assume the default quiet hours (11 PM – 9 AM), i.e. a 14-hour window,
+ * with the 10 PM slot handled by the bedtime brief.
+ */
 const INTERVAL_OPTIONS = [
-  { label: '1 hour', value: 60 },
-  { label: '2 hours', value: 120 },
-  { label: '4 hours', value: 240 },
+  { label: '1 hour', value: 60, hint: 'About 14 a day' },
+  { label: '2 hours', value: 120, hint: 'About 7 a day' },
+  { label: '4 hours', value: 240, hint: 'About 4 a day' },
 ];
 
 export default function FrequencySelectionScreen({ navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [selectedInterval, setSelectedInterval] = useState(60);
 
   const handleIntervalSelect = async (interval) => {
@@ -23,149 +33,116 @@ export default function FrequencySelectionScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>How often?</Text>
-          <Text style={styles.subtitle}>
-            Choose how frequently you'd like to receive tidbit notifications
-          </Text>
-        </View>
+        <Text style={styles.title}>How often?</Text>
+        <Text style={styles.subtitle}>
+          How frequently a card from your decks should appear. You can change this
+          later, and quiet hours keep them out of the night.
+        </Text>
 
         <View style={styles.optionsContainer}>
-          {INTERVAL_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.option,
-                selectedInterval === option.value && styles.optionSelected,
-              ]}
-              onPress={() => handleIntervalSelect(option.value)}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.optionText,
-                  selectedInterval === option.value && styles.optionTextSelected,
-                ]}
+          {INTERVAL_OPTIONS.map((option) => {
+            const selected = selectedInterval === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.option, selected && styles.optionSelected]}
+                onPress={() => handleIntervalSelect(option.value)}
+                activeOpacity={0.7}
               >
-                {option.label}
-              </Text>
-              {selectedInterval === option.value && (
-                <Text style={styles.checkmark}>✓</Text>
-              )}
-            </TouchableOpacity>
-          ))}
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                    {option.label}
+                  </Text>
+                  <Text style={styles.optionHint}>{option.hint}</Text>
+                </View>
+                {selected && (
+                  <Icon name="check" size={iconSize.lg} color={theme.primary} filled />
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
+      </ScrollView>
 
-        {Platform.OS === 'android' && (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              📱 On Android, notifications are sent when you unlock your phone
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={styles.nextButton}
-          onPress={handleNext}
-          activeOpacity={0.8}
-        >
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.nextButton} onPress={handleNext} activeOpacity={0.85}>
           <Text style={styles.nextButtonText}>Next</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 32,
-    paddingTop: 20,
-  },
-  header: {
-    marginBottom: 32,
+    padding: spacing.xxxl,
+    paddingTop: spacing.xl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 12,
+    ...type.display,
+    color: theme.text,
+    marginBottom: spacing.md,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    lineHeight: 24,
+    ...type.body,
+    color: theme.textSecondary,
+    marginBottom: spacing.xxxl,
   },
   optionsContainer: {
-    gap: 12,
-    marginBottom: 24,
+    gap: spacing.md,
   },
   option: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderRadius: 12,
-    backgroundColor: '#f3f4f6',
+    padding: spacing.xl,
+    borderRadius: radius.md,
+    backgroundColor: theme.surfaceAlt,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   optionSelected: {
-    backgroundColor: '#ede9fe',
-    borderColor: '#6366f1',
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
   },
   optionText: {
+    ...type.subheading,
     fontSize: 18,
-    fontWeight: '500',
-    color: '#1f2937',
+    color: theme.text,
   },
   optionTextSelected: {
-    color: '#6366f1',
-    fontWeight: '600',
+    color: theme.primary,
+    fontWeight: '700',
   },
-  checkmark: {
-    fontSize: 20,
-    color: '#6366f1',
-    fontWeight: 'bold',
+  optionHint: {
+    ...type.caption,
+    color: theme.textSecondary,
+    marginTop: 2,
   },
-  infoBox: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6366f1',
-  },
-  infoText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#1e40af',
+  footer: {
+    paddingHorizontal: spacing.xxxl,
+    paddingBottom: spacing.xxl,
+    paddingTop: spacing.lg,
   },
   nextButton: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    paddingHorizontal: 48,
-    borderRadius: 12,
+    backgroundColor: theme.primary,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.md,
     alignItems: 'center',
-    shadowColor: '#6366f1',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    ...elevation.raised,
+    shadowColor: theme.primary,
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
   },
   nextButtonText: {
     color: '#ffffff',
@@ -173,4 +150,3 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
-

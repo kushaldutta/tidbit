@@ -21,6 +21,8 @@ import { GroupService } from '../services/GroupService';
 import { ClassService } from '../services/ClassService';
 import CoinBalanceChip from '../components/CoinBalanceChip';
 import BuddyRequestsCard from '../components/BuddyRequestsCard';
+import Icon from '../components/Icon';
+import { iconSize, radius } from '../theme/tokens';
 
 export default function GamesScreen({ navigation }) {
   const { theme } = useTheme();
@@ -157,7 +159,7 @@ export default function GamesScreen({ navigation }) {
                   })}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.inboxEmoji}>⚔️</Text>
+                  <Icon name="speedDuel" size={iconSize.lg} color={theme.primary} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inboxTitle}>
                       {d.awaitingMe
@@ -166,7 +168,7 @@ export default function GamesScreen({ navigation }) {
                     </Text>
                     <Text style={styles.inboxSub}>{d.classCode} · 10 cards · definition → term</Text>
                   </View>
-                  <Text style={styles.chevron}>›</Text>
+                  <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -197,7 +199,13 @@ export default function GamesScreen({ navigation }) {
           )}
 
           {GAME_CATALOG.map((game) => (
-            <GameRow key={game.type} game={game} styles={styles} onPress={() => handleCatalogPress(game)} />
+            <GameRow
+              key={game.type}
+              game={game}
+              styles={styles}
+              theme={theme}
+              onPress={() => handleCatalogPress(game)}
+            />
           ))}
         </ScrollView>
       )}
@@ -205,15 +213,17 @@ export default function GamesScreen({ navigation }) {
   );
 }
 
-function GameRow({ game, styles, onPress }) {
+function GameRow({ game, styles, theme, onPress }) {
   return (
     <TouchableOpacity style={styles.gameRow} onPress={onPress} activeOpacity={0.85}>
-      <Text style={styles.gameEmoji}>{game.emoji}</Text>
+      <View style={styles.gameIconWrap}>
+        <Icon name={game.icon} size={iconSize.md} color={theme.primary} />
+      </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.gameTitle}>{game.title}</Text>
         <Text style={styles.gameSub}>{game.subtitle}</Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
     </TouchableOpacity>
   );
 }
@@ -252,7 +262,6 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.accent,
   },
-  inboxEmoji: { fontSize: 22 },
   inboxTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
   inboxSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
   cancelPick: { textAlign: 'center', color: theme.primary, fontWeight: '600', marginTop: 8 },
@@ -265,8 +274,16 @@ const makeStyles = (theme) => StyleSheet.create({
     padding: 14,
     marginBottom: 8,
   },
-  gameEmoji: { fontSize: 26 },
+  // Tinted square behind each icon: gives every row the same optical weight,
+  // which is exactly what a column of mismatched emoji could never do.
+  gameIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    backgroundColor: theme.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   gameTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
   gameSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
-  chevron: { fontSize: 22, color: theme.textSecondary, fontWeight: '600' },
 });

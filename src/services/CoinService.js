@@ -144,6 +144,52 @@ class CoinService {
       return false;
     }
   }
+
+  // ─── Shop ────────────────────────────────────────────────────
+
+  static async getUnlockedItemIds() {
+    if (!SUPABASE_CONFIGURED) return [];
+    const userId = AuthService.getUserId();
+    if (!userId) return [];
+    try {
+      const { data } = await supabase
+        .from('user_cosmetics')
+        .select('item_id')
+        .eq('user_id', userId);
+      return (data || []).map((r) => r.item_id);
+    } catch (err) {
+      console.warn('[CoinService] getUnlockedItemIds failed:', err.message);
+      return [];
+    }
+  }
+
+  /**
+   * Spend coins on a catalog item. Price is enforced server-side.
+   * Returns { ok, reason } where reason is ok | already_owned | insufficient_funds | unknown_item | error
+   */
+  static async purchase(itemId) {
+    if (!SUPABASE_CONFIGURED || !itemId) return { ok: false, reason: 'error' };
+    const userId = AuthService.getUserId();
+    if (!userId) return { ok: false, reason: 'error' };
+
+    try {
+      const { data, error } = await supabase.rpc('purchase_cosmetic', {
+        p_item_id: itemId,
+      });
+      if (error) throw error;
+      const reason = data || 'error';
+      if (reason === 'ok' || reason === 'already_owned') {
+        this.invalidateCache();
+        const fresh = await this.getBalance({ bypassCache: true });
+        DeviceEventEmitter.emit('coinsUpdated', fresh);
+        DeviceEventEmitter.emit('cosmeticsUpdated');
+      }
+      return { ok: reason === 'ok', reason };
+    } catch (err) {
+      console.warn('[CoinService] purchase failed:', err.message);
+      return { ok: false, reason: 'error' };
+    }
+  }
 }
 
 export { CoinService };

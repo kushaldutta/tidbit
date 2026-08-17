@@ -333,13 +333,23 @@ class StorageService {
   }
 
   // Quiet Hours
+  /**
+   * Defaults to ON (11 PM – 9 AM). With it off, a new user who picks the default
+   * 1-hour interval gets notified through the night, which is the fastest way to
+   * lose notification permission entirely.
+   *
+   * `null` means the user has never touched the setting, so they get the safe
+   * default. An explicit 'false' is preserved — we never re-enable it for someone
+   * who deliberately turned it off.
+   */
   static async getQuietHoursEnabled() {
     try {
       const enabled = await AsyncStorage.getItem(KEYS.QUIET_HOURS_ENABLED);
-      return enabled === 'true'; // Default to false
+      if (enabled === null) return true;
+      return enabled === 'true';
     } catch (error) {
       console.error('Error getting quiet hours enabled:', error);
-      return false;
+      return true;
     }
   }
 

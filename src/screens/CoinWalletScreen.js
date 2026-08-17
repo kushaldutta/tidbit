@@ -1,6 +1,5 @@
 /**
- * Study Coins wallet — balance, upcoming spend, recent earnings.
- * Shop is not live yet; this makes the pile feel like it's going somewhere.
+ * Study Coins wallet — balance, shop, recent earnings.
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -11,18 +10,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { CoinService } from '../services/CoinService';
-
-const COMING_SOON = [
-  { emoji: '🎨', title: 'Sunset theme', cost: 80, blurb: 'Warm colors for late-night sessions' },
-  { emoji: '🖼️', title: 'Avatar frame', cost: 50, blurb: 'Shows next to your name in class' },
-  { emoji: '❤️', title: 'Duel extra life', cost: 40, blurb: 'One miss forgiven in Speed Duel' },
-  { emoji: '🏅', title: 'Custom title', cost: 100, blurb: 'A badge on the class feed' },
-];
+import { SHOP_ITEMS, SHOP_ITEM, COMING_SOON_ITEMS } from '../config/coinShop';
 
 function sourceLabel(type) {
   const map = {
@@ -33,7 +27,7 @@ function sourceLabel(type) {
     achievement: 'Achievement',
     jeopardy: 'Jeopardy',
     wordle: 'Daily Term',
-    dungeon: 'Dungeon',
+    shop: 'Shop',
   };
   return map[type] || type.replace(/_/g, ' ');
 }
@@ -48,23 +42,27 @@ function relativeTime(iso) {
 }
 
 export default function CoinWalletScreen({ navigation }) {
-  const { theme } = useTheme();
+  const { theme, setThemeId } = useTheme();
   const styles = makeStyles(theme);
   const [balance, setBalance] = useState(null);
   const [ledger, setLedger] = useState([]);
+  const [unlockedIds, setUnlockedIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [buying, setBuying] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const [b, rows] = await Promise.all([
+      const [b, rows, ids] = await Promise.all([
         CoinService.getBalance({ bypassCache: true }),
         CoinService.getRecentLedger(15),
+        CoinService.getUnlockedItemIds(),
       ]);
       setBalance(b);
       setLedger(rows);
+      setUnlockedIds(ids);
     } catch (e) {
       console.warn('[CoinWallet]', e.message);
     } finally {
@@ -74,6 +72,50 @@ export default function CoinWalletScreen({ navigation }) {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const sunset = SHOP_ITEMS[SHOP_ITEM.THEME_SUNSET];
+  const ownsSunset = unlockedIds.includes(SHOP_ITEM.THEME_SUNSET);
+
+  const buySunset = () => {
+    if (ownsSunset) {
+      navigation.navigate('ThemePicker');
+      return;
+    }
+    const coins = balance ?? 0;
+    if (coins < sunset.cost) {
+      Alert.alert(
+        'Not enough coins',
+        `Sunset costs ${sunset.cost}. You have ${coins}.`,
+      );
+      return;
+    }
+    Alert.alert(
+      'Unlock Sunset?',
+      `${sunset.cost} Study Coins. You have ${coins}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: `Spend ${sunset.cost}`,
+          onPress: async () => {
+            setBuying(true);
+            try {
+              const result = await CoinService.purchase(SHOP_ITEM.THEME_SUNSET);
+              if (result.ok || result.reason === 'already_owned') {
+                await load();
+                await setThemeId('sunset');
+              } else if (result.reason === 'insufficient_funds') {
+                Alert.alert('Not enough coins', 'Earn more, then try again.');
+              } else {
+                Alert.alert('Couldn’t unlock', 'Try again in a moment.');
+              }
+            } finally {
+              setBuying(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -97,13 +139,33 @@ export default function CoinWalletScreen({ navigation }) {
             <Text style={styles.heroAmount}>{balance ?? 0}</Text>
             <Text style={styles.heroLabel}>Study Coins</Text>
             <Text style={styles.heroSub}>
-              Earn from challenges, duels, and runs. Spend later on cosmetics — never on study advantages.
+              Earn from challenges, duels, and runs. Spend on cosmetics — never on study advantages.
             </Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Coming soon</Text>
-          <Text style={styles.sectionSub}>Keep stacking. These unlock when the shop opens.</Text>
-          {COMING_SOON.map((item) => {
+          <Text style={styles.sectionTitle}>Shop</Text>
+          <Text style={styles.sectionSub}>Sunset is live. More cosmetics later.</Text>
+          <TouchableOpacity
+            style={styles.soonRow}
+            onPress={buySunset}
+            activeOpacity={0.85}
+            disabled={buying}
+          >
+            <Text style={styles.soonEmoji}>{sunset.emoji}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.soonTitle}>{sunset.title}</Text>
+              <Text style={styles.soonBlurb}>{sunset.blurb}</Text>
+            </View>
+            <View style={[styles.costPill, ownsSunset ? styles.costPillOwned : (balance ?? 0) >= sunset.cost && styles.costPillReady]}>
+              <Text style={[styles.costText, ownsSunset ? styles.costTextOwned : (balance ?? 0) >= sunset.cost && styles.costTextReady]}>
+                {ownsSunset ? 'Owned' : sunset.cost}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Coming soon</Text>
+          <Text style={styles.sectionSub}>Keep stacking. These unlock when the shop grows.</Text>
+          {COMING_SOON_ITEMS.map((item) => {
             const canAfford = (balance ?? 0) >= item.cost;
             return (
               <View key={item.title} style={styles.soonRow}>
@@ -133,7 +195,9 @@ export default function CoinWalletScreen({ navigation }) {
                     {sourceLabel(row.source_type)} · {relativeTime(row.created_at)}
                   </Text>
                 </View>
-                <Text style={styles.ledgerAmt}>+{row.amount}</Text>
+                <Text style={[styles.ledgerAmt, row.amount < 0 && styles.ledgerAmtSpend]}>
+                  {row.amount > 0 ? `+${row.amount}` : row.amount}
+                </Text>
               </View>
             ))
           )}
@@ -207,8 +271,10 @@ const makeStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
   },
   costPillReady: { backgroundColor: '#fef3c7' },
+  costPillOwned: { backgroundColor: '#dcfce7' },
   costText: { fontWeight: '800', color: '#6b7280' },
   costTextReady: { color: '#92400e' },
+  costTextOwned: { color: '#166534' },
   empty: { fontSize: 14, color: theme.textSecondary, marginTop: 8 },
   ledgerRow: {
     flexDirection: 'row',
@@ -220,4 +286,5 @@ const makeStyles = (theme) => StyleSheet.create({
   ledgerNote: { fontSize: 15, fontWeight: '600', color: theme.text },
   ledgerMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
   ledgerAmt: { fontSize: 16, fontWeight: '800', color: '#b45309' },
+  ledgerAmtSpend: { color: '#6b7280' },
 });

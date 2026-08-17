@@ -920,7 +920,7 @@ export default function SettingsScreen({ navigation }) {
         <Text style={styles.analyticsBtnEmoji}>🎨</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.analyticsBtnTitle}>App Theme</Text>
-          <Text style={styles.analyticsBtnSub}>Classic, Midnight, Forest, Sunset, Ocean</Text>
+          <Text style={styles.analyticsBtnSub}>Classic is free · Sunset with coins</Text>
         </View>
         <Text style={styles.premiumBannerArrow}>›</Text>
       </TouchableOpacity>
