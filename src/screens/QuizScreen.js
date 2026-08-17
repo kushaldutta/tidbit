@@ -21,7 +21,7 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 // ─── Same-Boat banner ─────────────────────────────────────────────────────────
 
-function SameBoatBanner({ stat }) {
+function SameBoatBanner({ stat, styles, theme }) {
   if (!stat || stat.attempts < 2) return null;
   const wrongPct = Math.round(100 - (stat.pctCorrect ?? 0));
   const rightPct = Math.round(stat.pctCorrect ?? 0);
@@ -29,13 +29,13 @@ function SameBoatBanner({ stat }) {
   let emoji, msg, bg, textColor;
   if (wrongPct >= 60) {
     emoji = '🤝'; msg = `${wrongPct}% of your classmates got this wrong too`;
-    bg = '#fef2f2'; textColor = '#991b1b';
+    bg = theme.dangerBg; textColor = theme.dangerText;
   } else if (wrongPct >= 30) {
     emoji = '📊'; msg = `${rightPct}% of your classmates got this right`;
-    bg = '#fffbeb'; textColor = '#92400e';
+    bg = theme.warningBg; textColor = theme.warningText;
   } else {
     emoji = '🏆'; msg = `${rightPct}% of classmates got this right — tough one?`;
-    bg = '#f0fdf4'; textColor = '#166534';
+    bg = theme.successBg; textColor = theme.successText;
   }
 
   return (
@@ -51,9 +51,17 @@ function SameBoatBanner({ stat }) {
 
 // ─── Confidence slider (Tier A standout) ────────────────────────────────────
 
-function ConfidenceSlider({ value, onChange }) {
+/**
+ * A 4-stop sequential ramp, deliberately NOT themed. Semantic tokens encode
+ * pass/fail; this encodes *degree*, so it needs evenly spaced steps between the
+ * endpoints. Swapping the ends for theme.danger/theme.success would break the
+ * ramp's even lightness progression.
+ */
+const CONFIDENCE_RAMP = ['#f87171', '#fb923c', '#facc15', '#4ade80'];
+
+function ConfidenceSlider({ value, onChange, styles, theme }) {
   const labels = ['Not sure', 'Somewhat', 'Pretty sure', 'Certain'];
-  const colors = ['#f87171', '#fb923c', '#facc15', '#4ade80'];
+  const colors = CONFIDENCE_RAMP;
   return (
     <View style={styles.confidenceWrap}>
       <Text style={styles.confidenceLabel}>How confident are you?</Text>
@@ -86,6 +94,7 @@ function ConfidenceSlider({ value, onChange }) {
 
 export default function QuizScreen({ route, navigation }) {
   const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const { deckId, deckTitle, studyScope, startCardId, categoryId } = route.params;
 
   const [questions, setQuestions] = useState([]);
@@ -169,7 +178,7 @@ export default function QuizScreen({ route, navigation }) {
   };
 
   if (loading) {
-    return <SafeAreaView style={styles.center}><ActivityIndicator color="#6366f1" /></SafeAreaView>;
+    return <SafeAreaView style={styles.center}><ActivityIndicator color={theme.primary} /></SafeAreaView>;
   }
 
   if (questions.length === 0) {
@@ -216,7 +225,7 @@ export default function QuizScreen({ route, navigation }) {
 
           {/* Confidence slider — shown before answering */}
           {!answered && (
-            <ConfidenceSlider value={confidence} onChange={setConfidence} />
+            <ConfidenceSlider value={confidence} onChange={setConfidence} styles={styles} theme={theme} />
           )}
 
           {/* Hint when confidence not set */}
@@ -230,18 +239,18 @@ export default function QuizScreen({ route, navigation }) {
           <View style={styles.optionsWrap}>
             {currentQ.options.map((opt, i) => {
               let bg = '#fff';
-              let borderColor = '#e5e7eb';
-              let textColor = '#111827';
+              let borderColor = theme.border;
+              let textColor = theme.text;
 
               if (answered) {
                 if (i === result.correctIndex) {
-                  bg = '#f0fdf4'; borderColor = '#4ade80'; textColor = '#166534';
+                  bg = theme.successBg; borderColor = theme.success; textColor = theme.successText;
                 } else if (i === chosen && !result.correct) {
-                  bg = '#fef2f2'; borderColor = '#f87171'; textColor = '#991b1b';
+                  bg = theme.dangerBg; borderColor = theme.danger; textColor = theme.dangerText;
                 }
               } else if (confidence === 0) {
                 // greyed out until confidence is selected
-                bg = '#f9fafb'; textColor = '#9ca3af';
+                bg = theme.surfaceAlt; textColor = theme.textMuted;
               }
 
               return (
@@ -277,7 +286,7 @@ export default function QuizScreen({ route, navigation }) {
                 )}
               </View>
 
-              <SameBoatBanner stat={sameBoatStat} />
+              <SameBoatBanner stat={sameBoatStat} styles={styles} theme={theme} />
 
               <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
                 <Text style={styles.nextBtnText}>
@@ -292,50 +301,50 @@ export default function QuizScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.surfaceAlt },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surfaceAlt },
 
   topBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 12,
   },
-  exitText: { fontSize: 14, color: '#6b7280', fontWeight: '600' },
-  progress: { fontSize: 14, color: '#374151', fontWeight: '600' },
-  scoreText: { fontSize: 14, color: '#16a34a', fontWeight: '700' },
+  exitText: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
+  progress: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
+  scoreText: { fontSize: 14, color: theme.success, fontWeight: '700' },
 
-  progressTrack: { height: 3, backgroundColor: '#e5e7eb', marginHorizontal: 20, borderRadius: 2 },
-  progressFill: { height: 3, backgroundColor: '#6366f1', borderRadius: 2 },
+  progressTrack: { height: 3, backgroundColor: theme.border, marginHorizontal: 20, borderRadius: 2 },
+  progressFill: { height: 3, backgroundColor: theme.primary, borderRadius: 2 },
 
   scroll: { padding: 20, paddingBottom: 48 },
 
   questionCard: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 24,
+    backgroundColor: theme.card, borderRadius: 20, padding: 24,
     marginBottom: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
   },
   questionLabel: {
-    fontSize: 10, fontWeight: '800', color: '#9ca3af',
+    fontSize: 10, fontWeight: '800', color: theme.textMuted,
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12,
   },
-  questionText: { fontSize: 20, fontWeight: '700', color: '#111827', lineHeight: 30 },
+  questionText: { fontSize: 20, fontWeight: '700', color: theme.text, lineHeight: 30 },
 
   confidenceWrap: {
-    backgroundColor: '#eef2ff', borderRadius: 16, padding: 16, marginBottom: 16,
+    backgroundColor: theme.primaryLight, borderRadius: 16, padding: 16, marginBottom: 16,
   },
-  confidenceLabel: { fontSize: 13, fontWeight: '600', color: '#4338ca', marginBottom: 12 },
+  confidenceLabel: { fontSize: 13, fontWeight: '600', color: theme.primaryDark, marginBottom: 12 },
   confidenceRow: { flexDirection: 'row', gap: 10 },
   confidenceBtn: {
     flex: 1, height: 44, borderRadius: 12, borderWidth: 2,
-    alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center', backgroundColor: theme.card,
   },
-  confidenceBtnText: { fontSize: 16, fontWeight: '700', color: '#374151' },
+  confidenceBtnText: { fontSize: 16, fontWeight: '700', color: theme.textSecondary },
   confidenceBtnTextActive: { color: '#fff' },
-  confidenceHint: { fontSize: 12, color: '#6366f1', marginTop: 10, textAlign: 'center', fontWeight: '600' },
+  confidenceHint: { fontSize: 12, color: theme.primary, marginTop: 10, textAlign: 'center', fontWeight: '600' },
 
   confidenceHintGlobal: {
-    fontSize: 13, color: '#9ca3af', textAlign: 'center', marginBottom: 12, fontStyle: 'italic',
+    fontSize: 13, color: theme.textMuted, textAlign: 'center', marginBottom: 12, fontStyle: 'italic',
   },
 
   optionsWrap: { gap: 10, marginBottom: 16 },
@@ -344,21 +353,21 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderWidth: 2, padding: 14, gap: 12,
   },
   optionLabel: {
-    width: 30, height: 30, borderRadius: 8, backgroundColor: '#e5e7eb',
+    width: 30, height: 30, borderRadius: 8, backgroundColor: theme.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  optionLabelCorrect: { backgroundColor: '#4ade80' },
-  optionLabelWrong: { backgroundColor: '#f87171' },
-  optionLabelText: { fontSize: 12, fontWeight: '800', color: '#374151' },
+  optionLabelCorrect: { backgroundColor: theme.success },
+  optionLabelWrong: { backgroundColor: theme.danger },
+  optionLabelText: { fontSize: 12, fontWeight: '800', color: theme.textSecondary },
   optionText: { flex: 1, fontSize: 15, fontWeight: '500', lineHeight: 22 },
 
   resultBanner: {
     borderRadius: 14, padding: 16, marginBottom: 12,
   },
-  resultCorrect: { backgroundColor: '#f0fdf4', borderWidth: 1.5, borderColor: '#4ade80' },
-  resultWrong: { backgroundColor: '#fef2f2', borderWidth: 1.5, borderColor: '#f87171' },
-  resultText: { fontSize: 16, fontWeight: '800', color: '#111827', marginBottom: 4 },
-  resultCorrectAnswer: { fontSize: 14, color: '#374151' },
+  resultCorrect: { backgroundColor: theme.successBg, borderWidth: 1.5, borderColor: theme.success },
+  resultWrong: { backgroundColor: theme.dangerBg, borderWidth: 1.5, borderColor: theme.danger },
+  resultText: { fontSize: 16, fontWeight: '800', color: theme.text, marginBottom: 4 },
+  resultCorrectAnswer: { fontSize: 14, color: theme.textSecondary },
 
   sameBoat: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -366,15 +375,15 @@ const styles = StyleSheet.create({
   },
   sameBoatEmoji: { fontSize: 24 },
   sameBoatMsg: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  sameBoatSub: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  sameBoatSub: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
   nextBtn: {
-    backgroundColor: '#6366f1', borderRadius: 16,
+    backgroundColor: theme.primary, borderRadius: 16,
     paddingVertical: 16, alignItems: 'center',
   },
   nextBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   emptyEmoji: { fontSize: 40, marginBottom: 12 },
-  emptyText: { fontSize: 16, color: '#6b7280', marginBottom: 16 },
-  backLink: { fontSize: 15, color: '#6366f1', fontWeight: '600' },
+  emptyText: { fontSize: 16, color: theme.textSecondary, marginBottom: 16 },
+  backLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },
 });

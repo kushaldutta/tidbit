@@ -14,8 +14,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../config/supabase';
 import { DeckService } from '../../services/DeckService';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function CardEditorScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const { deckId, cardId, mode, sectionId: initialSectionId, sections: routeSections } =
     route.params || {};
   const isCreate = mode === 'create' || !cardId;
@@ -111,7 +114,7 @@ export default function CardEditorScreen({ route, navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color="#6366f1" />
+        <ActivityIndicator color={theme.primary} />
       </SafeAreaView>
     );
   }
@@ -193,7 +196,7 @@ export default function CardEditorScreen({ route, navigation }) {
           <TextInput
             style={[styles.input, styles.inputMultiline]}
             placeholder="What is the question or term?"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             value={front}
             onChangeText={setFront}
             multiline
@@ -204,7 +207,7 @@ export default function CardEditorScreen({ route, navigation }) {
           <TextInput
             style={[styles.input, styles.inputMultiline]}
             placeholder="What is the answer or definition?"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             value={back}
             onChangeText={setBack}
             multiline
@@ -222,8 +225,8 @@ export default function CardEditorScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.surfaceAlt },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { padding: 16, paddingBottom: 48 },
   topBar: {
@@ -232,19 +235,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  back: { color: '#6366f1', fontSize: 16, fontWeight: '500' },
-  saveLink: { color: '#6366f1', fontSize: 16, fontWeight: '600' },
+  back: { color: theme.primary, fontSize: 16, fontWeight: '500' },
+  saveLink: { color: theme.primary, fontSize: 16, fontWeight: '600' },
   disabledText: { opacity: 0.5 },
   heading: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.text,
     marginVertical: 12,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.textSecondary,
     marginBottom: 8,
     marginTop: 16,
     textTransform: 'uppercase',
@@ -255,22 +258,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
   },
-  sectionChipActive: { backgroundColor: '#eef2ff', borderColor: '#6366f1' },
-  sectionChipText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  sectionChipTextActive: { color: '#4338ca' },
+  sectionChipActive: { backgroundColor: theme.primaryLight, borderColor: theme.primary },
+  sectionChipText: { fontSize: 13, fontWeight: '600', color: theme.textSecondary },
+  sectionChipTextActive: { color: theme.primaryDark },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111827',
+    color: theme.text,
   },
   inputMultiline: { minHeight: 96, textAlignVertical: 'top' },
   deleteButton: {
@@ -279,8 +282,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#fecaca',
-    backgroundColor: '#fef2f2',
+    borderColor: theme.danger,
+    backgroundColor: theme.dangerBg,
   },
-  deleteButtonText: { color: '#dc2626', fontWeight: '600', fontSize: 15 },
+  deleteButtonText: { color: theme.danger, fontWeight: '600', fontSize: 15 },
 });

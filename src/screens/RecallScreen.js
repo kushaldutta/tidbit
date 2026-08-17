@@ -32,7 +32,7 @@ function getRecallAnswer(card) {
 
 // ─── Same-Boat banner ─────────────────────────────────────────────────────────
 
-function SameBoatBanner({ stat }) {
+function SameBoatBanner({ stat, styles, theme }) {
   if (!stat || stat.attempts < 2) return null;
   const wrongPct = Math.round(100 - (stat.pctCorrect ?? 0));
   const rightPct = Math.round(stat.pctCorrect ?? 0);
@@ -40,13 +40,13 @@ function SameBoatBanner({ stat }) {
   let emoji, msg, bg, textColor;
   if (wrongPct >= 60) {
     emoji = '🤝'; msg = `${wrongPct}% of your classmates missed this too`;
-    bg = '#fef2f2'; textColor = '#991b1b';
+    bg = theme.dangerBg; textColor = theme.dangerText;
   } else if (wrongPct >= 30) {
     emoji = '📊'; msg = `${rightPct}% of classmates got this right`;
-    bg = '#fffbeb'; textColor = '#92400e';
+    bg = theme.warningBg; textColor = theme.warningText;
   } else {
     emoji = '🏆'; msg = `${rightPct}% of classmates got this — nice work`;
-    bg = '#f0fdf4'; textColor = '#166534';
+    bg = theme.successBg; textColor = theme.successText;
   }
 
   return (
@@ -62,14 +62,14 @@ function SameBoatBanner({ stat }) {
 
 // ─── Diff highlighter ─────────────────────────────────────────────────────────
 
-function DiffDisplay({ diff }) {
+function DiffDisplay({ diff, styles, theme }) {
   return (
     <Text style={styles.diffBase}>
       {diff.map((token, i) => {
-        let color = '#111827', bg = 'transparent', decoration = 'none';
-        if (token.type === 'match') { color = '#16a34a'; }
-        else if (token.type === 'insert') { color = '#dc2626'; bg = '#fee2e2'; }
-        else if (token.type === 'delete') { color = '#dc2626'; decoration = 'line-through'; }
+        let color = theme.text, bg = 'transparent', decoration = 'none';
+        if (token.type === 'match') { color = theme.success; }
+        else if (token.type === 'insert') { color = theme.danger; bg = theme.dangerBg; }
+        else if (token.type === 'delete') { color = theme.danger; decoration = 'line-through'; }
         return (
           <Text key={i} style={{ color, backgroundColor: bg, textDecorationLine: decoration }}>
             {token.char}
@@ -84,6 +84,7 @@ function DiffDisplay({ diff }) {
 
 export default function RecallScreen({ route, navigation }) {
   const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const { deckId, deckTitle, studyScope, startCardId, categoryId } = route.params;
 
   const [cards, setCards] = useState([]);
@@ -229,14 +230,14 @@ export default function RecallScreen({ route, navigation }) {
   };
 
   const gradeColor = () => {
-    if (!gradeResult) return '#6366f1';
-    if (gradeResult.grade === 'exact' || gradeResult.grade === 'close') return '#16a34a';
-    if (gradeResult.grade === 'partial') return '#f59e0b';
-    return '#dc2626';
+    if (!gradeResult) return theme.primary;
+    if (gradeResult.grade === 'exact' || gradeResult.grade === 'close') return theme.success;
+    if (gradeResult.grade === 'partial') return theme.warning;
+    return theme.danger;
   };
 
   if (loading) {
-    return <SafeAreaView style={styles.center}><ActivityIndicator color="#6366f1" /></SafeAreaView>;
+    return <SafeAreaView style={styles.center}><ActivityIndicator color={theme.primary} /></SafeAreaView>;
   }
 
   if (cards.length === 0) {
@@ -278,8 +279,8 @@ export default function RecallScreen({ route, navigation }) {
             setAudioMode(v);
             if (!v) Speech.stop();
           }}
-          trackColor={{ false: '#e5e7eb', true: '#c7d2fe' }}
-          thumbColor={audioMode ? '#6366f1' : '#9ca3af'}
+          trackColor={{ false: theme.border, true: theme.accent }}
+          thumbColor={audioMode ? theme.primary : theme.textMuted}
         />
       </View>
 
@@ -315,7 +316,7 @@ export default function RecallScreen({ route, navigation }) {
               ref={inputRef}
               style={styles.input}
               placeholder={RECALL_WRITE_TERM ? 'Type the term…' : 'Type your answer…'}
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={theme.textMuted}
               value={userAnswer}
               onChangeText={setUserAnswer}
               onSubmitEditing={handleSubmit}
@@ -344,7 +345,7 @@ export default function RecallScreen({ route, navigation }) {
                 {!gradeResult.isCorrect && gradeResult.diff && (
                   <>
                     <Text style={styles.diffLabel}>Character diff:</Text>
-                    <DiffDisplay diff={gradeResult.diff} />
+                    <DiffDisplay diff={gradeResult.diff} styles={styles} theme={theme} />
                   </>
                 )}
               </View>
@@ -368,7 +369,7 @@ export default function RecallScreen({ route, navigation }) {
                 </TouchableOpacity>
               )}
 
-              {!overridden && <SameBoatBanner stat={sameBoatStat} />}
+              {!overridden && <SameBoatBanner stat={sameBoatStat} styles={styles} theme={theme} />}
 
               <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
                 <Text style={styles.nextBtnText}>
@@ -394,65 +395,65 @@ export default function RecallScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.surfaceAlt },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.surfaceAlt },
 
   topBar: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 12,
   },
-  exitText: { fontSize: 14, color: '#6b7280', fontWeight: '600' },
-  progress: { fontSize: 14, color: '#374151', fontWeight: '600' },
-  scoreText: { fontSize: 14, color: '#16a34a', fontWeight: '700' },
+  exitText: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
+  progress: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
+  scoreText: { fontSize: 14, color: theme.success, fontWeight: '700' },
 
-  progressTrack: { height: 3, backgroundColor: '#e5e7eb', marginHorizontal: 20, borderRadius: 2 },
-  progressFill: { height: 3, backgroundColor: '#a78bfa', borderRadius: 2 },
+  progressTrack: { height: 3, backgroundColor: theme.border, marginHorizontal: 20, borderRadius: 2 },
+  progressFill: { height: 3, backgroundColor: theme.accent, borderRadius: 2 },
 
   audioToggleRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end',
     paddingHorizontal: 20, paddingVertical: 8, gap: 10,
   },
-  audioToggleLabel: { fontSize: 13, color: '#6b7280', fontWeight: '600' },
+  audioToggleLabel: { fontSize: 13, color: theme.textSecondary, fontWeight: '600' },
 
   scroll: { padding: 20, paddingBottom: 48 },
 
   promptCard: {
-    backgroundColor: '#fff', borderRadius: 20, padding: 24,
+    backgroundColor: theme.card, borderRadius: 20, padding: 24,
     marginBottom: 20,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
   },
   promptLabel: {
-    fontSize: 10, fontWeight: '800', color: '#9ca3af',
+    fontSize: 10, fontWeight: '800', color: theme.textMuted,
     letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12,
   },
-  promptText: { fontSize: 20, fontWeight: '700', color: '#111827', lineHeight: 30 },
+  promptText: { fontSize: 20, fontWeight: '700', color: theme.text, lineHeight: 30 },
 
   speakBtn: {
     marginTop: 16, alignSelf: 'flex-start',
-    backgroundColor: '#eef2ff', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: theme.primaryLight, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8,
   },
-  speakBtnText: { color: '#6366f1', fontWeight: '600', fontSize: 14 },
+  speakBtnText: { color: theme.primary, fontWeight: '600', fontSize: 14 },
 
   input: {
-    backgroundColor: '#fff', borderRadius: 16, borderWidth: 2, borderColor: '#e5e7eb',
-    padding: 16, fontSize: 16, color: '#111827', minHeight: 100,
+    backgroundColor: theme.card, borderRadius: 16, borderWidth: 2, borderColor: theme.border,
+    padding: 16, fontSize: 16, color: theme.text, minHeight: 100,
     textAlignVertical: 'top', marginBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
 
   gradeBanner: {
-    backgroundColor: '#fff', borderRadius: 16, borderWidth: 2,
+    backgroundColor: theme.card, borderRadius: 16, borderWidth: 2,
     padding: 16, marginBottom: 12,
   },
   gradeText: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
-  yourAnswerLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  yourAnswerText: { fontSize: 15, color: '#374151', marginBottom: 10 },
-  correctLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
-  correctText: { fontSize: 15, color: '#166534', fontWeight: '600', marginBottom: 10 },
-  diffLabel: { fontSize: 11, color: '#9ca3af', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  yourAnswerLabel: { fontSize: 11, color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  yourAnswerText: { fontSize: 15, color: theme.textSecondary, marginBottom: 10 },
+  correctLabel: { fontSize: 11, color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
+  correctText: { fontSize: 15, color: theme.successText, fontWeight: '600', marginBottom: 10 },
+  diffLabel: { fontSize: 11, color: theme.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 },
   diffBase: { fontSize: 15, lineHeight: 24 },
 
   sameBoat: {
@@ -461,30 +462,30 @@ const styles = StyleSheet.create({
   },
   sameBoatEmoji: { fontSize: 24 },
   sameBoatMsg: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  sameBoatSub: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  sameBoatSub: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
   submitBtn: {
-    backgroundColor: '#6366f1', borderRadius: 16, paddingVertical: 16, alignItems: 'center',
+    backgroundColor: theme.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center',
   },
-  submitBtnDisabled: { backgroundColor: '#c7d2fe' },
+  submitBtnDisabled: { backgroundColor: theme.accent },
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   overrideBtn: {
     borderRadius: 12, paddingVertical: 11, alignItems: 'center',
     marginBottom: 10, borderWidth: 1.5,
   },
-  overrideBtnMarkWrong: { borderColor: '#fca5a5', backgroundColor: '#fff5f5' },
-  overrideBtnMarkCorrect: { borderColor: '#86efac', backgroundColor: '#f0fdf4' },
+  overrideBtnMarkWrong: { borderColor: theme.danger, backgroundColor: theme.dangerBg },
+  overrideBtnMarkCorrect: { borderColor: theme.success, backgroundColor: theme.successBg },
   overrideBtnText: { fontSize: 13, fontWeight: '600' },
-  overrideBtnTextWrong: { color: '#dc2626' },
-  overrideBtnTextCorrect: { color: '#16a34a' },
+  overrideBtnTextWrong: { color: theme.danger },
+  overrideBtnTextCorrect: { color: theme.success },
 
   nextBtn: {
-    backgroundColor: '#6366f1', borderRadius: 16, paddingVertical: 16, alignItems: 'center',
+    backgroundColor: theme.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center',
   },
   nextBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   emptyEmoji: { fontSize: 40, marginBottom: 12 },
-  emptyText: { fontSize: 16, color: '#6b7280', marginBottom: 16 },
-  backLink: { fontSize: 15, color: '#6366f1', fontWeight: '600' },
+  emptyText: { fontSize: 16, color: theme.textSecondary, marginBottom: 16 },
+  backLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },
 });

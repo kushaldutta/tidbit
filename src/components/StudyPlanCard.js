@@ -1,12 +1,35 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import Icon from './Icon';
+import { spacing, radius, type, elevation, iconSize } from '../theme/tokens';
+
+/** Text and fills that sit ON the coloured card, so they work over any theme. */
+const ON_CARD = '#ffffff';
+const ON_CARD_MUTED = 'rgba(255, 255, 255, 0.85)';
+const ON_CARD_TRACK = 'rgba(255, 255, 255, 0.3)';
+
+function CardHeader({ styles, trailing }) {
+  return (
+    <View style={styles.header}>
+      <View style={styles.titleRow}>
+        <Icon name="studyPlan" size={iconSize.md} color={ON_CARD} />
+        <Text style={styles.title}>Today's Study Plan</Text>
+      </View>
+      {trailing}
+    </View>
+  );
+}
 
 export default function StudyPlanCard({ plan, onPress, isLoading }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
+
   if (isLoading) {
     return (
       <View style={styles.card}>
-        <Text style={styles.title}>📚 Today's Study Plan</Text>
-        <Text style={styles.loadingText}>Generating your plan...</Text>
+        <CardHeader styles={styles} />
+        <Text style={styles.mutedText}>Generating your plan…</Text>
       </View>
     );
   }
@@ -14,18 +37,20 @@ export default function StudyPlanCard({ plan, onPress, isLoading }) {
   if (!plan) {
     return (
       <View style={styles.card}>
-        <Text style={styles.title}>📚 Today's Study Plan</Text>
-        <Text style={styles.emptyText}>
-          No plan available. Enroll in a class on the Categories tab to get started!
+        <CardHeader styles={styles} />
+        <Text style={styles.mutedText}>
+          No plan yet — enroll in a class on the Categories tab to get started.
         </Text>
       </View>
     );
   }
 
   const isCompleted = plan.completed;
-  const progressText = isCompleted
-    ? `✅ Completed (${plan.completedCount}/${plan.totalCount})`
-    : `${plan.completedCount}/${plan.totalCount} done`;
+  const total = plan.totalCount || 0;
+  const done = plan.completedCount || 0;
+  // Guard the divide: an empty plan has totalCount 0, which produced "NaN%"
+  // and a progress bar that failed to lay out.
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 
   return (
     <TouchableOpacity
@@ -34,29 +59,28 @@ export default function StudyPlanCard({ plan, onPress, isLoading }) {
       activeOpacity={0.7}
       disabled={isCompleted}
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>📚 Today's Study Plan</Text>
-        {isCompleted && (
-          <View style={styles.completedBadge}>
-            <Text style={styles.completedBadgeText}>✓</Text>
-          </View>
-        )}
-      </View>
-      
+      <CardHeader
+        styles={styles}
+        trailing={
+          isCompleted ? (
+            <View style={styles.completedBadge}>
+              <Icon name="check" size={iconSize.sm} color={ON_CARD} filled />
+            </View>
+          ) : null
+        }
+      />
+
       <Text style={styles.planText}>
         Do {plan.dueCount} due + {plan.newCount} new ({plan.estimatedMinutes} min)
       </Text>
-      
+
       <View style={styles.progressContainer}>
         <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${(plan.completedCount / plan.totalCount) * 100}%` },
-            ]}
-          />
+          <View style={[styles.progressFill, { width: `${pct}%` }]} />
         </View>
-        <Text style={styles.progressText}>{progressText}</Text>
+        <Text style={styles.progressText}>
+          {isCompleted ? `Completed (${done}/${total})` : `${done}/${total} done`}
+        </Text>
       </View>
 
       {!isCompleted && (
@@ -68,93 +92,86 @@ export default function StudyPlanCard({ plan, onPress, isLoading }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   card: {
-    backgroundColor: '#6366f1',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
+    backgroundColor: theme.primary,
+    borderRadius: radius.card,
+    padding: spacing.xl,
+    marginBottom: spacing.xxl,
+    ...elevation.raised,
+    shadowColor: theme.primary,
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
+  // Completion reads as success, not as a second brand colour.
   cardCompleted: {
-    backgroundColor: '#10b981',
-    opacity: 0.9,
+    backgroundColor: theme.success,
+    shadowColor: theme.success,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
   },
   title: {
+    ...type.heading,
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    color: ON_CARD,
   },
   completedBadge: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: ON_CARD_TRACK,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  completedBadgeText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   planText: {
     fontSize: 18,
-    color: '#ffffff',
-    marginBottom: 16,
+    color: ON_CARD,
+    marginBottom: spacing.lg,
     fontWeight: '500',
   },
   progressContainer: {
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   progressBar: {
     height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 4,
-    marginBottom: 8,
+    backgroundColor: ON_CARD_TRACK,
+    borderRadius: 4, // half the 8pt track height — a true pill
+    marginBottom: spacing.sm,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#ffffff',
+    backgroundColor: ON_CARD,
     borderRadius: 4,
   },
   progressText: {
     fontSize: 14,
-    color: '#ffffff',
+    color: ON_CARD,
     fontWeight: '500',
   },
   startButton: {
-    marginTop: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    marginTop: spacing.lg,
+    backgroundColor: ON_CARD,
+    borderRadius: radius.md,
     padding: 14,
     alignItems: 'center',
   },
   startButtonText: {
-    color: '#6366f1',
+    color: theme.primary,
     fontSize: 16,
     fontWeight: '600',
   },
-  loadingText: {
-    fontSize: 14,
-    color: '#e0e7ff',
-    fontStyle: 'italic',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#e0e7ff',
-    fontStyle: 'italic',
+  mutedText: {
+    ...type.callout,
+    color: ON_CARD_MUTED,
   },
 });
-

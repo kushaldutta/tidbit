@@ -18,12 +18,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { DeckService } from '../../services/DeckService';
 import { GroupService } from '../../services/GroupService';
+import { useTheme } from '../../context/ThemeContext';
 
 const EMOJI_OPTIONS = ['📚', '🧠', '🔬', '🧪', '🧮', '📐', '🎨', '🌍', '⚡️', '💡', '🎯', '🏛️'];
 const FILTER_ALL = 'all';
 const FILTER_NONE = 'none';
 
 export default function DeckEditorScreen({ route, navigation }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const mode = route.params?.mode || 'create';
   const deckId = route.params?.deckId || null;
   const readOnly = mode === 'view';
@@ -351,7 +354,7 @@ export default function DeckEditorScreen({ route, navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color="#6366f1" />
+        <ActivityIndicator color={theme.primary} />
       </SafeAreaView>
     );
   }
@@ -406,7 +409,7 @@ export default function DeckEditorScreen({ route, navigation }) {
               <TextInput
                 style={styles.input}
                 placeholder="e.g. CS61A Midterm 2 vocabulary"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={theme.textMuted}
                 value={title}
                 onChangeText={setTitle}
                 editable={!readOnly && !saving}
@@ -416,7 +419,7 @@ export default function DeckEditorScreen({ route, navigation }) {
               <TextInput
                 style={[styles.input, styles.inputMultiline]}
                 placeholder="What's in this deck?"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={theme.textMuted}
                 value={description}
                 onChangeText={setDescription}
                 multiline
@@ -482,7 +485,7 @@ export default function DeckEditorScreen({ route, navigation }) {
                       {getCardSectionLabel(item)}
                     </Text>
                     {sectionBusy ? (
-                      <ActivityIndicator size="small" color="#6366f1" />
+                      <ActivityIndicator size="small" color={theme.primary} />
                     ) : (
                       <Text style={styles.sectionPickerChevron}>▾</Text>
                     )}
@@ -549,7 +552,7 @@ export default function DeckEditorScreen({ route, navigation }) {
                             </View>
                           </View>
                           {isBusy ? (
-                            <ActivityIndicator size="small" color="#6366f1" />
+                            <ActivityIndicator size="small" color={theme.primary} />
                           ) : (
                             <View
                               style={[
@@ -616,7 +619,7 @@ export default function DeckEditorScreen({ route, navigation }) {
                 <TextInput
                   style={styles.addSectionInput}
                   placeholder="New section name"
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor={theme.textMuted}
                   value={newSectionTitle}
                   onChangeText={setNewSectionTitle}
                   editable={!sectionSaving}
@@ -649,7 +652,7 @@ export default function DeckEditorScreen({ route, navigation }) {
                           value={renameSectionTitle}
                           onChangeText={setRenameSectionTitle}
                           placeholder="Section name"
-                          placeholderTextColor="#9ca3af"
+                          placeholderTextColor={theme.textMuted}
                           autoFocus
                           editable={!renameSaving}
                           onSubmitEditing={() => handleSaveRename(item.id)}
@@ -697,8 +700,8 @@ export default function DeckEditorScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.surfaceAlt },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16, paddingBottom: 48 },
   topBar: {
@@ -707,33 +710,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  back: { color: '#6366f1', fontSize: 16, fontWeight: '500' },
-  saveLink: { color: '#6366f1', fontSize: 16, fontWeight: '600' },
+  back: { color: theme.primary, fontSize: 16, fontWeight: '500' },
+  saveLink: { color: theme.primary, fontSize: 16, fontWeight: '600' },
   disabledText: { opacity: 0.5 },
   heading: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.text,
     marginVertical: 12,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.textSecondary,
     marginBottom: 8,
     marginTop: 16,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#111827',
+    color: theme.text,
   },
   inputMultiline: { minHeight: 64, textAlignVertical: 'top' },
   emojiRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -741,13 +744,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emojiChipActive: { borderColor: '#6366f1', backgroundColor: '#eef2ff' },
+  emojiChipActive: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
   emojiChipText: { fontSize: 22 },
   cardsHeader: {
     flexDirection: 'row',
@@ -756,33 +759,33 @@ const styles = StyleSheet.create({
     marginTop: 32,
     marginBottom: 12,
   },
-  cardsHeaderTitle: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  cardsHeaderTitle: { fontSize: 14, fontWeight: '700', color: theme.text },
   cardsHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   manageSectionsBtn: {
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 8,
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
   },
-  manageSectionsText: { color: '#4338ca', fontWeight: '600', fontSize: 13 },
-  addCardLink: { color: '#6366f1', fontWeight: '600' },
+  manageSectionsText: { color: theme.primaryDark, fontWeight: '600', fontSize: 13 },
+  addCardLink: { color: theme.primary, fontWeight: '600' },
   filterRow: { gap: 8, paddingBottom: 12 },
   filterChip: {
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
   },
-  filterChipActive: { backgroundColor: '#eef2ff', borderColor: '#6366f1' },
-  filterChipText: { fontSize: 13, fontWeight: '600', color: '#6b7280' },
-  filterChipTextActive: { color: '#4338ca' },
+  filterChipActive: { backgroundColor: theme.primaryLight, borderColor: theme.primary },
+  filterChipText: { fontSize: 13, fontWeight: '600', color: theme.textSecondary },
+  filterChipTextActive: { color: theme.primaryDark },
   cardRow: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     padding: 12,
     marginBottom: 8,
   },
@@ -795,39 +798,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 6,
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: theme.accent,
     marginBottom: 8,
   },
   sectionPickerText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#4338ca',
+    color: theme.primaryDark,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     flexShrink: 1,
   },
   sectionPickerChevron: {
     fontSize: 11,
-    color: '#6366f1',
+    color: theme.primary,
     fontWeight: '700',
   },
   cardSectionLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#6366f1',
+    color: theme.primary,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginBottom: 4,
   },
-  cardFront: { fontSize: 15, color: '#111827', fontWeight: '500' },
-  cardBack: { fontSize: 13, color: '#6b7280', marginTop: 4 },
+  cardFront: { fontSize: 15, color: theme.text, fontWeight: '500' },
+  cardBack: { fontSize: 13, color: theme.textSecondary, marginTop: 4 },
   empty: { padding: 24, alignItems: 'center' },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#374151' },
-  emptyBody: { fontSize: 14, color: '#9ca3af', marginTop: 4, textAlign: 'center' },
+  emptyTitle: { fontSize: 16, fontWeight: '600', color: theme.textSecondary },
+  emptyBody: { fontSize: 14, color: theme.textMuted, marginTop: 4, textAlign: 'center' },
   helperText: {
-    color: '#6b7280',
+    color: theme.textSecondary,
     fontSize: 13,
     fontStyle: 'italic',
     marginTop: 8,
@@ -836,7 +839,7 @@ const styles = StyleSheet.create({
   shareSectionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: theme.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 10,
@@ -845,50 +848,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     paddingHorizontal: 14,
     paddingVertical: 12,
     marginBottom: 8,
   },
   shareRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   shareGroupEmoji: { fontSize: 22 },
-  shareGroupName: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  shareGroupMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  shareGroupName: { fontSize: 15, fontWeight: '600', color: theme.text },
+  shareGroupMeta: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
   shareToggle: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: '#6366f1',
-    backgroundColor: '#fff',
+    borderColor: theme.primary,
+    backgroundColor: theme.card,
   },
-  shareToggleActive: { backgroundColor: '#6366f1', borderColor: '#6366f1' },
-  shareToggleText: { fontSize: 13, fontWeight: '600', color: '#6366f1' },
+  shareToggleActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  shareToggleText: { fontSize: 13, fontWeight: '600', color: theme.primary },
   shareToggleTextActive: { color: '#fff' },
   learnBtn: {
     marginTop: 16,
     paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 12,
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
     borderWidth: 1.5,
-    borderColor: '#c7d2fe',
+    borderColor: theme.accent,
   },
-  learnBtnText: { color: '#4338ca', fontWeight: '700', fontSize: 15 },
+  learnBtnText: { color: theme.primaryDark, fontWeight: '700', fontSize: 15 },
   deleteButton: {
     marginTop: 10,
     paddingVertical: 14,
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#fecaca',
-    backgroundColor: '#fef2f2',
+    borderColor: theme.danger,
+    backgroundColor: theme.dangerBg,
   },
-  deleteButtonText: { color: '#dc2626', fontWeight: '600', fontSize: 15 },
-  modalContainer: { flex: 1, backgroundColor: '#f9fafb' },
+  deleteButtonText: { color: theme.danger, fontWeight: '600', fontSize: 15 },
+  modalContainer: { flex: 1, backgroundColor: theme.surfaceAlt },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -896,11 +899,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
-  modalDone: { fontSize: 16, fontWeight: '600', color: '#6366f1' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: theme.text },
+  modalDone: { fontSize: 16, fontWeight: '600', color: theme.primary },
   modalSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
     paddingHorizontal: 16,
     marginBottom: 16,
     lineHeight: 20,
@@ -913,17 +916,17 @@ const styles = StyleSheet.create({
   },
   addSectionInput: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#111827',
+    color: theme.text,
   },
   addSectionBtn: {
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 10,
     paddingHorizontal: 16,
     justifyContent: 'center',
@@ -931,14 +934,14 @@ const styles = StyleSheet.create({
   addSectionBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   disabledBtn: { opacity: 0.5 },
   modalList: { paddingHorizontal: 16, paddingBottom: 24 },
-  modalEmpty: { color: '#9ca3af', fontStyle: 'italic', textAlign: 'center', marginTop: 24 },
+  modalEmpty: { color: theme.textMuted, fontStyle: 'italic', textAlign: 'center', marginTop: 24 },
   modalSectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
     padding: 14,
     marginBottom: 8,
   },
@@ -948,22 +951,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
-  modalSectionTitle: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  modalSectionMeta: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
-  modalRename: { color: '#6366f1', fontWeight: '600', fontSize: 14 },
-  modalRenameSave: { color: '#6366f1', fontWeight: '700', fontSize: 14 },
-  modalRenameCancel: { color: '#6b7280', fontWeight: '600', fontSize: 14 },
+  modalSectionTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
+  modalSectionMeta: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
+  modalRename: { color: theme.primary, fontWeight: '600', fontSize: 14 },
+  modalRenameSave: { color: theme.primary, fontWeight: '700', fontSize: 14 },
+  modalRenameCancel: { color: theme.textSecondary, fontWeight: '600', fontSize: 14 },
   renameSectionInput: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: theme.accent,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 15,
-    color: '#111827',
+    color: theme.text,
     marginRight: 12,
   },
-  modalDelete: { color: '#dc2626', fontWeight: '600', fontSize: 14 },
+  modalDelete: { color: theme.danger, fontWeight: '600', fontSize: 14 },
 });

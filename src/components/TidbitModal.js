@@ -14,10 +14,13 @@ import * as Haptics from 'expo-haptics';
 import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
+import { useTheme } from '../context/ThemeContext';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 
 export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
   const [isFlipped, setIsFlipped] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [learningState, setLearningState] = useState(null);
@@ -388,7 +391,7 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -412,10 +415,10 @@ const styles = StyleSheet.create({
     backfaceVisibility: 'hidden',
   },
   cardFront: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
   },
   cardBack: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
   },
   cardContent: {
     flex: 1,
@@ -446,7 +449,7 @@ const styles = StyleSheet.create({
   categoryLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#6366f1',
+    color: theme.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -457,30 +460,30 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   masteryBadgeNew: {
-    backgroundColor: '#e0e7ff',
+    backgroundColor: theme.primaryLight,
   },
   masteryBadgeLearning: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: theme.warningBg,
   },
   masteryBadgeMastered: {
-    backgroundColor: '#d1fae5',
+    backgroundColor: theme.successBg,
   },
   masteryBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
   },
   closeButton: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.surfaceAlt,
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButtonText: {
     fontSize: 20,
-    color: '#6b7280',
+    color: theme.textSecondary,
     lineHeight: 20,
   },
   tidbitContent: {
@@ -490,7 +493,7 @@ const styles = StyleSheet.create({
   tidbitText: {
     fontSize: 20,
     lineHeight: 32,
-    color: '#1f2937',
+    color: theme.text,
     fontWeight: '500',
     textAlign: 'center',
     marginBottom: 16,
@@ -498,7 +501,7 @@ const styles = StyleSheet.create({
   termText: {
     fontSize: 28,
     lineHeight: 38,
-    color: '#1f2937',
+    color: theme.text,
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 'auto',
@@ -506,31 +509,31 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   definitionBox: {
-    backgroundColor: '#eef2ff',
+    backgroundColor: theme.primaryLight,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: theme.primary,
   },
   definitionText: {
     fontSize: 15,
     lineHeight: 24,
-    color: '#1f2937',
+    color: theme.text,
     fontWeight: '500',
   },
   learningInfo: {
     marginBottom: 16,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.surfaceAlt,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: theme.primary,
   },
   learningInfoText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
     marginVertical: 2,
   },
@@ -538,11 +541,11 @@ const styles = StyleSheet.create({
     marginTop: 'auto',
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: theme.border,
   },
   flipHintText: {
     fontSize: 14,
-    color: '#6366f1',
+    color: theme.primary,
     textAlign: 'center',
     fontWeight: '500',
   },
@@ -553,7 +556,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   actionButton: {
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -568,21 +571,21 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   actionButtonKnew: {
-    borderColor: '#10b981',
-    backgroundColor: '#f0fdf4',
+    borderColor: theme.success,
+    backgroundColor: theme.successBg,
   },
   actionButtonDidnt: {
-    borderColor: '#f59e0b',
-    backgroundColor: '#fffbeb',
+    borderColor: theme.warning,
+    backgroundColor: theme.warningBg,
   },
   actionButtonSave: {
-    borderColor: '#6366f1',
-    backgroundColor: '#eef2ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
+    color: theme.text,
     textAlign: 'center',
   },
   flipBackButton: {
@@ -591,7 +594,7 @@ const styles = StyleSheet.create({
   },
   flipBackText: {
     fontSize: 14,
-    color: '#6366f1',
+    color: theme.primary,
     textAlign: 'center',
     fontWeight: '500',
   },

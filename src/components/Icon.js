@@ -82,7 +82,8 @@ const ICONS = {
   // ─── System / affordances ────────────────────────────────────────────────
   notifications: ['notifications-outline', 'notifications'],
   quietHours: ['moon-outline', 'moon'],
-  coins: ['diamond-outline', 'diamond'],
+  coins: ['disc-outline', 'disc'],
+  wallet: ['wallet-outline', 'wallet'],
   chevron: ['chevron-forward', 'chevron-forward'],
   back: ['arrow-back', 'arrow-back'],
   close: ['close', 'close'],
