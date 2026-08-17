@@ -55,6 +55,14 @@ class GameRunService {
       console.warn('[GameRunService] recordRun failed:', error.message);
       return null;
     }
+
+    try {
+      const { StreakService } = require('./StreakService');
+      StreakService.recordActivity().catch(() => {});
+    } catch {
+      /* streak is non-fatal */
+    }
+
     return data;
   }
 

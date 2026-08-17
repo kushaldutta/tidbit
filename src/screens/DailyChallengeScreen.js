@@ -220,10 +220,10 @@ export default function DailyChallengeScreen({ route, navigation }) {
     ]);
 
     // Update spaced repetition — recall mode earns the same stage credit as recall sessions
-    CardLearningService.recordReview(card.id, {
+    await CardLearningService.recordReview(card.id, {
       wasCorrect,
       mode: 'daily_challenge',
-    });
+    }).catch(() => {});
   };
 
   // ─── Advance / complete ───────────────────────────────────────

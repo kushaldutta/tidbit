@@ -22,6 +22,7 @@ import { AuthService } from '../services/AuthService';
 import { SameBoatService } from '../services/SameBoatService';
 import { InsightsService } from '../services/InsightsService';
 import { DailyChallengeService } from '../services/DailyChallengeService';
+import { StreakService } from '../services/StreakService';
 import { useTheme } from '../context/ThemeContext';
 import CoinBalanceChip from '../components/CoinBalanceChip';
 import BuddyRequestsCard from '../components/BuddyRequestsCard';
@@ -164,52 +165,7 @@ export default function HomeScreen({ navigation }) {
       await StorageService.setSelectedCategories(validCategories);
     }
     
-    // Calculate learning streak (same logic as StatsScreen)
-    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-    const allKeys = await AsyncStorage.getAllKeys();
-    const spacedRepKeys = allKeys.filter(key => key.startsWith('spaced_repetition_'));
-    
-    const today = new Date().toDateString();
-    const last7Days = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      last7Days.push(date.toDateString());
-    }
-    
-    const daysWithActivity = new Set();
-    
-    for (const key of spacedRepKeys) {
-      try {
-        const data = await AsyncStorage.getItem(key);
-        if (data) {
-          const state = JSON.parse(data);
-          // Track learning streak (days with activity)
-          if (state.lastSeen) {
-            const lastSeenDate = new Date(state.lastSeen).toDateString();
-            if (last7Days.includes(lastSeenDate)) {
-              daysWithActivity.add(lastSeenDate);
-            }
-          }
-        }
-      } catch (error) {
-        // Ignore parse errors
-      }
-    }
-    
-    // Calculate streak (consecutive days from today backwards)
-    let learningStreak = 0;
-    for (let i = 0; i < 7; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toDateString();
-      if (daysWithActivity.has(dateStr)) {
-        learningStreak++;
-      } else if (i > 0) {
-        // Break streak if we hit a day without activity (but today can be 0)
-        break;
-      }
-    }
+    const learningStreak = await StreakService.getCurrentStreak();
     
     // Today's quiz accuracy from card_attempts in AsyncStorage/Supabase
     let todayAccuracy = null;

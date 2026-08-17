@@ -224,7 +224,8 @@ class StudySessionService {
    * Non-fatal: all errors are swallowed so a network failure never crashes a session.
    *
    * cards_mastered is derived from user_card_state by a database trigger
-   * (migration 046) and must not be written here.
+   * (migration 046) and must not be written here. current_streak is owned
+   * by StreakService.
    */
   static async _syncToCloud(session) {
     if (!SUPABASE_CONFIGURED) return;
@@ -241,7 +242,6 @@ class StudySessionService {
           {
             user_id: userId,
             tidbits_seen: tidbitsSeen,
-            last_active_date: new Date().toISOString().split('T')[0],
           },
           { onConflict: 'user_id' }
         );

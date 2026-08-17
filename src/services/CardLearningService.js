@@ -458,6 +458,12 @@ class CardLearningService {
     if (isUuid(state.contentId)) {
       await this.retireLegacyDuplicate(state.contentId, categoryId);
     }
+    try {
+      const { StreakService } = require('./StreakService');
+      StreakService.recordActivity(now).catch(() => {});
+    } catch {
+      /* streak is non-fatal */
+    }
     return state;
   }
 

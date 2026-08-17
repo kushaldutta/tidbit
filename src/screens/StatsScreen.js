@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from '../services/AuthService';
+import { StreakService } from '../services/StreakService';
 import { useTheme } from '../context/ThemeContext';
 
 function pct(n, total) {
@@ -100,7 +101,7 @@ function AnalyticsContent({ navigation }) {
       // Run all three independent queries concurrently instead of one after
       // another — cuts load time roughly to the slowest single query instead
       // of the sum of all three.
-      const [{ data: userStats }, { data: attempts }, { count: aiCount }] = await Promise.all([
+      const [{ data: userStats }, { data: attempts }, { count: aiCount }, learningStreak] = await Promise.all([
         supabase
           .from('user_stats')
           .select('*')
@@ -116,6 +117,7 @@ function AnalyticsContent({ navigation }) {
           .from('ai_generation_log')
           .select('*', { count: 'exact', head: true })
           .eq('user_id', userId),
+        StreakService.getCurrentStreak(),
       ]);
 
       const allAttempts = attempts || [];
@@ -146,6 +148,7 @@ function AnalyticsContent({ navigation }) {
       setStats({
         tidbitsSeen: userStats?.tidbits_seen ?? 0,
         cardsMastered: userStats?.cards_mastered ?? 0,
+        currentStreak: learningStreak,
         totalAttempts: total,
         correctAttempts: correct,
         accuracy: pct(correct, total),
@@ -200,6 +203,7 @@ function AnalyticsContent({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.overviewRow}>
           {[
+            { label: 'Streak', value: `${s.currentStreak || 0}d`, emoji: '🔥' },
             { label: 'Tidbits seen', value: s.tidbitsSeen, emoji: '👁️' },
             { label: 'Cards mastered', value: s.cardsMastered, emoji: '🏆' },
             { label: 'Accuracy (30d)', value: `${s.accuracy}%`, emoji: '🎯' },
@@ -309,9 +313,10 @@ const makeStyles = (theme) => StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
   scroll: { padding: 20, paddingBottom: 60 },
 
-  overviewRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  overviewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   overviewCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '45%',
     backgroundColor: theme.card,
     borderRadius: 16,
     padding: 14,
