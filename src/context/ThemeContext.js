@@ -65,15 +65,20 @@ export const THEMES = {
       textSecondary: '#94a3b8',
       tabBar: '#1a1829',
       tabBarActive: '#818cf8',
-      // Semantic colors need more lift against a dark surface.
+      // Semantic colors need more lift against a dark surface, and the
+      // "on-tint" text colors invert entirely (light text on a dark tint).
       success: '#4ade80',
       successBg: '#14301f',
+      successText: '#bbf7d0',
       warning: '#fbbf24',
       warningBg: '#3a2c0a',
+      warningText: '#fde68a',
       danger: '#f87171',
       dangerBg: '#3b1616',
+      dangerText: '#fecaca',
       info: '#38bdf8',
       infoBg: '#0c2b3d',
+      infoText: '#bae6fd',
     },
     DARK_SURFACES
   ),

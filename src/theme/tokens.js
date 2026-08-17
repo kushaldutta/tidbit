@@ -57,12 +57,16 @@ export const type = {
 export const semantic = {
   success: '#16a34a',
   successBg: '#f0fdf4',
+  successText: '#14532d',
   warning: '#f59e0b',
-  warningBg: '#fffbeb',
+  warningBg: '#fff7ed',
+  warningText: '#9a3412',
   danger: '#dc2626',
   dangerBg: '#fef2f2',
+  dangerText: '#991b1b',
   info: '#0ea5e9',
   infoBg: '#f0f9ff',
+  infoText: '#075985',
 };
 
 /** Neutral ramp — light-theme surfaces and text. */

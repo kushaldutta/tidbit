@@ -68,6 +68,7 @@ const ICONS = {
 
   // ─── Social ──────────────────────────────────────────────────────────────
   group: ['people-circle-outline', 'people-circle'],
+  members: ['people-outline', 'people'],
   buddy: ['person-add-outline', 'person-add'],
   profile: ['person-circle-outline', 'person-circle'],
   comment: ['chatbubble-outline', 'chatbubble'],

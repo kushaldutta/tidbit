@@ -25,6 +25,18 @@ import { DailyChallengeService } from '../services/DailyChallengeService';
 import { useTheme } from '../context/ThemeContext';
 import CoinBalanceChip from '../components/CoinBalanceChip';
 import BuddyRequestsCard from '../components/BuddyRequestsCard';
+import Icon from '../components/Icon';
+import { spacing, radius, type, elevation, iconSize } from '../theme/tokens';
+
+function StatTile({ icon, value, label, tone, filled, muted, styles, onPress }) {
+  return (
+    <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.8}>
+      <Icon name={icon} size={iconSize.sm} color={tone} filled={filled} />
+      <Text style={[styles.statNumber, muted && { color: tone }]}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -261,23 +273,42 @@ export default function HomeScreen({ navigation }) {
         <CoinBalanceChip navigation={navigation} />
       </View>
 
+      {/* Every number is tappable and lands on the screen that acts on it — a
+          stat you can't do anything about is just a scoreboard. */}
       <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{dueCount}</Text>
-          <Text style={styles.statLabel}>Due</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.learningStreak}d</Text>
-          <Text style={styles.statLabel}>Streak</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>
-            {stats.todayAccuracy !== null && stats.todayAccuracy !== undefined
+        <StatTile
+          icon="due"
+          value={String(dueCount)}
+          label="Due"
+          tone={theme.primary}
+          styles={styles}
+          onPress={() => navigation.navigate('ReviewQueue')}
+        />
+        <StatTile
+          icon="streak"
+          value={`${stats.learningStreak}d`}
+          label="Streak"
+          // A live streak burns warm; a zero stays quiet rather than shouting
+          // failure at someone who just opened the app.
+          tone={stats.learningStreak > 0 ? theme.warning : theme.textMuted}
+          filled={stats.learningStreak > 0}
+          muted={stats.learningStreak === 0}
+          styles={styles}
+          onPress={() => navigation.navigate('Stats')}
+        />
+        <StatTile
+          icon="accuracy"
+          value={
+            stats.todayAccuracy !== null && stats.todayAccuracy !== undefined
               ? `${stats.todayAccuracy}%`
-              : '—'}
-          </Text>
-          <Text style={styles.statLabel}>Accuracy</Text>
-        </View>
+              : '—'
+          }
+          label="Accuracy"
+          tone={theme.primary}
+          muted={stats.todayAccuracy === null || stats.todayAccuracy === undefined}
+          styles={styles}
+          onPress={() => navigation.navigate('Insights')}
+        />
       </View>
 
       <BuddyRequestsCard />
@@ -288,7 +319,7 @@ export default function HomeScreen({ navigation }) {
           onPress={() => navigation.navigate('Insights')}
           activeOpacity={0.85}
         >
-          <Text style={styles.examBannerEmoji}>📅</Text>
+          <Icon name="exam" size={iconSize.lg} color={theme.primary} style={styles.rowIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.examBannerTitle}>
               {upcomingExam.name} {upcomingExam.label}
@@ -301,7 +332,7 @@ export default function HomeScreen({ navigation }) {
                   : `${upcomingExam.daysLeft} day${upcomingExam.daysLeft === 1 ? '' : 's'} left`}
             </Text>
           </View>
-          <Text style={styles.reviewQueueChevron}>›</Text>
+          <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
         </TouchableOpacity>
       )}
 
@@ -311,7 +342,7 @@ export default function HomeScreen({ navigation }) {
           onPress={() => navigation.navigate('ReviewQueue')}
           activeOpacity={0.85}
         >
-          <Text style={styles.insightEmoji}>🛟</Text>
+          <Icon name="insights" size={iconSize.lg} color={theme.warningText} style={styles.rowIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.insightKicker}>
               {homeInsight.belowClass
@@ -324,7 +355,7 @@ export default function HomeScreen({ navigation }) {
               {homeInsight.yourPct != null ? ` · you ${homeInsight.yourPct}%` : ''}
             </Text>
           </View>
-          <Text style={styles.reviewQueueChevron}>›</Text>
+          <Icon name="chevron" size={iconSize.md} color={theme.warningText} />
         </TouchableOpacity>
       )}
 
@@ -339,7 +370,12 @@ export default function HomeScreen({ navigation }) {
         onPress={() => navigation.navigate('ReviewQueue')}
         activeOpacity={0.85}
       >
-        <Text style={styles.reviewQueueEmoji}>📋</Text>
+        <Icon
+          name={dueCount > 0 ? 'reviewQueue' : 'check'}
+          size={iconSize.lg}
+          color={dueCount > 0 ? theme.primary : theme.success}
+          style={styles.rowIcon}
+        />
         <View style={{ flex: 1 }}>
           <Text style={styles.reviewQueueTitle}>Review Queue</Text>
           <Text style={styles.reviewQueueSub}>
@@ -348,7 +384,7 @@ export default function HomeScreen({ navigation }) {
               : 'All caught up — no reviews due'}
           </Text>
         </View>
-        <Text style={styles.reviewQueueChevron}>›</Text>
+        <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
       </TouchableOpacity>
 
       {challengeClasses.length > 0 && (
@@ -367,12 +403,12 @@ export default function HomeScreen({ navigation }) {
                 })}
                 activeOpacity={0.85}
               >
-                <Text style={styles.challengeEmoji}>⚡</Text>
+                <Icon name="dailyChallenge" size={iconSize.lg} color={theme.primary} style={styles.rowIcon} filled />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.challengeTitle}>{cls.code} Challenge</Text>
                   <Text style={styles.challengeSub}>10 questions · same for everyone today</Text>
                 </View>
-                <Text style={styles.challengeChevron}>›</Text>
+                <Icon name="chevron" size={iconSize.md} color={theme.primary} />
               </TouchableOpacity>
             );
           })}
@@ -390,14 +426,14 @@ export default function HomeScreen({ navigation }) {
         onPress={() => navigation.navigate('MyDecks')}
         activeOpacity={0.85}
       >
-        <Text style={styles.myDecksEmoji}>📚</Text>
+        <Icon name="decks" size={iconSize.lg} color={theme.primary} style={styles.rowIcon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.myDecksTitle}>My Decks</Text>
           <Text style={styles.myDecksSubtitle}>
             Create custom flashcard decks or browse presets
           </Text>
         </View>
-        <Text style={styles.myDecksChevron}>›</Text>
+        <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
       </TouchableOpacity>
 
       {groups.length > 0 && (
@@ -422,10 +458,9 @@ export default function HomeScreen({ navigation }) {
                 </View>
               </View>
               <View style={styles.groupRight}>
-                <Text style={styles.groupCount}>
-                  👥 {g.memberCount}
-                </Text>
-                <Text style={styles.groupChevron}>›</Text>
+                <Icon name="members" size={iconSize.sm} color={theme.textSecondary} />
+                <Text style={styles.groupCount}>{g.memberCount}</Text>
+                <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
               </View>
             </TouchableOpacity>
           ))}
@@ -435,12 +470,12 @@ export default function HomeScreen({ navigation }) {
             onPress={() => navigation.navigate('Feed')}
             activeOpacity={0.8}
           >
-            <Text style={styles.feedEntryEmoji}>📰</Text>
+            <Icon name="feed" size={iconSize.md} color={theme.primary} style={styles.rowIcon} />
             <View style={styles.feedEntryInfo}>
               <Text style={styles.feedEntryTitle}>Class Feed</Text>
               <Text style={styles.feedEntrySubtitle}>Posts, shared decks & activity from your groups</Text>
             </View>
-            <Text style={styles.feedEntryChevron}>›</Text>
+            <Icon name="chevron" size={iconSize.md} color={theme.primary} />
           </TouchableOpacity>
         </View>
       )}
@@ -525,12 +560,12 @@ const makeStyles = (theme) => StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
   },
-  myDecksEmoji: { fontSize: 32, marginRight: 14 },
+  // Shared spacing for the leading icon on every row-style card.
+  rowIcon: { marginRight: spacing.md },
   myDecksTitle: { fontSize: 16, fontWeight: '600', color: theme.text },
   myDecksSubtitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
-  myDecksChevron: { fontSize: 28, color: '#9ca3af', marginLeft: 8 },
 
   groupsSection: { marginTop: 20 },
   feedEntryBtn: {
@@ -543,11 +578,9 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.accent,
   },
-  feedEntryEmoji: { fontSize: 22, marginRight: 12 },
   feedEntryInfo: { flex: 1 },
   feedEntryTitle: { fontSize: 15, fontWeight: '700', color: theme.primary },
   feedEntrySubtitle: { fontSize: 12, color: theme.primary, marginTop: 2 },
-  feedEntryChevron: { fontSize: 20, color: theme.primary, marginLeft: 8 },
   groupCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -578,31 +611,26 @@ const makeStyles = (theme) => StyleSheet.create({
   groupTitle: { fontSize: 12, color: theme.textSecondary, marginTop: 1 },
   groupRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   groupCount: { fontSize: 13, color: theme.textSecondary },
-  groupChevron: { fontSize: 20, color: '#9ca3af' },
   statCard: {
     flex: 1,
     backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 4,
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
+    marginHorizontal: spacing.xs,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: spacing.xs,
+    ...elevation.card,
   },
   statNumber: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: theme.primary,
-    marginBottom: 4,
+    ...type.stat,
+    color: theme.text,
   },
   statLabel: {
-    fontSize: 12,
+    ...type.overline,
+    fontWeight: '600',
     color: theme.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   categoriesPreview: {
     backgroundColor: theme.card,
@@ -641,7 +669,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: theme.textMuted,
     fontStyle: 'italic',
     marginBottom: 16,
   },
@@ -673,10 +701,8 @@ const makeStyles = (theme) => StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  reviewQueueEmoji: { fontSize: 28, marginRight: 12 },
   reviewQueueTitle: { fontSize: 16, fontWeight: '800', color: theme.text },
   reviewQueueSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
-  reviewQueueChevron: { fontSize: 24, color: theme.textSecondary, fontWeight: '700' },
 
   examBanner: {
     flexDirection: 'row',
@@ -686,40 +712,36 @@ const makeStyles = (theme) => StyleSheet.create({
     padding: 14,
     marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: theme.accent || '#c7d2fe',
+    borderColor: theme.accent || theme.accent,
   },
-  examBannerEmoji: { fontSize: 24, marginRight: 12 },
   examBannerTitle: { fontSize: 15, fontWeight: '800', color: theme.text },
   examBannerSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
   insightCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff7ed',
+    backgroundColor: theme.warningBg,
     borderRadius: 16,
     padding: 14,
     marginBottom: 16,
     borderWidth: 1.5,
-    borderColor: '#fdba74',
+    borderColor: theme.warning,
   },
-  insightEmoji: { fontSize: 24, marginRight: 12 },
-  insightKicker: { fontSize: 11, fontWeight: '800', color: '#9a3412', letterSpacing: 0.3, textTransform: 'uppercase' },
-  insightTerm: { fontSize: 16, fontWeight: '800', color: '#111827', marginTop: 2 },
-  insightSub: { fontSize: 12, color: '#9a3412', marginTop: 2 },
+  insightKicker: { fontSize: 11, fontWeight: '800', color: theme.warningText, letterSpacing: 0.3, textTransform: 'uppercase' },
+  insightTerm: { fontSize: 16, fontWeight: '800', color: theme.text, marginTop: 2 },
+  insightSub: { fontSize: 12, color: theme.warningText, marginTop: 2 },
 
   challengeSection: { marginBottom: 16 },
   challengeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.primaryLight || '#eef2ff',
+    backgroundColor: theme.primaryLight || theme.primaryLight,
     borderRadius: 16,
     padding: 16,
     marginBottom: 10,
     borderWidth: 1.5,
-    borderColor: theme.accent || '#a5b4fc',
+    borderColor: theme.accent || theme.accent,
   },
-  challengeEmoji: { fontSize: 28, marginRight: 12 },
   challengeTitle: { fontSize: 15, fontWeight: '800', color: theme.primary },
   challengeSub: { fontSize: 12, color: theme.primary, marginTop: 2, opacity: 0.75 },
-  challengeChevron: { fontSize: 24, color: theme.primary, fontWeight: '700' },
 });
 
