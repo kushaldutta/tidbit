@@ -191,10 +191,26 @@ class CardLearningService {
     return true;
   }
 
+  /**
+   * Attach a deck card UUID to a legacy hash-keyed state. user_card_state is
+   * keyed by card UUID with no legacy equivalent, so until a state is linked
+   * its review history can never leave the device.
+   */
+  static async linkLegacyStateToCard(contentId, cardId) {
+    if (!contentId || isUuid(contentId) || !isUuid(cardId)) return false;
+    const state = await this.getState(contentId);
+    if (!state || state.cardId === cardId) return false;
+    state.cardId = cardId;
+    await AsyncStorage.setItem(localKey(contentId), JSON.stringify(state));
+    return true;
+  }
+
   static async syncCardToCloud(contentId) {
     const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
     const { AuthService } = require('./AuthService');
-    if (!SUPABASE_CONFIGURED || !isUuid(contentId)) return false;
+    // Legacy hash ids are allowed through: stateToRow yields null unless the
+    // state carries a card UUID, so unlinked ones still no-op.
+    if (!SUPABASE_CONFIGURED || !contentId) return false;
 
     const userId = AuthService.getUserId();
     if (!userId) {
@@ -277,7 +293,7 @@ class CardLearningService {
     await AsyncStorage.setItem(localKey(state.contentId), JSON.stringify(state));
     const { QueueService } = require('./QueueService');
     QueueService.invalidateReviewQueueCache();
-    if (isUuid(state.contentId)) {
+    if (isUuid(state.contentId) || state.cardId) {
       await this.syncCardToCloud(state.contentId);
     }
   }
@@ -625,6 +641,12 @@ class CardLearningService {
     return QueueService.getScopedDueCount();
   }
 
+  /**
+   * Cards worth re-drilling. Note that a first-exposure "didn't know" from a
+   * notification counts as a lapse by design — that repetition is how a
+   * discovered card keeps coming back — so newly discovered cards surface here
+   * alongside genuinely forgotten ones.
+   */
   static async getWeakSpots(limit = 10, cardIdsInScope = null) {
     const states = await this.getAllLocalStates();
     const scopeSet = cardIdsInScope ? new Set(cardIdsInScope) : null;

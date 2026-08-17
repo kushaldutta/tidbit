@@ -222,6 +222,9 @@ class StudySessionService {
    * Push session results to Supabase user_stats so the server-side cron can
    * detect milestone crossings and generate activity posts.
    * Non-fatal: all errors are swallowed so a network failure never crashes a session.
+   *
+   * cards_mastered is derived from user_card_state by a database trigger
+   * (migration 046) and must not be written here.
    */
   static async _syncToCloud(session) {
     if (!SUPABASE_CONFIGURED) return;
@@ -232,29 +235,18 @@ class StudySessionService {
       // Absolute tidbits_seen from local storage (source of truth on device)
       const tidbitsSeen = await StorageService.getTidbitsSeen();
 
-      // Fetch existing cloud stats to safely increment cards_mastered
-      const { data: existing } = await supabase
-        .from('user_stats')
-        .select('cards_mastered')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      const prevMastered = existing?.cards_mastered || 0;
-      const sessionKnew = session.stats?.knew || 0;
-
       await supabase
         .from('user_stats')
         .upsert(
           {
             user_id: userId,
             tidbits_seen: tidbitsSeen,
-            cards_mastered: prevMastered + sessionKnew,
             last_active_date: new Date().toISOString().split('T')[0],
           },
           { onConflict: 'user_id' }
         );
 
-      console.log(`[STUDY_SESSION] Cloud stats synced — tidbits_seen: ${tidbitsSeen}, +${sessionKnew} mastered`);
+      console.log(`[STUDY_SESSION] Cloud stats synced — tidbits_seen: ${tidbitsSeen}`);
     } catch (e) {
       console.warn('[STUDY_SESSION] _syncToCloud failed (non-fatal):', e.message);
     }

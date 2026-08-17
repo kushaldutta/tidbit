@@ -128,9 +128,14 @@ export function advanceStage(currentStage, { wasCorrect, mode }) {
   if (!wasCorrect) {
     if (idx >= 3) return 'recall';
     if (idx >= 1) return STAGES[Math.max(1, idx - 1)];
+    // A new card the user says they don't know is still introduced by the
+    // encounter, so it enters the ladder and the review queue either way.
     return 'introduced';
   }
 
+  // Self-reported modes only ever introduce a card: a user tapping "I knew it"
+  // must not be able to mark it known without answering a real question. They
+  // move new -> introduced and then hold, leaving promotion to the quiz modes.
   if (mode === 'notification' || mode === 'session' || mode === 'group_study') {
     return idx === 0 ? 'introduced' : STAGES[idx];
   }

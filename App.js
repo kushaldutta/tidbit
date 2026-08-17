@@ -236,12 +236,17 @@ function FullSetupStack({ startAt = 'profile' }) {
  * Syncs a notification button tap (knew / didnt_know / save) to Supabase.
  *
  * - knew / didnt_know → writes a card_attempt row (feeds Same-Boat stats)
- *                      → upserts user_stats tidbits_seen + cards_mastered
+ *                      → upserts user_stats tidbits_seen
  * - save              → writes a saved_tidbits row so the bookmark is cloud-persisted
  *
+ * cards_mastered is derived from user_card_state by a database trigger
+ * (migration 046) and must not be written here.
+ *
  * Runs silently — never throws, so a network failure won't break the flow.
+ * supabase-js resolves rather than throws on a rejected write, so every call
+ * checks `error` explicitly; otherwise failures here are invisible.
  */
-async function syncNotificationFeedbackToCloud(tidbitId, action) {
+async function syncNotificationFeedbackToCloud(tidbitId, action, categoryId = null) {
   if (!SUPABASE_CONFIGURED) return;
   const userId = AuthService.getUserId();
   if (!userId) return;
@@ -250,37 +255,63 @@ async function syncNotificationFeedbackToCloud(tidbitId, action) {
     if (action === 'knew' || action === 'didnt_know') {
       const wasCorrect = action === 'knew';
 
-      // Record in card_attempts (used by Same-Boat views)
-      await supabase.from('card_attempts').insert({
-        user_id: userId,
-        card_id: tidbitId,        // tidbitId doubles as card_id for preset tidbits
-        was_correct: wasCorrect,
-        source: 'notification',
-        attempted_at: new Date().toISOString(),
-      });
+      // card_attempts.card_id is a UUID FK to cards, so a legacy hash tidbit id
+      // has to be resolved to its deck card first or the insert is rejected.
+      const { QueueService } = require('./src/services/QueueService');
+      const { CardLearningService } = require('./src/services/CardLearningService');
+      const cardId = await QueueService.resolveCardUuid(tidbitId, categoryId);
 
-      // Upsert user_stats: increment tidbits_seen; increment cards_mastered only for 'knew'
+      if (!cardId) {
+        console.warn(
+          `[NOTIFICATION_ACTION] No deck card for tidbit ${tidbitId} `
+          + `(category=${categoryId || 'unknown'}) — attempt not recorded`,
+        );
+      } else {
+        // Linking lets the review reach user_card_state too, which is keyed by
+        // card UUID and would otherwise skip this tidbit entirely.
+        if (cardId !== tidbitId
+          && await CardLearningService.linkLegacyStateToCard(tidbitId, cardId)) {
+          await CardLearningService.syncCardToCloud(tidbitId);
+        }
+
+        const { error: attemptError } = await supabase.from('card_attempts').insert({
+          user_id: userId,
+          card_id: cardId,
+          was_correct: wasCorrect,
+          source: 'notification',
+          attempted_at: new Date().toISOString(),
+        });
+        if (attemptError) {
+          console.warn('[NOTIFICATION_ACTION] card_attempts insert failed:', attemptError.message);
+        }
+      }
+
       const { data: existing } = await supabase
         .from('user_stats')
-        .select('tidbits_seen, cards_mastered')
+        .select('tidbits_seen')
         .eq('user_id', userId)
         .maybeSingle();
 
-      await supabase.from('user_stats').upsert({
+      const { error: statsError } = await supabase.from('user_stats').upsert({
         user_id: userId,
         tidbits_seen: (existing?.tidbits_seen ?? 0) + 1,
-        cards_mastered: (existing?.cards_mastered ?? 0) + (wasCorrect ? 1 : 0),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'user_id' });
+      if (statsError) {
+        console.warn('[NOTIFICATION_ACTION] user_stats upsert failed:', statsError.message);
+      }
 
       console.log(`[NOTIFICATION_ACTION] Cloud sync: ${action} for tidbit ${tidbitId}`);
     } else if (action === 'save') {
       // Upsert into saved_tidbits so the bookmark survives reinstalls / cross-device
-      await supabase.from('saved_tidbits').upsert({
+      const { error: savedError } = await supabase.from('saved_tidbits').upsert({
         user_id: userId,
         tidbit_id: tidbitId,
         saved_at: new Date().toISOString(),
       }, { onConflict: 'user_id,tidbit_id' });
+      if (savedError) {
+        console.warn('[NOTIFICATION_ACTION] saved_tidbits upsert failed:', savedError.message);
+      }
 
       console.log(`[NOTIFICATION_ACTION] Cloud sync: saved tidbit ${tidbitId}`);
     }
@@ -583,15 +614,19 @@ export default function App() {
 
             if (spacedRepAction) {
               try {
+                // The tidbit's own subject category, not the iOS notification
+                // category above — needed to resolve legacy hash ids to cards.
+                const tidbitCategory = data?.category || null;
+
                 console.log(`[NOTIFICATION_ACTION] Recording feedback: tidbitId=${tidbitId}, action=${spacedRepAction}`);
-                await SpacedRepetitionService.recordFeedback(tidbitId, spacedRepAction);
+                await SpacedRepetitionService.recordFeedback(tidbitId, spacedRepAction, tidbitCategory);
                 console.log('[NOTIFICATION_ACTION] Local feedback recorded');
 
                 if (spacedRepAction === 'knew' || spacedRepAction === 'didnt_know') {
                   await StorageService.recordTidbitAnswered();
                 }
 
-                await syncNotificationFeedbackToCloud(tidbitId, spacedRepAction);
+                await syncNotificationFeedbackToCloud(tidbitId, spacedRepAction, tidbitCategory);
               } catch (error) {
                 console.error('[NOTIFICATION_ACTION] Error recording feedback:', error);
               }

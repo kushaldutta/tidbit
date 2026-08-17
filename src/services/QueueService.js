@@ -425,6 +425,25 @@ class QueueService {
     };
   }
 
+  /**
+   * Deck card UUID for a tidbit id, resolving legacy hash ids through the
+   * category's card pool. Returns null when no deck card matches, which is the
+   * case for tidbits that only ever existed in the bundled JSON.
+   */
+  static async resolveCardUuid(tidbitId, categoryId) {
+    if (!tidbitId) return null;
+    if (isUuid(tidbitId)) return tidbitId;
+    if (!categoryId) return null;
+    try {
+      const cards = await this.loadCardsForCategory(categoryId);
+      const card = this._findCardInPool(cards, tidbitId, categoryId);
+      return isUuid(card?.id) ? card.id : null;
+    } catch (e) {
+      console.warn('[QUEUE] resolveCardUuid failed:', e.message);
+      return null;
+    }
+  }
+
   /** Find a card in pool by UUID or legacy hash. */
   static _findCardInPool(pool, tidbitId, categoryId) {
     const byId = pool.find((c) => c.id === tidbitId);
