@@ -484,23 +484,29 @@ class ContentService {
 
   static async getCardAsTidbit(cardId) {
     if (!cardId) return null;
+
+    // cards.id is a UUID primary key, so a legacy hash id (`tidbit_<hash>`)
+    // can never match — Postgres rejects the value as invalid UUID syntax and
+    // the error gets swallowed below. Bailing out here matters a lot: the
+    // Review Queue resolves unmatched states one at a time, so on an account
+    // carrying legacy state from older app versions every orphan used to cost
+    // a full round trip that was guaranteed to fail.
+    const { isUuid } = require('./CardLearningService');
+    if (!isUuid(cardId)) return null;
+
     try {
       const { supabase, SUPABASE_CONFIGURED } = require('../config/supabase');
       if (!SUPABASE_CONFIGURED) return null;
+      // Single query with the deck joined — this used to be two sequential
+      // round trips (cards, then decks).
       const { data: card, error } = await supabase
         .from('cards')
-        .select('id, deck_id, front, back')
+        .select('id, deck_id, front, back, decks(slug)')
         .eq('id', cardId)
         .maybeSingle();
       if (error || !card) return null;
 
-      const { data: deck } = await supabase
-        .from('decks')
-        .select('slug')
-        .eq('id', card.deck_id)
-        .maybeSingle();
-
-      const category = deck?.slug || card.deck_id;
+      const category = card.decks?.slug || card.deck_id;
       const term = card.front !== card.back ? card.front : null;
       return {
         id: card.id,
