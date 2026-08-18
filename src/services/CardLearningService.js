@@ -77,7 +77,10 @@ function rowToState(row) {
     totalSeen: row.total_seen ?? 0,
     totalCorrect: row.total_correct ?? 0,
     lapses: row.lapses ?? 0,
-    reps: 0,
+    // Rows written before migration 047 have no reps column; total_seen is the
+    // closest proxy and, crucially, is non-zero for anything already reviewed,
+    // which keeps scheduleReview out of its first-encounter branch.
+    reps: row.reps ?? row.total_seen ?? 0,
     isMastered: row.is_mastered ?? false,
     isSaved: row.is_saved ?? false,
     wasShownAsDue: false,
@@ -114,6 +117,7 @@ function stateToRow(userId, state) {
     stability: state.stability,
     difficulty: state.difficulty,
     lapses: state.lapses ?? 0,
+    reps: state.reps ?? 0,
     last_review_at: state.lastReviewAt,
     last_review_mode: state.lastReviewMode,
   };
@@ -176,6 +180,7 @@ class CardLearningService {
         stability,
         difficulty,
         lapses,
+        reps,
         last_review_at,
         last_review_mode,
         ...baseOnly
@@ -489,12 +494,25 @@ class CardLearningService {
   }
 
   /**
+   * True when a card has a real review behind it.
+   *
+   * Deliberately does not look at `reps`: that field is the one piece of FSRS
+   * state that can come back as 0 from an older cloud row, so anything that
+   * gates display or scoring on it will silently forget the user's work.
+   * `lastReviewAt` and `stability` are only ever set by recordReview and both
+   * survive the round trip.
+   */
+  static hasBeenReviewed(state) {
+    return !!(state && state.lastReviewAt && state.stability);
+  }
+
+  /**
    * Probability the user still recalls this card at `at` — the same forgetting
    * curve the scheduler uses, read forward instead of asked "is it due yet".
    * A card that was never actually reviewed scores 0: not seen is not known.
    */
   static predictedRecall(state, at = new Date()) {
-    if (!state || !state.reps || !state.stability || !state.lastReviewAt) return 0;
+    if (!this.hasBeenReviewed(state)) return 0;
     const elapsedDays = (at.getTime() - new Date(state.lastReviewAt).getTime()) / 86400000;
     return retrievability(elapsedDays, state.stability);
   }

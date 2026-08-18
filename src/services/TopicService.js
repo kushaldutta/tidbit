@@ -85,7 +85,7 @@ class TopicService {
         const state = CardLearningService.getEffectiveStateFromMap(card, categoryId, stateMap);
         recallSum += CardLearningService.predictedRecall(state, now);
         if (examIsAhead) examRecallSum += CardLearningService.predictedRecall(state, examAt);
-        if (state?.reps) studied += 1;
+        if (CardLearningService.hasBeenReviewed(state)) studied += 1;
       }
 
       const count = bucket.cards.length;

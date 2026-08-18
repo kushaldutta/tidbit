@@ -536,18 +536,29 @@ class QueueService {
       })
       .sort((a, b) => a.recall - b.recall);
 
-    if (startCardId) {
-      const idx = ranked.findIndex(
-        (r) => r.card.id === startCardId
-          || CardLearningService.legacyHashForCard(r.card, categoryId) === startCardId,
-      );
-      if (idx > 0) {
-        const [pinned] = ranked.splice(idx, 1);
-        ranked.unshift(pinned);
-      }
+    const matchesStart = (r) => !!startCardId
+      && (r.card.id === startCardId
+        || CardLearningService.legacyHashForCard(r.card, categoryId) === startCardId);
+
+    // Guarantee the requested card survives the cut, however strong it looks.
+    const startIdx = ranked.findIndex(matchesStart);
+    if (startIdx > 0) {
+      const [pinned] = ranked.splice(startIdx, 1);
+      ranked.unshift(pinned);
     }
 
-    const picked = ranked.slice(0, limit);
+    // Pick weakest-first, then present in random order. Selection is the part
+    // that should be deterministic; a fixed running order just teaches the
+    // sequence, which is the opposite of what drilling a weak topic is for.
+    const picked = shuffleArray(ranked.slice(0, limit));
+
+    // A weak-spot tap names one specific card, so that one still leads.
+    const pinnedIdx = picked.findIndex(matchesStart);
+    if (pinnedIdx > 0) {
+      const [pinned] = picked.splice(pinnedIdx, 1);
+      picked.unshift(pinned);
+    }
+
     const deckId = await ContentService.getPresetDeckIdForSlug(categoryId);
     const distractorPool = await this._loadFullDeckCards(deckId, categoryId);
 

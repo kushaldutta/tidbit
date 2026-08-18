@@ -246,13 +246,16 @@ class ForecastService {
 
     return pool.map((card) => {
       const st = CardLearningService.getEffectiveStateFromMap(card, categoryId, stateMap);
-      if (!st || !st.reps || !st.stability || !st.lastReviewAt) {
+      if (!CardLearningService.hasBeenReviewed(st)) {
         return { s: 0, d: 0, reps: 0, lapses: 0, lastDay: 0, seen: false };
       }
       return {
         s: st.stability,
         d: st.difficulty || 5,
-        reps: st.reps,
+        // A reviewed card always has at least one rep, whatever the stored
+        // value says — a 0 here would send the simulation down the
+        // first-encounter branch and understate the card.
+        reps: Math.max(1, st.reps || 0),
         lapses: st.lapses || 0,
         // Negative: the last review happened this many days before today.
         lastDay: -(now - new Date(st.lastReviewAt).getTime()) / 86400000,
