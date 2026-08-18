@@ -115,6 +115,17 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const handleHomeInsight = () => {
+    if (!homeInsight?.cardId || !homeInsight?.categorySlug) return;
+    navigation.navigate('ReviewSession', {
+      categoryId: homeInsight.categorySlug,
+      topicDrill: true,
+      startCardId: homeInsight.cardId,
+      deckTitle: homeInsight.classCode
+        || ContentService.formatCategoryName(homeInsight.categorySlug),
+    });
+  };
+
   const loadCategoryProgress = async () => {
     try {
       await ClassService.ensureCategoriesSyncedToEnrollments();
@@ -295,7 +306,7 @@ export default function HomeScreen({ navigation }) {
       {homeInsight && (
         <TouchableOpacity
           style={styles.insightCard}
-          onPress={() => navigation.navigate('ReviewQueue')}
+          onPress={handleHomeInsight}
           activeOpacity={0.85}
         >
           <Icon name="insights" size={iconSize.lg} color={theme.warningText} style={styles.rowIcon} />
