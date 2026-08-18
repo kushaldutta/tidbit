@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import PremiumGate from '../components/PremiumGate';
@@ -147,6 +148,54 @@ function ForecastCard({ forecast: f, styles, theme, navigation, onPressExam }) {
   );
 }
 
+/** Which sections start open, and where that choice is remembered. */
+const SECTION_STATE_KEY = '@tidbit:insights_open_sections';
+const DEFAULT_OPEN = {
+  forecast: true,
+  readiness: false,
+  topics: false,
+  weak: false,
+};
+
+/**
+ * A section that can be folded away.
+ *
+ * The header keeps a one-line summary visible while collapsed — a section you
+ * cannot see into is worse than one you have to scroll past, so the number that
+ * would make you open it stays on screen either way.
+ */
+function CollapsibleSection({ title, subtitle, summary, open, onToggle, styles, theme, children }) {
+  return (
+    <View style={styles.section}>
+      <TouchableOpacity
+        style={styles.sectionHeader}
+        onPress={onToggle}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`${title}${summary ? `, ${summary}` : ''}`}
+      >
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {summary ? (
+          <Text style={[styles.sectionSummary, !open && styles.sectionSummaryClosed]}>
+            {summary}
+          </Text>
+        ) : null}
+        <Text style={[styles.sectionCaret, { color: theme.textSecondary }]}>
+          {open ? '\u25BE' : '\u25B8'}
+        </Text>
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.sectionBody}>
+          {subtitle ? <Text style={styles.sectionSub}>{subtitle}</Text> : null}
+          {children}
+        </View>
+      )}
+    </View>
+  );
+}
+
 /**
  * Colour bands for the topic grid.
  * `danger` is deliberately absent: per the theme tokens, a low score here is a
@@ -261,8 +310,27 @@ function InsightsContent({ navigation }) {
   const [readiness, setReadiness] = useState([]);
   const [forecasts, setForecasts] = useState([]);
   const [topicGroups, setTopicGroups] = useState([]);
+  const [openSections, setOpenSections] = useState(DEFAULT_OPEN);
   const [weakSpots, setWeakSpots] = useState([]);
   const [examTarget, setExamTarget] = useState(null);
+
+  // Remember which sections the user left open — re-collapsing the page on
+  // every visit would undo the point of collapsing it.
+  useEffect(() => {
+    AsyncStorage.getItem(SECTION_STATE_KEY)
+      .then((raw) => {
+        if (raw) setOpenSections({ ...DEFAULT_OPEN, ...JSON.parse(raw) });
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleSection = useCallback((key) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      AsyncStorage.setItem(SECTION_STATE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
 
   const load = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
@@ -290,6 +358,25 @@ function InsightsContent({ navigation }) {
     }, [load]),
   );
 
+  // What each header shows while folded shut.
+  const summaries = useMemo(() => {
+    const scored = forecasts.filter((f) => !f.empty);
+    const soonest = scored.find((f) => f.examDate && !f.examPassed) || scored[0];
+    const weakestReadiness = readiness[0];
+    const weakTopics = topicGroups.reduce(
+      (n, g) => n + g.topics.filter((t) => t.untouched || TopicService.bandFor(t) === 'weak').length,
+      0,
+    );
+    return {
+      forecast: soonest ? `${soonest.name} ${soonest.finals.current}%` : null,
+      readiness: weakestReadiness ? `lowest ${weakestReadiness.score}%` : null,
+      topics: topicGroups.length
+        ? (weakTopics ? `${weakTopics} need work` : 'all solid')
+        : null,
+      weak: weakSpots.length ? `${weakSpots.length} card${weakSpots.length !== 1 ? 's' : ''}` : null,
+    };
+  }, [forecasts, readiness, topicGroups, weakSpots]);
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: theme.background }]}>
@@ -308,56 +395,71 @@ function InsightsContent({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.sectionTitle}>Exam Day Forecast</Text>
-        <Text style={styles.sectionSub}>
-          How much of each class you'll actually recall on exam day — projected from the memory
-          strength of every card, not just what you've covered.
-        </Text>
-        {forecasts.length === 0 ? (
-          <Text style={styles.empty}>Enroll in a class to see your forecast.</Text>
-        ) : (
-          forecasts.map((f) => (
-            <ForecastCard
-              key={f.categoryId}
-              forecast={f}
-              styles={styles}
-              theme={theme}
-              navigation={navigation}
-              onPressExam={() =>
-                setExamTarget({
-                  categoryId: f.categoryId,
-                  name: f.name,
-                  examDate: f.examDate,
-                  examLabel: f.examLabel,
-                })
-              }
-            />
-          ))
-        )}
+        <CollapsibleSection
+          title="Exam Day Forecast"
+          subtitle="How much of each class you'll actually recall on exam day — projected from the memory strength of every card, not just what you've covered."
+          summary={summaries.forecast}
+          open={openSections.forecast}
+          onToggle={() => toggleSection('forecast')}
+          styles={styles}
+          theme={theme}
+        >
+          {forecasts.length === 0 ? (
+            <Text style={styles.empty}>Enroll in a class to see your forecast.</Text>
+          ) : (
+            forecasts.map((f) => (
+              <ForecastCard
+                key={f.categoryId}
+                forecast={f}
+                styles={styles}
+                theme={theme}
+                navigation={navigation}
+                onPressExam={() =>
+                  setExamTarget({
+                    categoryId: f.categoryId,
+                    name: f.name,
+                    examDate: f.examDate,
+                    examLabel: f.examLabel,
+                  })
+                }
+              />
+            ))
+          )}
+        </CollapsibleSection>
 
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Exam Readiness</Text>
-        <Text style={styles.sectionSub}>
-          How prepared you are based on mastery, overdue reviews, recent accuracy, and days until your exam.
-        </Text>
-        {readiness.length === 0 ? (
-          <Text style={styles.empty}>Enroll in a class to see readiness scores.</Text>
-        ) : (
-          readiness.map((item) => (
-            <ReadinessCard
-              key={item.categoryId}
-              item={item}
-              styles={styles}
-              onPressExam={() => setExamTarget(item)}
-            />
-          ))
-        )}
+        <CollapsibleSection
+          title="Exam Readiness"
+          subtitle="How prepared you are based on mastery, overdue reviews, recent accuracy, and days until your exam."
+          summary={summaries.readiness}
+          open={openSections.readiness}
+          onToggle={() => toggleSection('readiness')}
+          styles={styles}
+          theme={theme}
+        >
+          {readiness.length === 0 ? (
+            <Text style={styles.empty}>Enroll in a class to see readiness scores.</Text>
+          ) : (
+            readiness.map((item) => (
+              <ReadinessCard
+                key={item.categoryId}
+                item={item}
+                styles={styles}
+                onPressExam={() => setExamTarget(item)}
+              />
+            ))
+          )}
+        </CollapsibleSection>
 
         {topicGroups.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Topic Breakdown</Text>
-            <Text style={styles.sectionSub}>
-              Predicted recall for every topic in your classes, weakest first. Tap one to drill it.
-            </Text>
+          <CollapsibleSection
+            title="Topic Breakdown"
+            subtitle="Predicted recall for every topic in your classes, weakest first. Tap one to drill it."
+            summary={summaries.topics}
+            open={openSections.topics}
+            onToggle={() => toggleSection('topics')}
+            styles={styles}
+            theme={theme}
+          >
             {topicGroups.map((group) => (
               <ClassTopics
                 key={group.categoryId}
@@ -367,44 +469,49 @@ function InsightsContent({ navigation }) {
                 navigation={navigation}
               />
             ))}
-          </>
+          </CollapsibleSection>
         )}
 
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Weak Spots</Text>
-        <Text style={styles.sectionSub}>
-          The individual cards dragging those topics down. Tap one to drill its topic, starting
-          with that card.
-        </Text>
-        {weakSpots.length === 0 ? (
-          <Text style={styles.empty}>No weak spots detected yet — keep studying!</Text>
-        ) : (
-          weakSpots.map((spot) => (
-            <TouchableOpacity
-              key={spot.tidbit.id}
-              style={styles.weakRow}
-              onPress={() =>
-                navigation.navigate('ReviewSession', {
-                  categoryId: spot.tidbit.category,
-                  sectionId: spot.sectionId,
-                  topicDrill: true,
-                  startCardId: spot.tidbit.id,
-                  deckTitle: spot.sectionTitle || ContentService.formatCategoryName(spot.tidbit.category),
-                })
-              }
-              activeOpacity={0.8}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.weakTerm} numberOfLines={1}>
-                  {spot.tidbit.term || spot.tidbit.text}
-                </Text>
-                <Text style={styles.weakMeta}>
-                  {spot.sectionTitle || ContentService.formatCategoryName(spot.tidbit.category)} · {spot.accuracy}% accuracy · {spot.lapses} lapse{spot.lapses !== 1 ? 's' : ''}
-                </Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-          ))
-        )}
+        <CollapsibleSection
+          title="Weak Spots"
+          subtitle="The individual cards dragging those topics down. Tap one to drill its topic, starting with that card."
+          summary={summaries.weak}
+          open={openSections.weak}
+          onToggle={() => toggleSection('weak')}
+          styles={styles}
+          theme={theme}
+        >
+          {weakSpots.length === 0 ? (
+            <Text style={styles.empty}>No weak spots detected yet — keep studying!</Text>
+          ) : (
+            weakSpots.map((spot) => (
+              <TouchableOpacity
+                key={spot.tidbit.id}
+                style={styles.weakRow}
+                onPress={() =>
+                  navigation.navigate('ReviewSession', {
+                    categoryId: spot.tidbit.category,
+                    sectionId: spot.sectionId,
+                    topicDrill: true,
+                    startCardId: spot.tidbit.id,
+                    deckTitle: spot.sectionTitle || ContentService.formatCategoryName(spot.tidbit.category),
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.weakTerm} numberOfLines={1}>
+                    {spot.tidbit.term || spot.tidbit.text}
+                  </Text>
+                  <Text style={styles.weakMeta}>
+                    {spot.sectionTitle || ContentService.formatCategoryName(spot.tidbit.category)} · {spot.accuracy}% accuracy · {spot.lapses} lapse{spot.lapses !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                <Text style={styles.chevron}>›</Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </CollapsibleSection>
 
         <TouchableOpacity
           style={styles.queueBtn}
@@ -454,7 +561,27 @@ const makeStyles = (theme) => StyleSheet.create({
   back: { fontSize: 16, color: theme.primary, fontWeight: '600', marginBottom: 4 },
   headerTitle: { fontSize: 22, fontWeight: '800', color: theme.text },
   scroll: { padding: 20, paddingBottom: 48 },
-  sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 4 },
+  section: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.border,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    gap: 10,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.text, flexShrink: 1 },
+  sectionSummary: {
+    flex: 1,
+    textAlign: 'right',
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.textSecondary,
+  },
+  sectionSummaryClosed: { color: theme.primary },
+  sectionCaret: { fontSize: 13, width: 14, textAlign: 'right' },
+  sectionBody: { paddingBottom: 8 },
   sectionSub: { fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 20 },
   empty: { fontSize: 14, color: theme.textSecondary, marginBottom: 12 },
   forecastCard: {
