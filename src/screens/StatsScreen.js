@@ -281,7 +281,7 @@ function AnalyticsContent({ navigation }) {
               <Text style={styles.insightsCtaTitle}>Study Insights</Text>
               <Text style={styles.insightsCtaArrow}>›</Text>
             </View>
-            <Text style={styles.insightsCtaSub}>Exam readiness & weak spots — Premium</Text>
+            <Text style={styles.insightsCtaSub}>Exam-day forecast & weak spots — Premium</Text>
           </View>
         </TouchableOpacity>
 

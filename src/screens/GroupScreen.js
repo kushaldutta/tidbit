@@ -644,7 +644,7 @@ export default function GroupScreen({ route, navigation }) {
               : 'Set exam date'}
           </Text>
           <Text style={styles.classActionSub}>
-            {examInfo?.date ? 'Countdown on Home and Insights' : 'Midterm or final — readiness counts down'}
+            {examInfo?.date ? 'Countdown on Home and Insights' : 'Midterm or final — your forecast counts down'}
           </Text>
         </View>
         <Text style={styles.challengeChevron}>›</Text>

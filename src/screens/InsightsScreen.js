@@ -134,6 +134,14 @@ function ForecastCard({ forecast: f, styles, theme, navigation, onPressExam }) {
         {f.studiedCards} of {f.totalCards} cards studied · {f.accuracy}% accuracy · today you'd
         recall {f.today}%
       </Text>
+      {f.examScoped && (
+        <TouchableOpacity onPress={onPressExam} activeOpacity={0.7}>
+          <Text style={styles.forecastScope}>
+            Scoped to what's on this exam — {f.totalCards} of {f.classCards} cards in the class.
+            Edit
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity
         style={styles.forecastCta}
@@ -152,7 +160,6 @@ function ForecastCard({ forecast: f, styles, theme, navigation, onPressExam }) {
 const SECTION_STATE_KEY = '@tidbit:insights_open_sections';
 const DEFAULT_OPEN = {
   forecast: true,
-  readiness: false,
   topics: false,
   weak: false,
 };
@@ -273,41 +280,10 @@ function ClassTopics({ group, styles, theme, navigation }) {
   );
 }
 
-function ReadinessCard({ item, styles, onPressExam }) {
-  const color = item.score >= 75 ? '#16a34a' : item.score >= 50 ? '#ca8a04' : '#dc2626';
-  const days = item.examDate
-    ? Math.ceil((new Date(`${item.examDate}T12:00:00`) - Date.now()) / 86400000)
-    : null;
-  return (
-    <View style={styles.readinessCard}>
-      <View style={styles.readinessHeader}>
-        <Text style={styles.readinessName}>{item.name}</Text>
-        <Text style={[styles.readinessScore, { color }]}>{item.score}%</Text>
-      </View>
-      <Text style={styles.readinessSub}>
-        {item.masteryPct}% recall-ready · {item.overdue} overdue
-        {item.accuracy7d != null ? ` · ${item.accuracy7d}% accuracy (7d)` : ''}
-      </Text>
-      <TouchableOpacity onPress={onPressExam} activeOpacity={0.8}>
-        {item.examDate ? (
-          <Text style={styles.examLine}>
-            {item.examLabel || 'Exam'} {new Date(`${item.examDate}T12:00:00`).toLocaleDateString()}
-            {days != null ? ` · ${days < 0 ? 'passed' : days === 0 ? 'today' : `${days}d left`}` : ''}
-            {'  '}Edit
-          </Text>
-        ) : (
-          <Text style={styles.examLine}>+ Set exam date</Text>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-}
-
 function InsightsContent({ navigation }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [loading, setLoading] = useState(true);
-  const [readiness, setReadiness] = useState([]);
   const [forecasts, setForecasts] = useState([]);
   const [topicGroups, setTopicGroups] = useState([]);
   const [openSections, setOpenSections] = useState(DEFAULT_OPEN);
@@ -335,13 +311,11 @@ function InsightsContent({ navigation }) {
   const load = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
-      const [r, w, f, t] = await Promise.all([
-        InsightsService.getAllReadiness(),
+      const [w, f, t] = await Promise.all([
         InsightsService.getWeakSpots(8),
         ForecastService.getAllForecasts(),
         TopicService.getAllClassTopics(),
       ]);
-      setReadiness(r);
       setWeakSpots(w);
       setForecasts(f);
       setTopicGroups(t);
@@ -362,20 +336,18 @@ function InsightsContent({ navigation }) {
   const summaries = useMemo(() => {
     const scored = forecasts.filter((f) => !f.empty);
     const soonest = scored.find((f) => f.examDate && !f.examPassed) || scored[0];
-    const weakestReadiness = readiness[0];
     const weakTopics = topicGroups.reduce(
       (n, g) => n + g.topics.filter((t) => t.untouched || TopicService.bandFor(t) === 'weak').length,
       0,
     );
     return {
       forecast: soonest ? `${soonest.name} ${soonest.finals.current}%` : null,
-      readiness: weakestReadiness ? `lowest ${weakestReadiness.score}%` : null,
       topics: topicGroups.length
         ? (weakTopics ? `${weakTopics} need work` : 'all solid')
         : null,
       weak: weakSpots.length ? `${weakSpots.length} card${weakSpots.length !== 1 ? 's' : ''}` : null,
     };
-  }, [forecasts, readiness, topicGroups, weakSpots]);
+  }, [forecasts, topicGroups, weakSpots]);
 
   if (loading) {
     return (
@@ -420,31 +392,9 @@ function InsightsContent({ navigation }) {
                     name: f.name,
                     examDate: f.examDate,
                     examLabel: f.examLabel,
+                    examSectionIds: f.examSectionIds,
                   })
                 }
-              />
-            ))
-          )}
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          title="Exam Readiness"
-          subtitle="How prepared you are based on mastery, overdue reviews, recent accuracy, and days until your exam."
-          summary={summaries.readiness}
-          open={openSections.readiness}
-          onToggle={() => toggleSection('readiness')}
-          styles={styles}
-          theme={theme}
-        >
-          {readiness.length === 0 ? (
-            <Text style={styles.empty}>Enroll in a class to see readiness scores.</Text>
-          ) : (
-            readiness.map((item) => (
-              <ReadinessCard
-                key={item.categoryId}
-                item={item}
-                styles={styles}
-                onPressExam={() => setExamTarget(item)}
               />
             ))
           )}
@@ -526,22 +476,20 @@ function InsightsContent({ navigation }) {
         onClose={() => setExamTarget(null)}
         categoryId={examTarget?.categoryId}
         classCode={examTarget?.name}
-        current={examTarget?.examDate ? { date: examTarget.examDate, label: examTarget.examLabel } : null}
+        current={examTarget?.examDate
+          ? {
+            date: examTarget.examDate,
+            label: examTarget.examLabel,
+            sectionIds: examTarget.examSectionIds || null,
+          }
+          : null}
         onSaved={() => load(false)}
       />
     </SafeAreaView>
   );
 }
 
-// TEMP (Expo testing): lets Study Insights open without a subscription so the
-// new forecast work can be exercised on a free account. Set back to false
-// before shipping — the gate itself is untouched.
-const BYPASS_PREMIUM_GATE = true;
-
 export default function InsightsScreen({ navigation }) {
-  if (BYPASS_PREMIUM_GATE) {
-    return <InsightsContent navigation={navigation} />;
-  }
   return (
     <PremiumGate navigation={navigation} feature="Study Insights">
       <InsightsContent navigation={navigation} />
@@ -628,6 +576,13 @@ const makeStyles = (theme) => StyleSheet.create({
     marginTop: 12,
     lineHeight: 16,
   },
+  forecastScope: {
+    fontSize: 11,
+    color: theme.primary,
+    fontWeight: '600',
+    marginTop: 6,
+    lineHeight: 16,
+  },
   forecastCta: {
     marginTop: 12,
     backgroundColor: theme.primary,
@@ -636,17 +591,6 @@ const makeStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
   },
   forecastCtaText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  readinessCard: {
-    backgroundColor: theme.card,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
-  },
-  readinessHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  readinessName: { fontSize: 16, fontWeight: '700', color: theme.text, flex: 1 },
-  readinessScore: { fontSize: 28, fontWeight: '900' },
-  readinessSub: { fontSize: 13, color: theme.textSecondary, marginTop: 6 },
-  examLine: { fontSize: 12, color: theme.primary, marginTop: 4, fontWeight: '600' },
   topicGroup: { marginBottom: 18 },
   topicGroupTitle: {
     fontSize: 14,

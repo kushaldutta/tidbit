@@ -2,9 +2,9 @@
  * ForecastService — projects how much of a class you will actually recall on
  * exam day, under three different study behaviours.
  *
- * The readiness score answers "how am I doing?". This answers the question a
- * student actually has: "if I keep doing what I'm doing, what do I walk into
- * the exam knowing — and what would it take to fix that?"
+ * This answers the question a student actually has: "if I keep doing what I'm
+ * doing, what do I walk into the exam knowing — and what would it take to fix
+ * that?"
  *
  * Method
  * ------
@@ -15,6 +15,10 @@
  * part of the exam whether or not you have opened them.
  *
  * Three scenarios are simulated day by day to the exam:
+ * Only the material the exam actually covers is counted. A midterm scoped to
+ * three of nine sections is forecast against those three; the rest of the class
+ * is real work, but it is not what you are being tested on next.
+ *
  *   stop        — you never study this class again (pure decay)
  *   current     — you keep your measured pace of the last two weeks
  *   recommended — the smallest daily pace that reaches the target by exam day
@@ -273,9 +277,17 @@ class ForecastService {
     const attempts = deps.attempts || (await this.loadRecentAttempts());
     const examDates = deps.examDates || (await InsightsService.getExamDates());
 
-    const cards = await QueueService.loadCardsForCategory(categoryId);
+    const allCards = await QueueService.loadCardsForCategory(categoryId);
     const name = ContentService.formatCategoryName(categoryId);
     const examInfo = examDates[categoryId];
+
+    // Narrow to the sections this exam covers. If the scope matches nothing —
+    // a stale section id, or a class whose cards carry no section at all — fall
+    // back to the whole class rather than forecasting against zero cards.
+    const scopeIds = examInfo?.sectionIds?.length ? new Set(examInfo.sectionIds) : null;
+    const scoped = scopeIds ? allCards.filter((c) => scopeIds.has(c.section_id)) : [];
+    const cards = scoped.length ? scoped : allCards;
+    const examScoped = scopeIds != null && scoped.length > 0;
     const examDate = examInfo?.date || null;
     const daysUntilExam = examDate
       ? Math.ceil((new Date(`${examDate}T12:00:00`).getTime() - Date.now()) / 86400000)
@@ -328,10 +340,14 @@ class ForecastService {
       name,
       examDate,
       examLabel: examInfo?.label || null,
+      examSectionIds: examInfo?.sectionIds || null,
       daysUntilExam,
       examPassed,
       horizon,
       totalCards: cards.length,
+      classCards: allCards.length,
+      // True when the forecast is running against a subset of the class.
+      examScoped,
       studiedCards,
       coveragePct: Math.round((studiedInSample / simCards.length) * 100),
       accuracy: Math.round(accuracy * 100),
