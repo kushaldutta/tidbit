@@ -107,6 +107,9 @@ export default function QuizScreen({ route, navigation }) {
   const [score, setScore] = useState({ correct: 0, total: 0 });
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  // Stamped when a question first appears, so response time measures thinking
+  // rather than time since the screen mounted.
+  const shownAtRef = useRef(null);
 
   useEffect(() => {
     QueueService.buildCardsForLearnMode(deckId, studyScope, {
@@ -120,6 +123,10 @@ export default function QuizScreen({ route, navigation }) {
   }, [deckId, studyScope, startCardId, categoryId]);
 
   const currentQ = questions[index];
+
+  useEffect(() => {
+    if (currentQ) shownAtRef.current = Date.now();
+  }, [currentQ?.cardId]);
 
   const handleChoose = async (optionIndex) => {
     if (result) return; // already answered
@@ -135,17 +142,19 @@ export default function QuizScreen({ route, navigation }) {
       total: prev.total + 1,
     }));
 
-    // Record attempt with confidence
-    await SameBoatService.recordAttempt(currentQ.cardId, wasCorrect, 'quiz');
+    // Record attempt with confidence. The rating is genuine here — the screen
+    // refuses to accept an answer until the user has rated it, and they rate it
+    // before finding out whether they were right.
+    await SameBoatService.recordAttempt(currentQ.cardId, wasCorrect, 'quiz', {
+      confidence,
+      responseMs: shownAtRef.current ? Date.now() - shownAtRef.current : null,
+    });
     await CardLearningService.recordReview(currentQ.cardId, {
       wasCorrect,
       mode: 'quiz',
       confidence,
       categoryId: categoryId || null,
     });
-    // Also write confidence to card_attempts via a direct update isn't possible
-    // after insert — the confidence is passed as part of the insert in a future
-    // SameBoatService upgrade; for now it's stored in the local result only.
 
     // Fetch Same-Boat stat
     const stat = await SameBoatService.getCardStat(currentQ.cardId);

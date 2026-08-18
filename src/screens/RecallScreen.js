@@ -113,6 +113,16 @@ export default function RecallScreen({ route, navigation }) {
 
   const currentCard = cards[index];
 
+  // Stamped when a card first appears, so response time measures recall effort
+  // rather than time since the screen mounted.
+  // 1–4, 0 = not yet rated. Asked before grading so the rating stays honest.
+  const [confidence, setConfidence] = useState(0);
+
+  const shownAtRef = useRef(null);
+  useEffect(() => {
+    if (currentCard) shownAtRef.current = Date.now();
+  }, [currentCard?.id]);
+
   // Speak the question when audio mode is on or card changes in audio mode
   useEffect(() => {
     if (!audioMode || !currentCard || gradeResult) return;
@@ -145,6 +155,7 @@ export default function RecallScreen({ route, navigation }) {
 
   const handleSubmit = async () => {
     if (!userAnswer.trim() || gradeResult) return;
+    if (confidence === 0) return; // rate before grading, never after
 
     const correctAnswer = getRecallAnswer(currentCard);
     const result = RecallService.grade(userAnswer, correctAnswer);
@@ -156,12 +167,14 @@ export default function RecallScreen({ route, navigation }) {
       total: prev.total + 1,
     }));
 
-    // Record attempt
-    await SameBoatService.recordAttempt(currentCard.id, result.isCorrect, 'recall');
+    await SameBoatService.recordAttempt(currentCard.id, result.isCorrect, 'recall', {
+      confidence,
+      responseMs: shownAtRef.current ? Date.now() - shownAtRef.current : null,
+    });
     await CardLearningService.recordReview(currentCard.id, {
       wasCorrect: result.isCorrect,
       mode: 'recall',
-      confidence: result.isCorrect ? 3 : 1,
+      confidence,
       categoryId: categoryId || null,
     });
 
@@ -195,6 +208,7 @@ export default function RecallScreen({ route, navigation }) {
     setGradeResult(null);
     setSameBoatStat(null);
     setOverridden(false);
+    setConfidence(0);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
@@ -215,12 +229,19 @@ export default function RecallScreen({ route, navigation }) {
       grade: flippedCorrect ? 'exact' : 'wrong',
     }));
 
-    // Re-record the attempt with corrected value (replaces the original in aggregate stats)
-    await SameBoatService.recordAttempt(currentCard.id, flippedCorrect, 'recall_override');
+    // Re-record the attempt with corrected value (replaces the original in
+    // aggregate stats). No response time: the clock stopped when the answer was
+    // revealed, so anything measured here is the user reading the grade, not
+    // recalling the card.
+    // The user's rating still stands — an override corrects the grade, not how
+    // sure they were before they saw it.
+    await SameBoatService.recordAttempt(currentCard.id, flippedCorrect, 'recall_override', {
+      confidence,
+    });
     await CardLearningService.recordReview(currentCard.id, {
       wasCorrect: flippedCorrect,
       mode: 'recall_override',
-      confidence: flippedCorrect ? 3 : 1,
+      confidence,
       categoryId: categoryId || null,
     });
 
@@ -380,13 +401,43 @@ export default function RecallScreen({ route, navigation }) {
           )}
 
           {!answered && (
+            <View style={styles.confidenceWrap}>
+              <Text style={styles.confidenceLabel}>How confident are you?</Text>
+              <View style={styles.confidenceRow}>
+                {[1, 2, 3, 4].map((v) => (
+                  <TouchableOpacity
+                    key={v}
+                    style={[styles.confidenceBtn, confidence === v && styles.confidenceBtnActive]}
+                    onPress={() => setConfidence(v)}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.confidenceBtnText,
+                        confidence === v && styles.confidenceBtnTextActive,
+                      ]}
+                    >
+                      {v}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {!answered && (
             <TouchableOpacity
-              style={[styles.submitBtn, !userAnswer.trim() && styles.submitBtnDisabled]}
+              style={[
+                styles.submitBtn,
+                (!userAnswer.trim() || confidence === 0) && styles.submitBtnDisabled,
+              ]}
               onPress={handleSubmit}
-              disabled={!userAnswer.trim()}
+              disabled={!userAnswer.trim() || confidence === 0}
               activeOpacity={0.85}
             >
-              <Text style={styles.submitBtnText}>Submit</Text>
+              <Text style={styles.submitBtnText}>
+                {confidence === 0 && userAnswer.trim() ? 'Rate your confidence' : 'Submit'}
+              </Text>
             </TouchableOpacity>
           )}
         </ScrollView>
@@ -464,6 +515,20 @@ const makeStyles = (theme) => StyleSheet.create({
   sameBoatMsg: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   sameBoatSub: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
+  confidenceWrap: { marginBottom: 16 },
+  confidenceLabel: { fontSize: 14, fontWeight: '600', color: theme.textSecondary, marginBottom: 8 },
+  confidenceRow: { flexDirection: 'row', gap: 8 },
+  confidenceBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.primaryLight || '#ddd',
+    alignItems: 'center',
+  },
+  confidenceBtnActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+  confidenceBtnText: { fontWeight: '700', color: theme.text },
+  confidenceBtnTextActive: { color: '#fff' },
   submitBtn: {
     backgroundColor: theme.primary, borderRadius: 16, paddingVertical: 16, alignItems: 'center',
   },

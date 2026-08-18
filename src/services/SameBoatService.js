@@ -2,22 +2,56 @@ import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 import { ClassService } from './ClassService';
 
+/**
+ * Past this, the user put the phone down mid-card. Storing that as a response
+ * time would poison every average built on the column, so it is dropped.
+ */
+const MAX_PLAUSIBLE_RESPONSE_MS = 10 * 60 * 1000;
+
 class SameBoatService {
   /**
    * Record that the current user attempted a card and whether they got it right.
    * This is the core instrumentation call — invoke it every time a user flips a
    * card and marks known/unknown.
+   *
+   * `confidence` (1–4) must be the user's own rating, given *before* they found
+   * out whether they were right. Never derive it from correctness: the reason
+   * this column is worth storing is to surface cards the user is confident about
+   * and wrong about, and a derived rating makes that pairing impossible by
+   * construction. Callers with no genuine rating should omit it.
+   *
+   * `responseMs` is the time from the card appearing to the answer being
+   * submitted. Omit it where the number would not mean what it says — a puzzle
+   * spanning several guesses, or a correction made after the answer was already
+   * revealed.
    */
-  static async recordAttempt(cardId, wasCorrect, source = 'session') {
+  static async recordAttempt(
+    cardId,
+    wasCorrect,
+    source = 'session',
+    { confidence = null, responseMs = null } = {},
+  ) {
     if (!SUPABASE_CONFIGURED) return;
     const userId = AuthService.getUserId();
     if (!userId) return;
+
+    const cleanConfidence = Number.isInteger(confidence) && confidence >= 1 && confidence <= 4
+      ? confidence
+      : null;
+    const cleanResponseMs = Number.isFinite(responseMs)
+      && responseMs > 0
+      && responseMs <= MAX_PLAUSIBLE_RESPONSE_MS
+      ? Math.round(responseMs)
+      : null;
+
     try {
       await supabase.from('card_attempts').insert({
         user_id:      userId,
         card_id:      cardId,
         was_correct:  wasCorrect,
         source,
+        confidence:   cleanConfidence,
+        response_ms:  cleanResponseMs,
         attempted_at: new Date().toISOString(),
       });
     } catch (e) {

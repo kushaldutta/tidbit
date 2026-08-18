@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -80,6 +80,15 @@ export default function ReviewSessionScreen({ route, navigation }) {
   const current = items[index];
   const answered = current?.mode === 'quiz' ? quizResult !== null : recallResult !== null;
 
+  // Stamped when a card first appears, so response time measures thinking
+  // rather than time since the session loaded.
+  const shownAtRef = useRef(null);
+  useEffect(() => {
+    if (current) shownAtRef.current = Date.now();
+  }, [current?.card?.id]);
+
+  const elapsedMs = () => (shownAtRef.current ? Date.now() - shownAtRef.current : null);
+
   const resetQuestionState = () => {
     setConfidence(0);
     setChosen(null);
@@ -113,7 +122,12 @@ export default function ReviewSessionScreen({ route, navigation }) {
     };
     setScore(nextScore);
 
-    await SameBoatService.recordAttempt(current.card.id, wasCorrect, 'quiz');
+    // Genuine confidence: the handler above returns early until the user has
+    // rated the card, and they rate it before seeing whether they were right.
+    await SameBoatService.recordAttempt(current.card.id, wasCorrect, 'quiz', {
+      confidence,
+      responseMs: elapsedMs(),
+    });
     await CardLearningService.recordReview(current.card.id, {
       wasCorrect,
       mode: 'quiz',
@@ -124,6 +138,7 @@ export default function ReviewSessionScreen({ route, navigation }) {
 
   const handleRecallSubmit = async () => {
     if (!userAnswer.trim() || recallResult || !current?.card) return;
+    if (confidence === 0) return; // rate before grading, never after
 
     const correctAnswer = getRecallAnswer(current.card);
     const result = RecallService.grade(userAnswer, correctAnswer);
@@ -135,11 +150,14 @@ export default function ReviewSessionScreen({ route, navigation }) {
     };
     setScore(nextScore);
 
-    await SameBoatService.recordAttempt(current.card.id, result.isCorrect, 'recall');
+    await SameBoatService.recordAttempt(current.card.id, result.isCorrect, 'recall', {
+      confidence,
+      responseMs: elapsedMs(),
+    });
     await CardLearningService.recordReview(current.card.id, {
       wasCorrect: result.isCorrect,
       mode: 'recall',
-      confidence: result.isCorrect ? 3 : 1,
+      confidence,
       categoryId: current.categoryId || categoryId || null,
     });
   };
@@ -269,10 +287,31 @@ export default function ReviewSessionScreen({ route, navigation }) {
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
+
+                  <View style={styles.confidenceWrap}>
+                    <Text style={styles.confidenceLabel}>How confident are you?</Text>
+                    <View style={styles.confidenceRow}>
+                      {[1, 2, 3, 4].map((v) => (
+                        <TouchableOpacity
+                          key={v}
+                          style={[styles.confidenceBtn, confidence === v && styles.confidenceBtnActive]}
+                          onPress={() => setConfidence(v)}
+                        >
+                          <Text style={[styles.confidenceBtnText, confidence === v && styles.confidenceBtnTextActive]}>
+                            {v}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
                   <TouchableOpacity
-                    style={[styles.nextBtn, !userAnswer.trim() && styles.nextBtnDisabled]}
+                    style={[
+                      styles.nextBtn,
+                      (!userAnswer.trim() || confidence === 0) && styles.nextBtnDisabled,
+                    ]}
                     onPress={handleRecallSubmit}
-                    disabled={!userAnswer.trim()}
+                    disabled={!userAnswer.trim() || confidence === 0}
                   >
                     <Text style={styles.nextBtnText}>Check answer</Text>
                   </TouchableOpacity>

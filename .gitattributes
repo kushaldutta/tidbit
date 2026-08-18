@@ -1,0 +1,38 @@
+# Line endings
+#
+# This repo is CRLF nearly throughout (~180 of 210 text files). Nothing declared
+# that, so line endings depended on whatever tool last wrote a file — which is
+# how commit 3cacd11 ended up rewriting six files end to end when only a few
+# hundred lines actually changed.
+#
+# Pinning eol=crlf keeps checkouts and fresh clones consistent with what is
+# already on disk, and makes git warn ("LF will be replaced by CRLF") as soon as
+# a file drifts from the convention.
+#
+# Note what this does NOT do: because the committed blobs still hold CRLF, a
+# tool that rewrites a file as LF will still produce a whole-file diff. Closing
+# that hole means normalising the stored blobs to LF:
+#
+#     git add --renormalize . && git commit -m "normalize line endings"
+#
+# after which both LF and CRLF working copies diff clean. That is a one-time
+# ~180-file commit, which is why it has not been done here.
+* text=auto eol=crlf
+
+# Binaries must never be line-ending converted.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.mp3   binary
+*.mp4   binary
+*.wav   binary
+*.jar   binary
+*.keystore binary
+*.p8    binary
+*.p12   binary
