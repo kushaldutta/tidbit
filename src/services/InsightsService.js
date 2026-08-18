@@ -6,6 +6,7 @@ import { AuthService } from './AuthService';
 import { ClassService } from './ClassService';
 import { CardLearningService } from './CardLearningService';
 import { ContentService } from './ContentService';
+import { DeckService } from './DeckService';
 import { QueueService } from './QueueService';
 
 class InsightsService {
@@ -80,21 +81,30 @@ class InsightsService {
       .sort((a, b) => a.daysLeft - b.daysLeft);
   }
 
-  static async getClassReadiness(categoryId) {
+  /**
+   * Readiness for one class.
+   * `deps` lets a caller scoring several classes share the one state map and
+   * exam-date lookup instead of re-reading them per class, which is what made
+   * this page slow once it grew past a single section.
+   */
+  static async getClassReadiness(categoryId, deps = {}) {
     const cards = await QueueService.loadCardsForCategory(categoryId);
     if (!cards.length) {
       return { categoryId, score: 0, masteryPct: 0, overdue: 0, total: 0, accuracy7d: null };
     }
 
+    const stateMap = deps.stateMap || (await CardLearningService.getStateMap());
+
     let mastered = 0;
     let overdue = 0;
     const cardIds = cards.map((c) => c.id);
+    const now = new Date();
 
     for (const card of cards) {
-      const state = await CardLearningService.getState(card.id);
+      const state = CardLearningService.getEffectiveStateFromMap(card, categoryId, stateMap);
       if (!state) continue;
       if (state.stage === 'mastered' || state.stage === 'recall') mastered += 1;
-      if (state.dueAt && new Date(state.dueAt) < new Date()) overdue += 1;
+      if (state.dueAt && new Date(state.dueAt) < now) overdue += 1;
     }
 
     const masteryPct = Math.round((mastered / cards.length) * 100);
@@ -119,7 +129,7 @@ class InsightsService {
       }
     }
 
-    const examDates = await this.getExamDates();
+    const examDates = deps.examDates || (await this.getExamDates());
     const examInfo = examDates[categoryId];
     let examBoost = 0;
     if (examInfo?.date) {
@@ -153,9 +163,13 @@ class InsightsService {
   static async getAllReadiness() {
     const categories = await ClassService.getEnrollmentCategoryIds();
     if (!categories.length) return [];
+    const [stateMap, examDates] = await Promise.all([
+      CardLearningService.getStateMap(),
+      this.getExamDates(),
+    ]);
     const results = [];
     for (const cat of categories) {
-      results.push(await this.getClassReadiness(cat));
+      results.push(await this.getClassReadiness(cat, { stateMap, examDates }));
     }
     return results.sort((a, b) => a.score - b.score);
   }
@@ -165,6 +179,19 @@ class InsightsService {
     const eligible = await QueueService.loadEligibleCards(categories);
     const cardIds = eligible.map((c) => c.id);
     const weakStates = await CardLearningService.getWeakSpots(limit, cardIds);
+    if (!weakStates.length) return [];
+
+    // Section titles for every enrolled class, so a weak card can name the
+    // topic it belongs to and the row can drill that topic directly.
+    const sectionTitles = new Map();
+    await Promise.all(
+      categories.map(async (cat) => {
+        const deckId = await ContentService.getPresetDeckIdForSlug(cat);
+        if (!deckId) return;
+        const sections = await DeckService.listSections(deckId);
+        sections.forEach((sec) => sectionTitles.set(sec.id, sec.title));
+      }),
+    );
 
     const spots = [];
     for (const state of weakStates) {
@@ -180,6 +207,8 @@ class InsightsService {
           term: card.front !== card.back ? card.front : null,
           category: card.categoryId,
         },
+        sectionId: card.section_id || null,
+        sectionTitle: card.section_id ? sectionTitles.get(card.section_id) || null : null,
         accuracy: acc,
         lapses: state.lapses,
         stage: state.stage,

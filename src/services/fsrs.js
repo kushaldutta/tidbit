@@ -20,6 +20,15 @@ function forgettingCurve(elapsedDays, stability) {
   return Math.pow(1 + (FACTOR * elapsedDays) / stability, DECAY);
 }
 
+/**
+ * Probability of recalling a card `elapsedDays` after its last review.
+ * Exported for the exam-day forecast, which decays every card forward in time
+ * rather than only asking whether it is due.
+ */
+export function retrievability(elapsedDays, stability) {
+  return forgettingCurve(Math.max(0, elapsedDays), stability);
+}
+
 function nextInterval(stability, desiredRetention = 0.9) {
   if (stability <= 0) return 1;
   const interval = (stability / FACTOR) * (Math.pow(desiredRetention, 1 / DECAY) - 1);

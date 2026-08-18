@@ -11,9 +11,218 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import PremiumGate from '../components/PremiumGate';
 import ExamDateModal from '../components/ExamDateModal';
+import ForecastChart from '../components/ForecastChart';
 import { InsightsService } from '../services/InsightsService';
+import { ForecastService } from '../services/ForecastService';
+import { TopicService } from '../services/TopicService';
 import { ContentService } from '../services/ContentService';
 import { useTheme } from '../context/ThemeContext';
+
+function shortDate(iso) {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/**
+ * The headline is the whole point of this card: one sentence naming the number
+ * the student actually cares about, and what closes the gap.
+ */
+function forecastHeadline(f) {
+  const target = f.examLabel || 'the exam';
+  if (!f.examDate || f.examPassed) {
+    return `Studying nothing new, you'd recall ${f.finals.stop}% of ${f.name} a month from now. Set an exam date to forecast against the real deadline.`;
+  }
+  if (!f.achievable) {
+    return `Even at full tilt you'd reach about ${f.finals.recommended}% by ${target} — there's more material here than days left. Prioritise: the weak spots below are worth the most.`;
+  }
+  if (f.idle) {
+    return `You haven't studied ${f.name} in two weeks. Walk in now and you'd recall ${f.finals.stop}% — ${f.recommendedPace} cards a day gets you to ${f.targetPct}%.`;
+  }
+  if (f.finals.current >= f.targetPct) {
+    return `You're on track. Hold this pace and you'll walk into ${target} recalling ${f.finals.current}% of the material.`;
+  }
+  return `At your current pace you'll walk into ${target} recalling ${f.finals.current}% of ${f.name}. ${f.recommendedPace} cards a day gets you to ${f.targetPct}%.`;
+}
+
+function LegendRow({ color, label, sub, value, styles }) {
+  return (
+    <View style={styles.legendRow}>
+      <View style={[styles.legendDot, { backgroundColor: color }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.legendLabel}>{label}</Text>
+        {sub ? <Text style={styles.legendSub}>{sub}</Text> : null}
+      </View>
+      <Text style={[styles.legendValue, { color }]}>{value}%</Text>
+    </View>
+  );
+}
+
+function ForecastCard({ forecast: f, styles, theme, navigation, onPressExam }) {
+  if (f.empty) return null;
+
+  const hasExam = !!f.examDate && !f.examPassed;
+  const series = [
+    {
+      key: 'recommended',
+      points: f.series.recommended,
+      color: theme.success,
+      emphasis: true,
+    },
+    ...(f.idle
+      ? []
+      : [{ key: 'current', points: f.series.current, color: theme.primary, emphasis: true }]),
+    { key: 'stop', points: f.series.stop, color: theme.danger },
+  ];
+
+  const xLabels = hasExam
+    ? ['Today', `${f.examLabel || 'Exam'} · ${shortDate(f.examDate)}`]
+    : ['Today', `+${f.horizon} days`];
+
+  return (
+    <View style={styles.forecastCard}>
+      <View style={styles.forecastHeader}>
+        <Text style={styles.forecastName}>{f.name}</Text>
+        <TouchableOpacity onPress={onPressExam} activeOpacity={0.8}>
+          <Text style={styles.forecastChip}>
+            {hasExam
+              ? `${f.examLabel || 'Exam'} · ${f.daysUntilExam === 0 ? 'today' : `${f.daysUntilExam}d left`}`
+              : '+ Set exam date'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.forecastHeadline}>{forecastHeadline(f)}</Text>
+
+      <ForecastChart
+        series={series}
+        maxDay={f.horizon}
+        target={f.targetPct}
+        theme={theme}
+        xLabels={xLabels}
+      />
+
+      <View style={styles.legend}>
+        <LegendRow
+          color={theme.success}
+          label="Recommended pace"
+          sub={`${f.recommendedPace} cards/day`}
+          value={f.finals.recommended}
+          styles={styles}
+        />
+        {!f.idle && (
+          <LegendRow
+            color={theme.primary}
+            label="Your current pace"
+            sub={`${f.currentPace} cards/day, measured over 2 weeks`}
+            value={f.finals.current}
+            styles={styles}
+          />
+        )}
+        <LegendRow
+          color={theme.danger}
+          label={f.idle ? 'Your current pace (none)' : 'If you stop now'}
+          sub={f.idle ? 'no reviews in the last 2 weeks' : 'no more reviews in this class'}
+          value={f.finals.stop}
+          styles={styles}
+        />
+      </View>
+
+      <Text style={styles.forecastMeta}>
+        {f.studiedCards} of {f.totalCards} cards studied · {f.accuracy}% accuracy · today you'd
+        recall {f.today}%
+      </Text>
+
+      <TouchableOpacity
+        style={styles.forecastCta}
+        onPress={() => navigation.navigate('ReviewQueue')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.forecastCtaText}>
+          Study {f.recommendedPace} card{f.recommendedPace !== 1 ? 's' : ''} today
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+/**
+ * Colour bands for the topic grid.
+ * `danger` is deliberately absent: per the theme tokens, a low score here is a
+ * prompt to study, not an error state. Amber means "go here next".
+ */
+function topicBand(topic, theme) {
+  switch (TopicService.bandFor(topic)) {
+    case 'strong':
+      return { bg: theme.successBg, fg: theme.successText, edge: theme.success };
+    case 'weak':
+      return { bg: theme.warningBg, fg: theme.warningText, edge: theme.warning };
+    case 'untouched':
+      return { bg: theme.surfaceAlt, fg: theme.textMuted, edge: theme.border, dashed: true };
+    default:
+      return { bg: theme.surfaceAlt, fg: theme.text, edge: theme.borderStrong };
+  }
+}
+
+function TopicTile({ topic, styles, theme, onPress }) {
+  const band = topicBand(topic, theme);
+  return (
+    <TouchableOpacity
+      style={[
+        styles.topicTile,
+        {
+          backgroundColor: band.bg,
+          borderColor: band.edge,
+          borderStyle: band.dashed ? 'dashed' : 'solid',
+        },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <Text style={[styles.topicTitle, { color: band.fg }]} numberOfLines={2}>
+        {topic.title}
+      </Text>
+      {topic.untouched ? (
+        <Text style={[styles.topicValue, { color: band.fg, fontSize: 15 }]}>Not started</Text>
+      ) : (
+        <Text style={[styles.topicValue, { color: band.fg }]}>{topic.recallPct}%</Text>
+      )}
+      <Text style={[styles.topicMeta, { color: band.fg }]}>
+        {topic.studiedCount}/{topic.cardCount} cards
+        {topic.examRecallPct != null && !topic.untouched
+          ? ` · ${topic.examRecallPct}% by exam`
+          : ''}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function ClassTopics({ group, styles, theme, navigation }) {
+  return (
+    <View style={styles.topicGroup}>
+      <Text style={styles.topicGroupTitle}>{group.name}</Text>
+      <View style={styles.topicGrid}>
+        {group.topics.map((topic) => (
+          <TopicTile
+            key={topic.sectionId || 'unsectioned'}
+            topic={topic}
+            styles={styles}
+            theme={theme}
+            onPress={() =>
+              navigation.navigate('ReviewSession', {
+                categoryId: group.categoryId,
+                sectionId: topic.sectionId,
+                topicDrill: true,
+                deckTitle: topic.title,
+              })
+            }
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 function ReadinessCard({ item, styles, onPressExam }) {
   const color = item.score >= 75 ? '#16a34a' : item.score >= 50 ? '#ca8a04' : '#dc2626';
@@ -50,18 +259,24 @@ function InsightsContent({ navigation }) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [loading, setLoading] = useState(true);
   const [readiness, setReadiness] = useState([]);
+  const [forecasts, setForecasts] = useState([]);
+  const [topicGroups, setTopicGroups] = useState([]);
   const [weakSpots, setWeakSpots] = useState([]);
   const [examTarget, setExamTarget] = useState(null);
 
   const load = useCallback(async (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     try {
-      const [r, w] = await Promise.all([
+      const [r, w, f, t] = await Promise.all([
         InsightsService.getAllReadiness(),
         InsightsService.getWeakSpots(8),
+        ForecastService.getAllForecasts(),
+        TopicService.getAllClassTopics(),
       ]);
       setReadiness(r);
       setWeakSpots(w);
+      setForecasts(f);
+      setTopicGroups(t);
     } catch (e) {
       console.warn('[Insights] load error:', e.message);
     } finally {
@@ -93,7 +308,34 @@ function InsightsContent({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.sectionTitle}>Exam Readiness</Text>
+        <Text style={styles.sectionTitle}>Exam Day Forecast</Text>
+        <Text style={styles.sectionSub}>
+          How much of each class you'll actually recall on exam day — projected from the memory
+          strength of every card, not just what you've covered.
+        </Text>
+        {forecasts.length === 0 ? (
+          <Text style={styles.empty}>Enroll in a class to see your forecast.</Text>
+        ) : (
+          forecasts.map((f) => (
+            <ForecastCard
+              key={f.categoryId}
+              forecast={f}
+              styles={styles}
+              theme={theme}
+              navigation={navigation}
+              onPressExam={() =>
+                setExamTarget({
+                  categoryId: f.categoryId,
+                  name: f.name,
+                  examDate: f.examDate,
+                  examLabel: f.examLabel,
+                })
+              }
+            />
+          ))
+        )}
+
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Exam Readiness</Text>
         <Text style={styles.sectionSub}>
           How prepared you are based on mastery, overdue reviews, recent accuracy, and days until your exam.
         </Text>
@@ -110,8 +352,29 @@ function InsightsContent({ navigation }) {
           ))
         )}
 
+        {topicGroups.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Topic Breakdown</Text>
+            <Text style={styles.sectionSub}>
+              Predicted recall for every topic in your classes, weakest first. Tap one to drill it.
+            </Text>
+            {topicGroups.map((group) => (
+              <ClassTopics
+                key={group.categoryId}
+                group={group}
+                styles={styles}
+                theme={theme}
+                navigation={navigation}
+              />
+            ))}
+          </>
+        )}
+
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Weak Spots</Text>
-        <Text style={styles.sectionSub}>Cards to drill before your next exam.</Text>
+        <Text style={styles.sectionSub}>
+          The individual cards dragging those topics down. Tap one to drill its topic, starting
+          with that card.
+        </Text>
         {weakSpots.length === 0 ? (
           <Text style={styles.empty}>No weak spots detected yet — keep studying!</Text>
         ) : (
@@ -119,7 +382,15 @@ function InsightsContent({ navigation }) {
             <TouchableOpacity
               key={spot.tidbit.id}
               style={styles.weakRow}
-              onPress={() => navigation.navigate('ReviewQueue')}
+              onPress={() =>
+                navigation.navigate('ReviewSession', {
+                  categoryId: spot.tidbit.category,
+                  sectionId: spot.sectionId,
+                  topicDrill: true,
+                  startCardId: spot.tidbit.id,
+                  deckTitle: spot.sectionTitle || ContentService.formatCategoryName(spot.tidbit.category),
+                })
+              }
               activeOpacity={0.8}
             >
               <View style={{ flex: 1 }}>
@@ -127,7 +398,7 @@ function InsightsContent({ navigation }) {
                   {spot.tidbit.term || spot.tidbit.text}
                 </Text>
                 <Text style={styles.weakMeta}>
-                  {ContentService.formatCategoryName(spot.tidbit.category)} · {spot.accuracy}% accuracy · {spot.lapses} lapse{spot.lapses !== 1 ? 's' : ''}
+                  {spot.sectionTitle || ContentService.formatCategoryName(spot.tidbit.category)} · {spot.accuracy}% accuracy · {spot.lapses} lapse{spot.lapses !== 1 ? 's' : ''}
                 </Text>
               </View>
               <Text style={styles.chevron}>›</Text>
@@ -155,7 +426,15 @@ function InsightsContent({ navigation }) {
   );
 }
 
+// TEMP (Expo testing): lets Study Insights open without a subscription so the
+// new forecast work can be exercised on a free account. Set back to false
+// before shipping — the gate itself is untouched.
+const BYPASS_PREMIUM_GATE = true;
+
 export default function InsightsScreen({ navigation }) {
+  if (BYPASS_PREMIUM_GATE) {
+    return <InsightsContent navigation={navigation} />;
+  }
   return (
     <PremiumGate navigation={navigation} feature="Study Insights">
       <InsightsContent navigation={navigation} />
@@ -178,6 +457,58 @@ const makeStyles = (theme) => StyleSheet.create({
   sectionTitle: { fontSize: 18, fontWeight: '800', color: theme.text, marginBottom: 4 },
   sectionSub: { fontSize: 13, color: theme.textSecondary, marginBottom: 14, lineHeight: 20 },
   empty: { fontSize: 14, color: theme.textSecondary, marginBottom: 12 },
+  forecastCard: {
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  forecastHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  forecastName: { fontSize: 17, fontWeight: '800', color: theme.text, flex: 1 },
+  forecastChip: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.primary,
+    backgroundColor: theme.primaryLight,
+    overflow: 'hidden',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  forecastHeadline: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: theme.text,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  legend: { marginTop: 14, gap: 8 },
+  legendRow: { flexDirection: 'row', alignItems: 'center' },
+  legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+  legendLabel: { fontSize: 13, fontWeight: '600', color: theme.text },
+  legendSub: { fontSize: 11, color: theme.textMuted, marginTop: 1 },
+  legendValue: { fontSize: 17, fontWeight: '800' },
+  forecastMeta: {
+    fontSize: 11,
+    color: theme.textMuted,
+    marginTop: 12,
+    lineHeight: 16,
+  },
+  forecastCta: {
+    marginTop: 12,
+    backgroundColor: theme.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  forecastCtaText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   readinessCard: {
     backgroundColor: theme.card,
     borderRadius: 14,
@@ -189,6 +520,25 @@ const makeStyles = (theme) => StyleSheet.create({
   readinessScore: { fontSize: 28, fontWeight: '900' },
   readinessSub: { fontSize: 13, color: theme.textSecondary, marginTop: 6 },
   examLine: { fontSize: 12, color: theme.primary, marginTop: 4, fontWeight: '600' },
+  topicGroup: { marginBottom: 18 },
+  topicGroupTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    marginBottom: 10,
+  },
+  topicGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  topicTile: {
+    width: '48%',
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    minHeight: 96,
+    justifyContent: 'space-between',
+  },
+  topicTitle: { fontSize: 13, fontWeight: '700', lineHeight: 17 },
+  topicValue: { fontSize: 22, fontWeight: '900', marginTop: 6 },
+  topicMeta: { fontSize: 10, marginTop: 2, opacity: 0.75 },
   weakRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -8,6 +8,7 @@ import {
   ratingFromReview,
   advanceStage,
   isMasteredStage,
+  retrievability,
   STAGES,
 } from './fsrs';
 
@@ -485,6 +486,17 @@ class CardLearningService {
     state.wasShownAsDue = false;
     state.shownAsDueAt = null;
     await this.saveState(state);
+  }
+
+  /**
+   * Probability the user still recalls this card at `at` — the same forgetting
+   * curve the scheduler uses, read forward instead of asked "is it due yet".
+   * A card that was never actually reviewed scores 0: not seen is not known.
+   */
+  static predictedRecall(state, at = new Date()) {
+    if (!state || !state.reps || !state.stability || !state.lastReviewAt) return 0;
+    const elapsedDays = (at.getTime() - new Date(state.lastReviewAt).getTime()) / 86400000;
+    return retrievability(elapsedDays, state.stability);
   }
 
   static isDue(state, targetTime = new Date()) {

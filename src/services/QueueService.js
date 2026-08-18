@@ -498,6 +498,67 @@ class QueueService {
     return items;
   }
 
+  /**
+   * A drill session scoped to one topic (deck section), weakest cards first.
+   *
+   * Unlike buildReviewSessionItems this deliberately ignores due dates: tapping
+   * a weak topic means "study this now", and the cards dragging a topic down are
+   * usually the ones the scheduler has not surfaced yet — never-seen cards, or
+   * ones whose next review is still days out.
+   *
+   * Pass `sectionId: null` to drill the whole class, still weakest-first.
+   */
+  static async buildTopicSessionItems(
+    categoryId,
+    { sectionId = null, startCardId = null, limit = LEARN_SESSION_CARD_LIMIT } = {},
+  ) {
+    if (!categoryId) return [];
+
+    const [cards, stateMap] = await Promise.all([
+      this.loadCardsForCategory(categoryId),
+      CardLearningService.getStateMap(),
+    ]);
+    const scoped = sectionId ? cards.filter((c) => c.section_id === sectionId) : cards;
+    if (!scoped.length) return [];
+
+    const now = new Date();
+    const ranked = scoped
+      .map((card) => {
+        const state = CardLearningService.getEffectiveStateFromMap(card, categoryId, stateMap);
+        const stage = state ? effectiveStage(state) : 'new';
+        return {
+          card,
+          // A card the user has never answered gets introduced with a quiz
+          // rather than thrown at them as blank-page recall.
+          stage: stage === 'new' ? 'introduced' : stage,
+          recall: CardLearningService.predictedRecall(state, now),
+        };
+      })
+      .sort((a, b) => a.recall - b.recall);
+
+    if (startCardId) {
+      const idx = ranked.findIndex(
+        (r) => r.card.id === startCardId
+          || CardLearningService.legacyHashForCard(r.card, categoryId) === startCardId,
+      );
+      if (idx > 0) {
+        const [pinned] = ranked.splice(idx, 1);
+        ranked.unshift(pinned);
+      }
+    }
+
+    const picked = ranked.slice(0, limit);
+    const deckId = await ContentService.getPresetDeckIdForSlug(categoryId);
+    const distractorPool = await this._loadFullDeckCards(deckId, categoryId);
+
+    const items = [];
+    for (const { card, stage } of picked) {
+      const item = this._sessionItemForCard(card, stage, categoryId, distractorPool);
+      if (item) items.push(item);
+    }
+    return items;
+  }
+
   /** Up to `limit` due cards mixed across enrolled classes (round-robin by class). */
   static async buildMixedReviewSessionItems(
     categoryIds = null,

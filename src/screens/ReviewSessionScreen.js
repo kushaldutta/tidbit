@@ -38,6 +38,8 @@ export default function ReviewSessionScreen({ route, navigation }) {
     startCardId,
     categoryId,
     mixedReview = false,
+    topicDrill = false,
+    sectionId = null,
   } = route.params || {};
 
   const [items, setItems] = useState([]);
@@ -55,17 +57,25 @@ export default function ReviewSessionScreen({ route, navigation }) {
   const [recallResult, setRecallResult] = useState(null);
 
   useEffect(() => {
-    const loader = mixedReview
-      ? QueueService.buildMixedReviewSessionItems()
-      : QueueService.buildReviewSessionItems(deckId, studyScope, {
-          startCardId: startCardId || null,
-          categoryId: categoryId || null,
-        });
+    let loader;
+    if (mixedReview) {
+      loader = QueueService.buildMixedReviewSessionItems();
+    } else if (topicDrill) {
+      loader = QueueService.buildTopicSessionItems(categoryId, {
+        sectionId,
+        startCardId: startCardId || null,
+      });
+    } else {
+      loader = QueueService.buildReviewSessionItems(deckId, studyScope, {
+        startCardId: startCardId || null,
+        categoryId: categoryId || null,
+      });
+    }
     loader.then((sessionItems) => {
       setItems(sessionItems);
       setLoading(false);
     });
-  }, [deckId, studyScope, startCardId, categoryId, mixedReview]);
+  }, [deckId, studyScope, startCardId, categoryId, mixedReview, topicDrill, sectionId]);
 
   const current = items[index];
   const answered = current?.mode === 'quiz' ? quizResult !== null : recallResult !== null;
@@ -156,7 +166,11 @@ export default function ReviewSessionScreen({ route, navigation }) {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: theme.background }]}>
         <Text style={styles.emptyEmoji}>📭</Text>
-        <Text style={styles.emptyText}>No cards due for review right now.</Text>
+        <Text style={styles.emptyText}>
+          {topicDrill
+            ? 'No cards in this topic yet.'
+            : 'No cards due for review right now.'}
+        </Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
         </TouchableOpacity>
