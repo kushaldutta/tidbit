@@ -260,6 +260,8 @@ class QueueService {
     const groups = {};
     const seenIds = new Set();
     const orphanUuids = [];
+    // Legacy hash states that resolved to nothing — candidates for pruning.
+    const unresolvable = [];
 
     const addItem = (cat, tidbit, stage, dueAt) => {
       if (!tidbit?.id || seenIds.has(tidbit.id)) return;
@@ -294,8 +296,24 @@ class QueueService {
         const category = tidbit?.category;
         if (tidbit && category && categories.includes(category) && !presetDeckByCategory[category]) {
           addItem(category, ContentService.ensureTidbitHasId(tidbit), effectiveStage(state), state.dueAt);
+        } else if (!tidbit) {
+          // Resolved to nothing at all. Note: a tidbit that resolves but is
+          // filtered out above (not enrolled, or superseded by a preset deck) is
+          // NOT unresolvable and must never be pruned.
+          unresolvable.push(state.contentId);
         }
       }
+    }
+
+    // Prune only when content genuinely loaded. On fallback content, or when the
+    // deck fetch failed, everything looks unresolvable and we would delete real
+    // progress. Fire-and-forget so the queue never waits on it.
+    if (
+      unresolvable.length > 0
+      && eligible.length > 0
+      && !ContentService.isUsingFallbackContent()
+    ) {
+      CardLearningService.pruneUnresolvableStates(unresolvable).catch(() => {});
     }
 
     if (orphanUuids.length > 0) {

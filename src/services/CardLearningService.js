@@ -700,6 +700,54 @@ class CardLearningService {
       .slice(0, limit);
   }
 
+  /**
+   * Delete local learning states that can never resolve to a card.
+   *
+   * These accumulate whenever a content migration rebuilds a deck: the old
+   * hash-keyed state survives locally but the card it pointed at is gone. They
+   * contribute nothing to any due count yet are re-resolved on every Review
+   * Queue and Home open, and the set only grows.
+   *
+   * This deletes user data, so the rules are deliberately narrow:
+   *  - UUID ids are NEVER pruned. A UUID names a real cards row that may simply
+   *    be unreachable right now (offline, deck still syncing).
+   *  - Saved states are kept even when unresolvable — that is explicit user intent.
+   *  - The matching legacy spaced_repetition_ key is removed too, otherwise
+   *    migrateLegacySpacedRepetition would resurrect the state if MIGRATION_KEY
+   *    were ever cleared (clearAllState does exactly that).
+   *
+   * Callers must confirm content actually loaded first — see
+   * ContentService.isUsingFallbackContent().
+   *
+   * @returns {Promise<number>} how many states were removed
+   */
+  static async pruneUnresolvableStates(contentIds) {
+    if (!contentIds?.length) return 0;
+
+    const keys = [];
+    let pruned = 0;
+
+    for (const id of new Set(contentIds)) {
+      if (!id || isUuid(id)) continue;
+      const state = await this.getState(id);
+      if (state?.isSaved) continue;
+      keys.push(localKey(id));
+      keys.push(`${LEGACY_SR_PREFIX}${id}`);
+      pruned += 1;
+    }
+
+    if (!keys.length) return 0;
+
+    try {
+      await AsyncStorage.multiRemove(keys);
+      console.log(`[CardLearning] Pruned ${pruned} unresolvable state(s)`);
+      return pruned;
+    } catch (e) {
+      console.warn('[CardLearning] prune failed:', e.message);
+      return 0;
+    }
+  }
+
   static async clearAllState() {
     const keys = await AsyncStorage.getAllKeys();
     const clKeys = keys.filter((k) => k.startsWith(LOCAL_PREFIX));

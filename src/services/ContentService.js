@@ -104,8 +104,44 @@ const FALLBACK_TIDBITS = {
 
 // Tidbits loaded from server or cache (will be populated in init())
 let TIDBITS = FALLBACK_TIDBITS;
+
 let CONTENT_VERSION = null;
 let LAST_VERSION_CHECK = null;
+
+/**
+ * Memoised hash-id -> tidbit index over TIDBITS.
+ *
+ * getTidbitById used to rescan every category and recompute generateTidbitId()
+ * for every tidbit on each call. Callers that resolve ids in a loop (the Review
+ * Queue, the Due/Mastered/Saved viewers) paid that scan once per id, so the cost
+ * was orphans x total tidbits — which grows with content volume.
+ *
+ * The cache is keyed on the TIDBITS object identity rather than invalidated by
+ * hand, so all five reassignment sites (server fetch, cache load, fallback)
+ * rebuild it automatically and it can never go stale.
+ */
+let tidbitIndexCache = null;
+let tidbitIndexSource = null;
+
+function getTidbitIndex() {
+  if (tidbitIndexCache && tidbitIndexSource === TIDBITS) return tidbitIndexCache;
+
+  const index = new Map();
+  for (const category of Object.keys(TIDBITS || {})) {
+    for (const item of TIDBITS[category] || []) {
+      const text = typeof item === 'string' ? item : item?.text;
+      if (!text) continue;
+      const term = typeof item === 'string' ? null : (item.term || null);
+      const id = generateTidbitId(text, category);
+      // First writer wins, matching the old top-down scan order.
+      if (!index.has(id)) index.set(id, { id, text, term, category });
+    }
+  }
+
+  tidbitIndexCache = index;
+  tidbitIndexSource = TIDBITS;
+  return index;
+}
 
 // Cache keys
 const CACHE_KEYS = {
@@ -592,31 +628,30 @@ class ContentService {
    * @param {boolean} requireSelectedCategory - If true, only return tidbits from selected categories (default: true)
    * @returns {Promise<Object|null>} The tidbit object or null if not found
    */
+  /**
+   * True when TIDBITS is still the bundled fallback, i.e. neither the server nor
+   * the cache has produced real content this session.
+   *
+   * Callers that DELETE data based on "this id resolved to nothing" must check
+   * this first — on fallback content almost every real id looks unresolvable.
+   * Uses object identity, so it cannot drift out of sync with the 5 assignment sites.
+   */
+  static isUsingFallbackContent() {
+    return TIDBITS === FALLBACK_TIDBITS;
+  }
+
   static async getTidbitById(tidbitId, requireSelectedCategory = true) {
     if (!tidbitId) return null;
 
     const activeCategories = requireSelectedCategory
       ? await this.resolveActiveCategories()
       : null;
-    const categoriesToSearch = activeCategories ?? Object.keys(TIDBITS);
 
-    for (const category of categoriesToSearch) {
-      const categoryTidbits = TIDBITS[category] || [];
-
-      for (const tidbitItem of categoryTidbits) {
-        const text = typeof tidbitItem === 'string' ? tidbitItem : tidbitItem.text;
-        const term = typeof tidbitItem === 'string' ? null : (tidbitItem.term || null);
-        const id = generateTidbitId(text, category);
-        if (id === tidbitId) {
-          return {
-            id,
-            text,
-            term,
-            category,
-            timestamp: new Date().toISOString(),
-          };
-        }
-      }
+    // O(1) against the memoised index instead of rescanning every category and
+    // rehashing every tidbit on each call.
+    const hit = getTidbitIndex().get(tidbitId);
+    if (hit && (!activeCategories || activeCategories.includes(hit.category))) {
+      return { ...hit, timestamp: new Date().toISOString() };
     }
 
     const cardTidbit = await this.getCardAsTidbit(tidbitId);
