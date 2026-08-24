@@ -30,13 +30,6 @@ import BuddyRequestsCard from '../components/BuddyRequestsCard';
 import Icon from '../components/Icon';
 import { spacing, radius, type, elevation, iconSize } from '../theme/tokens';
 
-// ─── TEMPORARY DIAGNOSTIC — remove once the double-load is understood ────────
-// Distinguishes the three things that can trigger a Home data load, so the logs
-// say WHICH one fired rather than just showing doubled work.
-let __homeFocusEvents = 0;
-let __homeStatsEvents = 0;
-// ─────────────────────────────────────────────────────────────────────────────
-
 function StatTile({ icon, value, label, tone, filled, muted, styles, onPress }) {
   return (
     <TouchableOpacity style={styles.statCard} onPress={onPress} activeOpacity={0.8}>
@@ -80,8 +73,6 @@ export default function HomeScreen({ navigation }) {
   // ReviewQueueScreen / GamesScreen already do.
   useFocusEffect(
     useCallback(() => {
-      __homeFocusEvents += 1;
-      console.log(`[HOME_DIAG] focus load #${__homeFocusEvents}`);
       loadData();
       loadDevMode();
       loadStudyPlan();
@@ -92,8 +83,6 @@ export default function HomeScreen({ navigation }) {
   // Stays subscribed for the screen's whole life, not just while focused.
   useEffect(() => {
     const statsSub = DeviceEventEmitter.addListener('statsUpdated', () => {
-      __homeStatsEvents += 1;
-      console.log(`[HOME_DIAG] statsUpdated event #${__homeStatsEvents} -> loadData`);
       loadData();
     });
     return () => statsSub.remove();
