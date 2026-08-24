@@ -78,6 +78,7 @@ const ICONS = {
   snap: ['camera-outline', 'camera'],
   add: ['add-circle-outline', 'add-circle'],
   edit: ['pencil-outline', 'pencil'],
+  palette: ['color-palette-outline', 'color-palette'],
 
   // ─── System / affordances ────────────────────────────────────────────────
   notifications: ['notifications-outline', 'notifications'],
@@ -85,6 +86,8 @@ const ICONS = {
   coins: ['disc-outline', 'disc'],
   wallet: ['wallet-outline', 'wallet'],
   chevron: ['chevron-forward', 'chevron-forward'],
+  expand: ['chevron-down', 'chevron-down'],
+  collapse: ['chevron-up', 'chevron-up'],
   back: ['arrow-back', 'arrow-back'],
   close: ['close', 'close'],
   more: ['ellipsis-horizontal', 'ellipsis-horizontal'],

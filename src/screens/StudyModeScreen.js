@@ -1,5 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { StudyPlanService } from '../services/StudyPlanService';
@@ -7,6 +14,15 @@ import { CardLearningService } from '../services/CardLearningService';
 import { BuddyService } from '../services/BuddyService';
 import { useTheme } from '../context/ThemeContext';
 import CoinBalanceChip from '../components/CoinBalanceChip';
+import NavRow from '../components/NavRow';
+import { spacing, radius, type, elevation } from '../theme/tokens';
+
+const SESSIONS = [
+  { label: 'Quick', count: 5 },
+  { label: 'Standard', count: 10 },
+  { label: 'Focused', count: 15 },
+  { label: 'Deep', count: 30 },
+];
 
 export default function StudyModeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -50,150 +66,87 @@ export default function StudyModeScreen({ navigation }) {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
-      <View style={styles.titleRow}>
-        <Text style={styles.title}>Study Mode</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
+    >
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.title}>Study</Text>
+          <Text style={styles.subtitle}>Practice, review, and play</Text>
+        </View>
         <CoinBalanceChip navigation={navigation} />
       </View>
-      <Text style={styles.subtitle}>
-        Quiz, recall, and match from your decks, or run a focused review session.
-      </Text>
 
-      <View style={styles.learnSection}>
-        <Text style={styles.learnSectionTitle}>Interactive Learn Modes</Text>
-        <Text style={styles.learnSectionSub}>
-          Quiz, Recall, and Match: study from your own decks or preset class decks
-        </Text>
-        <TouchableOpacity
-          style={styles.learnBtn}
-          onPress={() => navigation.navigate('LearnModePicker')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.learnBtnEmoji}>🎯</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.learnBtnLabel}>Start Learning</Text>
-            <Text style={styles.learnBtnSub}>Quiz · Recall · Match · Speed Run</Text>
-          </View>
-          <Text style={styles.learnBtnArrow}>›</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.learnBtn, { marginTop: 12, borderColor: '#f59e0b' }]}
-          onPress={() => navigation.navigate('Games')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.learnBtnEmoji}>🎮</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.learnBtnLabel}>Games</Text>
-            <Text style={styles.learnBtnSub}>Daily Challenge · Speed Duel · Runner</Text>
-          </View>
-          <Text style={styles.learnBtnArrow}>›</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.learnBtn, { marginTop: 12 }]}
-          onPress={() => navigation.navigate('BuddyRequests')}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.learnBtnEmoji}>🤝</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.learnBtnLabel}>Buddy requests</Text>
-            <Text style={styles.learnBtnSub}>
-              {buddyRequestCount > 0
-                ? `${buddyRequestCount} waiting — accept or decline`
-                : 'Incoming study-buddy invites'}
-            </Text>
-          </View>
-          {buddyRequestCount > 0 ? (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{buddyRequestCount}</Text>
-            </View>
-          ) : (
-            <Text style={styles.learnBtnArrow}>›</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <NavRow
+        icon="startLearning"
+        title="Start Learning"
+        sub="Quiz · Recall · Match · Speed Run"
+        onPress={() => navigation.navigate('LearnModePicker')}
+        tone="accent"
+      />
 
-      <TouchableOpacity
-        style={styles.reviewBtn}
+      <NavRow
+        icon={dueCount > 0 ? 'reviewQueue' : 'check'}
+        title="Review Queue"
+        sub={dueCount > 0 ? `${dueCount} due now` : 'Nothing due — nice work'}
         onPress={() => navigation.navigate('ReviewQueue')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.reviewBtnEmoji}>📋</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.reviewBtnLabel}>Review Queue</Text>
-          <Text style={styles.reviewBtnSub}>
-            {dueCount > 0 ? `${dueCount} due now` : 'Nothing due — nice work'}
-          </Text>
+      />
+
+      <NavRow
+        icon="games"
+        title="Games"
+        sub="Daily Challenge · Speed Duel · Runner"
+        onPress={() => navigation.navigate('Games')}
+      />
+
+      <NavRow
+        icon="buddy"
+        title="Buddy requests"
+        sub={
+          buddyRequestCount > 0
+            ? `${buddyRequestCount} waiting — accept or decline`
+            : 'Incoming study-buddy invites'
+        }
+        onPress={() => navigation.navigate('BuddyRequests')}
+        badge={buddyRequestCount}
+      />
+
+      <View style={styles.sessionSection}>
+        <Text style={styles.sectionTitle}>Focused Sessions</Text>
+        <Text style={styles.sectionSub}>Mixes reviews you owe with new material.</Text>
+        <View style={styles.sessionGrid}>
+          {SESSIONS.map(({ label, count }) => (
+            <TouchableOpacity
+              key={label}
+              style={[styles.sessionTile, isGenerating && styles.sessionTileDisabled]}
+              onPress={() => startSession(count)}
+              disabled={isGenerating}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.sessionLabel}>{label}</Text>
+              <Text style={styles.sessionCount}>{count} cards</Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        <Text style={styles.learnBtnArrow}>›</Text>
-      </TouchableOpacity>
 
-      <Text style={styles.focusedHeader}>Focused Sessions</Text>
-      <Text style={styles.focusedSub}>
-        Pick a session length. Tidbit will mix reviews you owe with new material.
-      </Text>
+        {error && <Text style={styles.errorText}>{error}</Text>}
 
-      <View style={styles.optionsContainer}>
-        <SessionOption
-          label="Quick Session"
-          description="5 tidbits · light review"
-          onPress={() => startSession(5)}
-          disabled={isGenerating}
-        />
-        <SessionOption
-          label="Standard Session"
-          description="10 tidbits · balanced"
-          onPress={() => startSession(10)}
-          disabled={isGenerating}
-        />
-        <SessionOption
-          label="Focused Session"
-          description="15 tidbits · deeper practice"
-          onPress={() => startSession(15)}
-          disabled={isGenerating}
-        />
-        <SessionOption
-          label="Deep Session"
-          description="30 tidbits · serious study"
-          onPress={() => startSession(30)}
-          disabled={isGenerating}
-        />
+        {isGenerating && (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={theme.primary} />
+            <Text style={styles.loadingText}>Building your session</Text>
+          </View>
+        )}
       </View>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
-
-      {isGenerating && (
-        <Text style={styles.loadingText}>Building your session...</Text>
-      )}
-
-      <TouchableOpacity
-        style={styles.myDecksBtn}
+      <NavRow
+        icon="decks"
+        title="My Decks"
+        sub="Create, edit, and manage your flashcard decks"
         onPress={() => navigation.navigate('MyDecks')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.myDecksEmoji}>📚</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.myDecksLabel}>My Decks</Text>
-          <Text style={styles.myDecksSub}>Create, edit, and manage your flashcard decks</Text>
-        </View>
-        <Text style={styles.myDecksArrow}>›</Text>
-      </TouchableOpacity>
+      />
     </ScrollView>
-  );
-}
-
-function SessionOption({ label, description, onPress, disabled }) {
-  const { theme } = useTheme();
-  const styles = makeStyles(theme);
-  return (
-    <TouchableOpacity
-      style={[styles.optionCard, disabled && styles.optionCardDisabled]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.optionLabel}>{label}</Text>
-      <Text style={styles.optionDescription}>{description}</Text>
-    </TouchableOpacity>
   );
 }
 
@@ -203,140 +156,76 @@ const makeStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.background,
   },
   content: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl + spacing.sm,
   },
-  titleRow: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    marginBottom: spacing.xl,
+    gap: spacing.md,
   },
   title: {
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: 'bold',
     color: theme.text,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: 16,
     color: theme.textSecondary,
-    marginBottom: 24,
   },
-  learnSection: {
-    marginBottom: 28,
-  },
-  learnSectionTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: theme.text,
-    marginBottom: 4,
-  },
-  learnSectionSub: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 16,
-  },
-  learnBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: theme.primaryLight,
-    borderRadius: 18,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: theme.accent,
-  },
-  learnBtnEmoji: { fontSize: 32 },
-  learnBtnLabel: { fontSize: 17, fontWeight: '800', color: theme.primary, marginBottom: 2 },
-  learnBtnSub: { fontSize: 13, color: theme.primary },
-  learnBtnArrow: { fontSize: 28, color: theme.primary, fontWeight: '700' },
-  badge: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: theme.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  badgeText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  focusedHeader: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: theme.text,
-    marginBottom: 4,
-  },
-  focusedSub: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginBottom: 16,
-  },
-  optionsContainer: {
-    marginBottom: 24,
-  },
-  optionCard: {
-    backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  optionCardDisabled: {
-    opacity: 0.6,
-  },
-  optionLabel: {
+
+  sessionSection: { marginTop: spacing.xs, marginBottom: spacing.xl },
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: theme.text,
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
-  optionDescription: {
-    fontSize: 14,
+  sectionSub: {
+    fontSize: 13,
     color: theme.textSecondary,
+    marginBottom: spacing.md,
   },
+  sessionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  sessionTile: {
+    flexGrow: 1,
+    flexBasis: '44%',
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    ...elevation.card,
+  },
+  sessionTileDisabled: { opacity: 0.5 },
+  sessionLabel: { fontSize: 16, fontWeight: '600', color: theme.text },
+  sessionCount: {
+    ...type.overline,
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+
   errorText: {
-    marginTop: 8,
-    color: '#dc2626',
+    marginTop: spacing.md,
+    color: theme.danger,
     fontSize: 14,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   loadingText: {
-    marginTop: 8,
     color: theme.textSecondary,
     fontSize: 14,
-    fontStyle: 'italic',
   },
-  myDecksBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    marginTop: 8,
-  },
-  myDecksEmoji: { fontSize: 28 },
-  myDecksLabel: { fontSize: 16, fontWeight: '700', color: theme.text, marginBottom: 2 },
-  myDecksSub: { fontSize: 13, color: theme.textSecondary },
-  myDecksArrow: { fontSize: 24, color: theme.textSecondary, fontWeight: '700' },
-  reviewBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1.5,
-    borderColor: theme.primaryLight || '#e5e7eb',
-  },
-  reviewBtnEmoji: { fontSize: 26, marginRight: 12 },
-  reviewBtnLabel: { fontSize: 16, fontWeight: '800', color: theme.text },
-  reviewBtnSub: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
 });

@@ -30,6 +30,9 @@ import { CoinService } from '../services/CoinService';
 import { BuddyService } from '../services/BuddyService';
 import * as Notifications from 'expo-notifications';
 import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../constants/legalUrls';
+import Icon from '../components/Icon';
+import NavRow from '../components/NavRow';
+import { spacing, radius, iconSize } from '../theme/tokens';
 
 const INTERVAL_OPTIONS = [
   { label: '1 hour', value: 60 },
@@ -471,92 +474,63 @@ export default function SettingsScreen({ navigation }) {
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Manage your account and preferences</Text>
+        <Text style={styles.subtitle}>Notifications, profile, and account</Text>
       </View>
 
-      <TouchableOpacity
-        style={styles.profileCard}
+      <NavRow
+        title={profile?.display_name?.trim() || 'Set up your profile'}
+        sub={profileSubtitle || 'Add your name and school'}
         onPress={() => navigation.navigate('EditProfile')}
-        activeOpacity={0.85}
-      >
-        <View style={styles.profileAvatar}>
-          <Text style={styles.profileAvatarText}>{profileInitial}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.profileName}>
-            {profile?.display_name?.trim() || 'Set up your profile'}
-          </Text>
-          {profileSubtitle ? (
-            <Text style={styles.profileSub}>{profileSubtitle}</Text>
-          ) : (
-            <Text style={styles.profileSub}>Add your name and school</Text>
-          )}
-        </View>
-        <Text style={styles.profileChevron}>›</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.coinRow}
-        onPress={() => navigation.navigate('CoinWallet')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.coinRowEmoji}>🪙</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.coinRowTitle}>
-            {coinBalance == null ? 'Study Coins' : `${coinBalance} Study Coins`}
-          </Text>
-          <Text style={styles.coinRowSub}>Balance, earnings, and what’s coming to the shop</Text>
-        </View>
-        <Text style={styles.profileChevron}>›</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.buddyRow}
-        onPress={() => navigation.navigate('BuddyRequests')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.buddyRowEmoji}>🤝</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.buddyRowTitle}>Buddy requests</Text>
-          <Text style={styles.buddyRowSub}>
-            {buddyRequestCount > 0
-              ? `${buddyRequestCount} waiting — accept or decline`
-              : 'View incoming study-buddy invites'}
-          </Text>
-        </View>
-        {buddyRequestCount > 0 ? (
-          <View style={styles.buddyBadge}>
-            <Text style={styles.buddyBadgeText}>{buddyRequestCount}</Text>
+        leading={
+          <View style={styles.profileAvatar}>
+            <Text style={styles.profileAvatarText}>{profileInitial}</Text>
           </View>
-        ) : (
-          <Text style={styles.profileChevron}>›</Text>
-        )}
-      </TouchableOpacity>
+        }
+      />
 
+      <NavRow
+        icon="coins"
+        title={coinBalance == null ? 'Study Coins' : `${coinBalance} Study Coins`}
+        sub="Balance, earnings, and the shop"
+        onPress={() => navigation.navigate('CoinWallet')}
+        tone="warn"
+      />
+
+      <NavRow
+        icon="buddy"
+        title="Buddy requests"
+        sub={
+          buddyRequestCount > 0
+            ? `${buddyRequestCount} waiting — accept or decline`
+            : 'Incoming study-buddy invites'
+        }
+        onPress={() => navigation.navigate('BuddyRequests')}
+        badge={buddyRequestCount}
+      />
+
+      {/* One notification group, not three stacked cards: the master switch and
+          everything it gates belong to the same decision. */}
       <View style={styles.section}>
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
             <Text style={styles.settingLabel}>Notifications</Text>
             <Text style={styles.settingDescription}>
-              Receive tidbits via notifications
+              Push tidbits to your lock screen
             </Text>
           </View>
           <Switch
             value={notificationsEnabled}
             onValueChange={handleToggleNotifications}
-            trackColor={{ false: '#e5e7eb', true: '#6366f1' }}
+            trackColor={{ false: theme.borderStrong, true: theme.primary }}
             thumbColor="#ffffff"
           />
         </View>
-      </View>
 
-      {Platform.OS === 'ios' && notificationsEnabled && (
-        <>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notification Interval</Text>
-            <Text style={styles.sectionDescription}>
-              How often you'd like to receive tidbit notifications
-            </Text>
+        {Platform.OS === 'ios' && notificationsEnabled && (
+          <>
+            <View style={styles.divider} />
+
+            <Text style={styles.subsectionTitle}>Interval</Text>
             <View style={styles.intervalOptions}>
               {INTERVAL_OPTIONS.map((option) => (
                 <TouchableOpacity
@@ -576,38 +550,31 @@ export default function SettingsScreen({ navigation }) {
                     {option.label}
                   </Text>
                   {notificationInterval === option.value && (
-                    <Text style={styles.checkmark}>✓</Text>
+                    <Icon name="check" size={iconSize.md} color={theme.primary} filled />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
 
-          <View style={styles.section}>
+            <View style={styles.divider} />
+
             <View style={styles.settingRow}>
               <View style={styles.settingInfo}>
                 <Text style={styles.settingLabel}>Quiet Hours</Text>
-                {quietHoursEnabled ? (
-                  <Text style={styles.settingDescription}>
-                    No notifications from {formatHour(quietHoursStart)} to {formatHour(quietHoursEnd)}
-                  </Text>
-                ) : (
-                  <Text style={styles.settingDescription}>
-                    No notifications during selected hours
-                  </Text>
-                )}
-                <Text style={styles.settingSubnote}>
-                  Quiet hours are applied in PST.
+                <Text style={styles.settingDescription}>
+                  {quietHoursEnabled
+                    ? `No notifications from ${formatHour(quietHoursStart)} to ${formatHour(quietHoursEnd)}, PST`
+                    : 'Mute notifications overnight'}
                 </Text>
               </View>
               <Switch
                 value={quietHoursEnabled}
                 onValueChange={handleToggleQuietHours}
-                trackColor={{ false: '#e5e7eb', true: '#6366f1' }}
+                trackColor={{ false: theme.borderStrong, true: theme.primary }}
                 thumbColor="#ffffff"
               />
             </View>
-            
+
             {quietHoursEnabled && (
               <View style={styles.quietHoursExpanded}>
                 <TouchableOpacity
@@ -618,15 +585,17 @@ export default function SettingsScreen({ navigation }) {
                   <Text style={styles.expandButtonText}>
                     {showQuietHoursPicker ? 'Hide' : 'Choose'} Quiet Hours
                   </Text>
-                  <Text style={styles.expandButtonIcon}>
-                    {showQuietHoursPicker ? '▲' : '▼'}
-                  </Text>
+                  <Icon
+                    name={showQuietHoursPicker ? 'collapse' : 'expand'}
+                    size={iconSize.sm}
+                    color={theme.primary}
+                  />
                 </TouchableOpacity>
-                
+
                 {showQuietHoursPicker && (
                   <View style={styles.quietHoursPicker}>
                     <View style={styles.timePickerRow}>
-                      <Text style={styles.timePickerLabel}>Start:</Text>
+                      <Text style={styles.timePickerLabel}>Start</Text>
                       <View style={styles.hourSelector}>
                         {[22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((hour) => (
                           <TouchableOpacity
@@ -649,9 +618,9 @@ export default function SettingsScreen({ navigation }) {
                         ))}
                       </View>
                     </View>
-                    
+
                     <View style={styles.timePickerRow}>
-                      <Text style={styles.timePickerLabel}>End:</Text>
+                      <Text style={styles.timePickerLabel}>End</Text>
                       <View style={styles.hourSelector}>
                         {[22, 23, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hour) => (
                           <TouchableOpacity
@@ -678,24 +647,26 @@ export default function SettingsScreen({ navigation }) {
                 )}
               </View>
             )}
-          </View>
-        </>
-      )}
+          </>
+        )}
 
-      {Platform.OS === 'android' && notificationsEnabled && (
-        <View style={styles.section}>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              📱 Android: Notifications are sent when you unlock your phone
-            </Text>
-          </View>
-        </View>
-      )}
+        {Platform.OS === 'android' && notificationsEnabled && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.infoBox}>
+              <Icon name="info" size={iconSize.md} color={theme.info} style={styles.infoIcon} />
+              <Text style={styles.infoText}>
+                On Android, notifications arrive when you unlock your phone.
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Notification sources</Text>
         <Text style={styles.sectionDescription}>
-          Choose which enrolled classes and personal decks can appear in your tidbit notifications.
+          Classes and decks that can show up in notifications.
         </Text>
         {decksLoading ? (
           <Text style={styles.deckEmptyText}>Loading…</Text>
@@ -727,15 +698,18 @@ export default function SettingsScreen({ navigation }) {
                             onPress={() => toggleClassSectionsExpanded(source.classId)}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                           >
-                            <Text style={styles.sectionExpandText}>
-                              {sectionsExpanded ? '▾' : '▸'} Sections
-                            </Text>
+                            <Text style={styles.sectionExpandText}>Sections</Text>
+                            <Icon
+                              name={sectionsExpanded ? 'collapse' : 'expand'}
+                              size={iconSize.sm}
+                              color={theme.primary}
+                            />
                           </TouchableOpacity>
                         )}
                         <Switch
                           value={source.selected}
                           onValueChange={(v) => handleClassNotificationToggle(source.classId, v)}
-                          trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                          trackColor={{ false: theme.borderStrong, true: theme.primary }}
                           thumbColor="#ffffff"
                         />
                       </View>
@@ -754,7 +728,7 @@ export default function SettingsScreen({ navigation }) {
                                 onValueChange={(v) =>
                                   handleSectionNotificationToggle(source.deckId, section.id, v)
                                 }
-                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                trackColor={{ false: theme.borderStrong, true: theme.primary }}
                                 thumbColor="#ffffff"
                               />
                             </View>
@@ -772,7 +746,7 @@ export default function SettingsScreen({ navigation }) {
                                 onValueChange={(v) =>
                                   handleUncategorizedNotificationToggle(source.deckId, v)
                                 }
-                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                trackColor={{ false: theme.borderStrong, true: theme.primary }}
                                 thumbColor="#ffffff"
                               />
                             </View>
@@ -810,15 +784,18 @@ export default function SettingsScreen({ navigation }) {
                             onPress={() => toggleDeckSectionsExpanded(deck.id)}
                             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                           >
-                            <Text style={styles.sectionExpandText}>
-                              {sectionsExpanded ? '▾' : '▸'} Sections
-                            </Text>
+                            <Text style={styles.sectionExpandText}>Sections</Text>
+                            <Icon
+                              name={sectionsExpanded ? 'collapse' : 'expand'}
+                              size={iconSize.sm}
+                              color={theme.primary}
+                            />
                           </TouchableOpacity>
                         )}
                         <Switch
                           value={deck.selected}
                           onValueChange={(v) => handleDeckToggle(deck.id, v)}
-                          trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                          trackColor={{ false: theme.borderStrong, true: theme.primary }}
                           thumbColor="#ffffff"
                         />
                       </View>
@@ -837,7 +814,7 @@ export default function SettingsScreen({ navigation }) {
                                 onValueChange={(v) =>
                                   handleSectionNotificationToggle(deck.deckId, section.id, v)
                                 }
-                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                trackColor={{ false: theme.borderStrong, true: theme.primary }}
                                 thumbColor="#ffffff"
                               />
                             </View>
@@ -855,7 +832,7 @@ export default function SettingsScreen({ navigation }) {
                                 onValueChange={(v) =>
                                   handleUncategorizedNotificationToggle(deck.deckId, v)
                                 }
-                                trackColor={{ false: '#e5e7eb', true: theme.primary }}
+                                trackColor={{ false: theme.borderStrong, true: theme.primary }}
                                 thumbColor="#ffffff"
                               />
                             </View>
@@ -870,60 +847,38 @@ export default function SettingsScreen({ navigation }) {
             {notificationDecks.classSources.length === 0 &&
               notificationDecks.myDecks.length === 0 && (
               <Text style={styles.deckEmptyText}>
-                Enroll in classes on the Categories tab or create decks with cards to enable notification sources.
+                Enroll in a class or create a deck to pick notification sources.
               </Text>
             )}
           </>
         )}
       </View>
 
-      {/* Premium upgrade banner */}
-      <TouchableOpacity
-        style={styles.premiumBanner}
+      <NavRow
+        icon="ai"
+        title={isPremium ? 'View Your Plan' : 'Upgrade to Premium'}
+        sub={
+          isPremium
+            ? 'Manage or cancel your subscription'
+            : 'AI generation, analytics, themes & more'
+        }
         onPress={handlePremiumPress}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.premiumBannerEmoji}>{isPremium ? '⭐' : '✨'}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.premiumBannerTitle}>
-            {isPremium ? 'View Your Plan' : 'Upgrade to Premium'}
-          </Text>
-          <Text style={styles.premiumBannerSub}>
-            {isPremium
-              ? 'Manage or cancel your subscription'
-              : 'AI generation, analytics, themes & more'}
-          </Text>
-        </View>
-        <Text style={styles.premiumBannerArrow}>›</Text>
-      </TouchableOpacity>
+        tone="accent"
+      />
 
-      {/* Analytics shortcut */}
-      <TouchableOpacity
-        style={styles.analyticsBtn}
+      <NavRow
+        icon="stats"
+        title="Analytics"
+        sub="Retention forecast, accuracy trends, study modes"
         onPress={() => navigation.navigate('Stats')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.analyticsBtnEmoji}>📊</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.analyticsBtnTitle}>Analytics</Text>
-          <Text style={styles.analyticsBtnSub}>Retention forecast, accuracy trends, study modes</Text>
-        </View>
-        <Text style={styles.premiumBannerArrow}>›</Text>
-      </TouchableOpacity>
+      />
 
-      {/* Theme picker entry */}
-      <TouchableOpacity
-        style={[styles.analyticsBtn, { marginTop: 8 }]}
+      <NavRow
+        icon="palette"
+        title="App Theme"
+        sub="Classic is free · Sunset with coins"
         onPress={() => navigation.navigate('ThemePicker')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.analyticsBtnEmoji}>🎨</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.analyticsBtnTitle}>App Theme</Text>
-          <Text style={styles.analyticsBtnSub}>Classic is free · Sunset with coins</Text>
-        </View>
-        <Text style={styles.premiumBannerArrow}>›</Text>
-      </TouchableOpacity>
+      />
 
       {false && (
         <View style={styles.section}>
@@ -1063,46 +1018,29 @@ export default function SettingsScreen({ navigation }) {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
-        <View style={styles.aboutContent}>
-          <Text style={styles.aboutText}>
-            <Text style={styles.aboutLabel}>App Name:</Text> Tidbit
-          </Text>
-          <Text style={styles.aboutText}>
-            <Text style={styles.aboutLabel}>Version:</Text> 2.3.1
-          </Text>
-          <Text style={styles.aboutText}>
-            <Text style={styles.aboutLabel}>Description:</Text> Study with your class — course-native flashcards, daily challenges, and classmates in the same lecture.
-          </Text>
-          <TouchableOpacity
-            onPress={() => Linking.openURL('mailto:kushald@berkeley.edu?subject=Tidbit App Support')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.aboutText}>
-              <Text style={styles.aboutLabel}>Contact:</Text>{' '}
-              <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
-                support@tidbit.app
-              </Text>
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => openLegalUrl(PRIVACY_URL, 'Privacy Policy')}
-            activeOpacity={0.7}
-            style={{ marginTop: 8 }}
-          >
-            <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
-              Privacy Policy
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => openLegalUrl(TERMS_URL, 'Terms of Service')}
-            activeOpacity={0.7}
-            style={{ marginTop: 8 }}
-          >
-            <Text style={[styles.aboutText, { color: '#6366f1', textDecorationLine: 'underline' }]}>
-              Terms of Service
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.aboutText}>
+          Study with your class — course-native flashcards, daily challenges, and
+          classmates in the same lecture.
+        </Text>
+        <Text style={styles.aboutVersion}>Tidbit 2.3.1</Text>
+        <TouchableOpacity
+          onPress={() => Linking.openURL('mailto:kushald@berkeley.edu?subject=Tidbit App Support')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.aboutLink}>Contact support</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => openLegalUrl(PRIVACY_URL, 'Privacy Policy')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.aboutLink}>Privacy Policy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => openLegalUrl(TERMS_URL, 'Terms of Service')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.aboutLink}>Terms of Service</Text>
+        </TouchableOpacity>
       </View>
 
       {profile?.is_moderator && (
@@ -1152,7 +1090,7 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.deleteAccountButtonText}>Delete Account</Text>
         </TouchableOpacity>
         <Text style={styles.deleteAccountHint}>
-          Permanently removes your account and all data. Required for App Store compliance.
+          Permanently removes your account and all of its data.
         </Text>
       </View>
 
@@ -1216,162 +1154,57 @@ const makeStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.background,
   },
   content: {
-    padding: 20,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxxl,
   },
   header: {
-    marginBottom: 32,
+    marginBottom: spacing.xl,
   },
   title: {
-    fontSize: 32,
+    fontSize: 42,
     fontWeight: 'bold',
     color: theme.text,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   subtitle: {
     fontSize: 16,
     color: theme.textSecondary,
   },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: theme.primaryLight,
-  },
-  coinRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: '#fffbeb',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: '#fcd34d',
-  },
-  coinRowEmoji: { fontSize: 26 },
-  coinRowTitle: { fontSize: 15, fontWeight: '800', color: '#92400e' },
-  coinRowSub: { fontSize: 12, color: '#b45309', marginTop: 2 },
-  buddyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: '#eef2ff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1.5,
-    borderColor: '#c7d2fe',
-  },
-  buddyRowEmoji: { fontSize: 26 },
-  buddyRowTitle: { fontSize: 15, fontWeight: '800', color: '#3730a3' },
-  buddyRowSub: { fontSize: 12, color: '#4f46e5', marginTop: 2 },
-  buddyBadge: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#4f46e5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  buddyBadgeText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   profileAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: radius.pill,
     backgroundColor: theme.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: spacing.md,
   },
   profileAvatarText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: theme.primary,
   },
-  profileName: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: theme.text,
-    marginBottom: 2,
-  },
-  profileSub: {
-    fontSize: 13,
-    color: theme.textSecondary,
-  },
-  profileChevron: {
-    fontSize: 24,
-    color: '#9ca3af',
-    fontWeight: '600',
-  },
-  deckGroupLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  deckRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.primaryLight || '#eef2ff',
-  },
-  deckEmoji: { fontSize: 22 },
-  deckInfo: { flex: 1 },
-  deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
-  deckSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
-  sectionExpandBtn: {
-    marginRight: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-  },
-  sectionExpandText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.primary || '#6366f1',
-  },
-  sectionList: {
-    marginLeft: 36,
-    marginBottom: 4,
-    borderLeftWidth: 2,
-    borderLeftColor: theme.primaryLight || '#eef2ff',
-    paddingLeft: 12,
-  },
-  sectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.primaryLight || '#eef2ff',
-  },
-  sectionInfo: { flex: 1 },
-  deckSectionTitle: { fontSize: 13, fontWeight: '600', color: theme.text },
-  sectionSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
-  deckEmptyText: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    lineHeight: 20,
-    fontStyle: 'italic',
-  },
+
+  // ─── Sections ───────────────────────────────────────────────────────────
   section: {
     backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: radius.md,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.text,
+    marginBottom: spacing.sm,
+  },
+  sectionDescription: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    lineHeight: 19,
+    marginBottom: spacing.lg,
   },
   settingRow: {
     flexDirection: 'row',
@@ -1380,47 +1213,43 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   settingInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: spacing.lg,
   },
   settingLabel: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.text,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   settingDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.textSecondary,
-    lineHeight: 20,
+    lineHeight: 19,
   },
-  settingSubnote: {
-    fontSize: 12,
-    color: '#9ca3af',
-    marginTop: 4,
+  divider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: spacing.lg,
   },
-  sectionTitle: {
-    fontSize: 18,
+  subsectionTitle: {
+    fontSize: 13,
     fontWeight: '600',
-    color: theme.text,
-    marginBottom: 8,
-  },
-  sectionDescription: {
-    fontSize: 14,
     color: theme.textSecondary,
-    lineHeight: 20,
-    marginBottom: 16,
+    marginBottom: spacing.sm,
   },
+
+  // ─── Notification interval ──────────────────────────────────────────────
   intervalOptions: {
-    gap: 12,
+    gap: spacing.sm,
   },
   intervalOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: theme.background,
-    borderWidth: 2,
+    padding: spacing.lg,
+    borderRadius: radius.sm,
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
     borderColor: 'transparent',
   },
   intervalOptionSelected: {
@@ -1428,36 +1257,265 @@ const makeStyles = (theme) => StyleSheet.create({
     borderColor: theme.primary,
   },
   intervalOptionText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15,
     color: theme.text,
   },
   intervalOptionTextSelected: {
     color: theme.primary,
     fontWeight: '600',
   },
-  checkmark: {
-    fontSize: 20,
-    color: theme.primary,
-    fontWeight: 'bold',
+
+  // ─── Quiet hours ────────────────────────────────────────────────────────
+  quietHoursExpanded: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
   },
-  infoBox: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: theme.primary,
+  expandButton: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: radius.sm,
   },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e40af',
-    marginBottom: 8,
-  },
-  infoText: {
+  expandButtonText: {
     fontSize: 14,
-    lineHeight: 20,
-    color: '#1e40af',
+    fontWeight: '600',
+    color: theme.primary,
+  },
+  quietHoursPicker: {
+    marginTop: spacing.lg,
+  },
+  timePickerRow: {
+    marginBottom: spacing.lg,
+  },
+  timePickerLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  hourSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  hourButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.sm,
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  hourButtonSelected: {
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
+  },
+  hourButtonText: {
+    fontSize: 12,
+    color: theme.text,
+  },
+  hourButtonTextSelected: {
+    color: theme.primary,
+    fontWeight: '600',
+  },
+
+  // ─── Notification sources ───────────────────────────────────────────────
+  deckGroupLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: spacing.sm,
+  },
+  deckRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  // Deck cover emoji are user-chosen content, not UI icons — they stay emoji.
+  deckEmoji: { fontSize: 22 },
+  deckInfo: { flex: 1 },
+  deckTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
+  deckSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  sectionExpandBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginRight: spacing.xs,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+  },
+  sectionExpandText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.primary,
+  },
+  sectionList: {
+    marginLeft: spacing.xxxl + spacing.xs,
+    marginBottom: spacing.xs,
+    borderLeftWidth: 2,
+    borderLeftColor: theme.border,
+    paddingLeft: spacing.md,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  sectionInfo: { flex: 1 },
+  deckSectionTitle: { fontSize: 13, fontWeight: '600', color: theme.text },
+  sectionSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  deckEmptyText: {
+    fontSize: 13,
+    color: theme.textMuted,
+    lineHeight: 19,
+  },
+
+  // ─── About ──────────────────────────────────────────────────────────────
+  aboutText: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: theme.textSecondary,
+  },
+  aboutVersion: {
+    fontSize: 13,
+    color: theme.textMuted,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  aboutLink: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.primary,
+    paddingVertical: spacing.sm,
+  },
+
+  // ─── Moderation ─────────────────────────────────────────────────────────
+  moderationQueueBtn: {
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: radius.sm,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  moderationQueueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  moderationQueueText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  moderationQueueHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: spacing.xs,
+  },
+  reportBadge: {
+    backgroundColor: theme.danger,
+    borderRadius: radius.pill,
+    minWidth: 24,
+    height: 24,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportBadgeText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  // ─── Account ────────────────────────────────────────────────────────────
+  signOutButton: {
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.md + 2,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  signOutButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  accountHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+    lineHeight: 18,
+  },
+  deleteAccountButton: {
+    backgroundColor: theme.dangerBg,
+    borderWidth: 1,
+    borderColor: theme.danger,
+    borderRadius: radius.sm,
+    padding: spacing.md + 2,
+    alignItems: 'center',
+  },
+  deleteAccountButtonText: {
+    color: theme.danger,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteAccountHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginTop: spacing.sm,
+    lineHeight: 18,
+  },
+  accountButtonDisabled: {
+    opacity: 0.5,
+  },
+  devResetButton: {
+    backgroundColor: theme.dangerBg,
+    borderWidth: 1,
+    borderColor: theme.danger,
+    borderRadius: radius.sm,
+    padding: spacing.md + 2,
+    alignItems: 'center',
+  },
+  devResetText: {
+    color: theme.danger,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // ─── Shared / misc ──────────────────────────────────────────────────────
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.infoBg,
+    borderRadius: radius.sm,
+    padding: spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.info,
+  },
+  infoIcon: { marginRight: spacing.md },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 19,
+    color: theme.infoText,
   },
   loadingText: {
     fontSize: 16,
@@ -1465,12 +1523,14 @@ const makeStyles = (theme) => StyleSheet.create({
     textAlign: 'center',
     marginTop: 50,
   },
+
+  // ─── Debug tools (behind `{false && …}`) ─────────────────────────────────
   testButton: {
     backgroundColor: theme.primary,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: radius.md,
+    padding: spacing.lg,
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   testButtonText: {
     color: '#ffffff',
@@ -1482,22 +1542,22 @@ const makeStyles = (theme) => StyleSheet.create({
     color: theme.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   testButtonSecondary: {
-    backgroundColor: '#8b5cf6',
-    marginTop: 8,
+    backgroundColor: theme.primaryDark,
+    marginTop: spacing.sm,
   },
   debugStats: {
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   debugStatRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: theme.border,
   },
   debugStatLabel: {
     fontSize: 14,
@@ -1508,232 +1568,4 @@ const makeStyles = (theme) => StyleSheet.create({
     fontWeight: '600',
     color: theme.text,
   },
-  premiumBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#0f0a2e', borderRadius: 16,
-    padding: 18, marginHorizontal: 16, marginBottom: 8,
-  },
-  premiumBannerEmoji: { fontSize: 26 },
-  premiumBannerTitle: { fontSize: 16, fontWeight: '800', color: '#fff', marginBottom: 2 },
-  premiumBannerSub: { fontSize: 13, color: '#a5b4fc' },
-  premiumBannerArrow: { fontSize: 24, color: '#a5b4fc', fontWeight: '700' },
-  analyticsBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: theme.card, borderRadius: 16, padding: 16,
-    marginHorizontal: 20, marginTop: 10,
-    borderWidth: 1.5, borderColor: '#e5e7eb',
-  },
-  analyticsBtnEmoji: { fontSize: 26 },
-  analyticsBtnTitle: { fontSize: 15, fontWeight: '700', color: theme.text, marginBottom: 2 },
-  analyticsBtnSub: { fontSize: 12, color: theme.textSecondary },
-  actionButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: theme.background,
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: theme.text,
-  },
-  chevron: {
-    fontSize: 24,
-    color: '#9ca3af',
-  },
-  aboutContent: {
-    marginTop: 8,
-  },
-  aboutText: {
-    fontSize: 14,
-    lineHeight: 24,
-    color: theme.textSecondary,
-    marginBottom: 8,
-  },
-  aboutLabel: {
-    fontWeight: '600',
-    color: theme.text,
-  },
-  quietHoursExpanded: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  expandButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: theme.background,
-    borderRadius: 8,
-  },
-  expandButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.primary,
-  },
-  expandButtonIcon: {
-    fontSize: 12,
-    color: theme.primary,
-  },
-  quietHoursPicker: {
-    marginTop: 16,
-  },
-  timePickerRow: {
-    marginBottom: 16,
-  },
-  timePickerLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.text,
-    marginBottom: 8,
-  },
-  hourSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  hourButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: theme.background,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  hourButtonSelected: {
-    backgroundColor: theme.primaryLight,
-    borderColor: theme.primary,
-  },
-  hourButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: theme.text,
-  },
-  hourButtonTextSelected: {
-    color: theme.primary,
-    fontWeight: '600',
-  },
-  quietHoursInfo: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-  },
-  quietHoursInfoText: {
-    fontSize: 13,
-    color: '#1e40af',
-    textAlign: 'center',
-  },
-  classesButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: theme.background,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  classesButtonText: { fontSize: 15, fontWeight: '500', color: theme.text },
-  classesChevron: { fontSize: 20, color: '#9ca3af' },
-  devResetButton: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-  },
-  devResetText: {
-    color: '#dc2626',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  moderationQueueBtn: {
-    backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  moderationQueueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  moderationQueueText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  moderationQueueHint: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginTop: 6,
-  },
-  reportBadge: {
-    backgroundColor: '#dc2626',
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reportBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  signOutButton: {
-    backgroundColor: theme.card,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  signOutButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.text,
-  },
-  accountHint: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginTop: 8,
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  deleteAccountButton: {
-    backgroundColor: '#fef2f2',
-    borderWidth: 1,
-    borderColor: '#fca5a5',
-    borderRadius: 10,
-    padding: 14,
-    alignItems: 'center',
-  },
-  deleteAccountButtonText: {
-    color: '#dc2626',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  deleteAccountHint: {
-    fontSize: 12,
-    color: theme.textSecondary,
-    marginTop: 8,
-    lineHeight: 18,
-  },
-  accountButtonDisabled: {
-    opacity: 0.5,
-  },
 });
-

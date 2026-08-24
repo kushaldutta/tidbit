@@ -15,39 +15,11 @@ import { ClassService } from '../services/ClassService';
 import { ProfileService } from '../services/ProfileService';
 import { useTheme } from '../context/ThemeContext';
 import CatalogSegmentedControl from '../components/CatalogSegmentedControl';
-import { DEFAULT_SCHOOL_ID, getSchool, schoolIdForClassId } from '../config/schools';
+import Icon from '../components/Icon';
+import { spacing, radius, iconSize } from '../theme/tokens';
+import { DEFAULT_SCHOOL_ID, getSchool } from '../config/schools';
 
-const SUBJECT_EMOJI = {
-  'Computer Science':  '💻',
-  'Mathematics':       '📐',
-  'Data Science':      '📊',
-  'Statistics':        '📊',
-  'Economics':         '📈',
-  'Physics':           '⚛️',
-  'Chemistry':         '🧪',
-  'Biology':           '🔬',
-  'EECS':              '⚡',
-  'Molecular Biology': '🔬',
-  'Psychology':        '🧠',
-  'Nuclear Engineering': '☢️',
-  'Classics':          '🏛️',
-  'History':           '📜',
-  'English':           '📚',
-  'Language':          '🌍',
-  'Geography':         '🌎',
-  'Social Studies':    '🌍',
-  'Science':           '🔬',
-  'Art':               '🎨',
-  'Books':             '📖',
-  'Life Skills':       '🌱',
-  'Languages':         '🗣️',
-  'Philosophy':        '💭',
-  'General Knowledge': '🧠',
-  'Technology':        '💻',
-  'Business':          '💼',
-};
-
-function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle, query }) {
+function SubjectSection({ subject, classes, enrolledIds, saving, onToggle, query }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
   const [open, setOpen] = useState(false);
@@ -68,41 +40,46 @@ function SubjectSection({ subject, emoji, classes, enrolledIds, saving, onToggle
   return (
     <View style={styles.deptSection}>
       <TouchableOpacity style={styles.deptHeader} onPress={() => setOpen((v) => !v)} activeOpacity={0.7}>
-        <Text style={styles.deptEmoji}>{emoji}</Text>
         <Text style={styles.deptName}>{subject}</Text>
         {enrolledCount > 0 && (
           <View style={styles.deptBadge}>
             <Text style={styles.deptBadgeText}>{enrolledCount}</Text>
           </View>
         )}
-        <Text style={styles.chevron}>{isOpen ? '›' : '›'}</Text>
+        <Icon
+          name={isOpen ? 'collapse' : 'expand'}
+          size={iconSize.md}
+          color={theme.textMuted}
+        />
       </TouchableOpacity>
 
       {isOpen && (
         <View style={styles.catList}>
-          {filtered.map((cls) => {
+          {filtered.map((cls, i) => {
             const active = enrolledIds.has(cls.id);
             const isLoading = saving === cls.id;
             return (
               <TouchableOpacity
                 key={cls.id}
-                style={[styles.catRow, active && styles.catRowActive]}
+                style={[
+                  styles.catRow,
+                  active && styles.catRowActive,
+                  i === filtered.length - 1 && styles.catRowLast,
+                ]}
                 onPress={() => onToggle(cls)}
                 disabled={isLoading}
                 activeOpacity={0.7}
               >
                 <View style={styles.catInfo}>
-                  <View style={styles.catTitleRow}>
-                    <Text style={[styles.catName, active && styles.catNameActive]}>{cls.code}</Text>
-                  </View>
+                  <Text style={[styles.catName, active && styles.catNameActive]}>{cls.code}</Text>
                   <Text style={styles.catDesc} numberOfLines={1}>{cls.title}</Text>
                 </View>
                 {isLoading ? (
-                  <ActivityIndicator size="small" color="#6366f1" />
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : active ? (
+                  <Icon name="check" size={iconSize.lg} color={theme.primary} filled />
                 ) : (
-                  <View style={[styles.check, active && styles.checkActive]}>
-                    {active && <Text style={styles.checkMark}>✓</Text>}
-                  </View>
+                  <View style={styles.checkEmpty} />
                 )}
               </TouchableOpacity>
             );
@@ -223,10 +200,10 @@ export default function CategoriesScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Classes</Text>
-        <Text style={styles.subtitle}>{catalogSchool.browseSubtitle}</Text>
+        <Text style={styles.subtitle}>Enroll to get tidbits</Text>
       </View>
 
-      <View style={styles.segmentWrap}>
+      <View style={styles.gutter}>
         <CatalogSegmentedControl
           value={catalogSchoolId}
           onChange={handleCatalogChange}
@@ -243,31 +220,28 @@ export default function CategoriesScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chipScroll}
           >
-            {enrolledClasses.map((c) => {
-              const school = getSchool(c.school_id || schoolIdForClassId(c.id));
-              return (
-                <TouchableOpacity
-                  key={c.id}
-                  style={styles.chip}
-                  onPress={() => toggle(c)}
-                  disabled={saving === c.id}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.chipEmoji}>{school.emoji}</Text>
-                  <Text style={styles.chipText}>{c.code}</Text>
-                  <Text style={styles.chipX}> ×</Text>
-                </TouchableOpacity>
-              );
-            })}
+            {enrolledClasses.map((c) => (
+              <TouchableOpacity
+                key={c.id}
+                style={styles.chip}
+                onPress={() => toggle(c)}
+                disabled={saving === c.id}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.chipText}>{c.code}</Text>
+                <Icon name="close" size={iconSize.sm} color={theme.primary} />
+              </TouchableOpacity>
+            ))}
           </ScrollView>
         </View>
       )}
 
       <View style={styles.searchWrap}>
+        <Icon name="search" size={iconSize.md} color={theme.textMuted} />
         <TextInput
           style={styles.searchInput}
           placeholder={catalogSchool.searchPlaceholder}
-          placeholderTextColor="#9ca3af"
+          placeholderTextColor={theme.textMuted}
           value={query}
           onChangeText={setQuery}
           autoCorrect={false}
@@ -276,7 +250,7 @@ export default function CategoriesScreen() {
       </View>
 
       {showCatalogSpinner ? (
-        <ActivityIndicator style={{ flex: 1 }} color="#6366f1" />
+        <ActivityIndicator style={{ flex: 1 }} color={theme.primary} />
       ) : (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -285,9 +259,9 @@ export default function CategoriesScreen() {
         >
           {enrolledIds.size === 0 && !query && (
             <View style={styles.emptyHint}>
-              <Text style={styles.emptyHintEmoji}>☝️</Text>
+              <Icon name="info" size={iconSize.md} color={theme.info} style={styles.emptyHintIcon} />
               <Text style={styles.emptyHintText}>
-                Pick at least one class to start receiving tidbits and join study groups
+                Pick at least one class to start getting tidbits and join study groups.
               </Text>
             </View>
           )}
@@ -296,7 +270,6 @@ export default function CategoriesScreen() {
             <SubjectSection
               key={subject}
               subject={subject}
-              emoji={SUBJECT_EMOJI[subject] || '📖'}
               classes={classes}
               enrolledIds={enrolledIds}
               saving={saving}
@@ -319,90 +292,129 @@ export default function CategoriesScreen() {
 const makeStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
 
-  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
-  title: { fontSize: 26, fontWeight: '800', color: theme.text },
-  subtitle: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
+  /** Every band on this screen shares one gutter so the left edge is a straight line. */
+  gutter: { paddingHorizontal: spacing.xl },
 
-  segmentWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  title: { fontSize: 42, fontWeight: 'bold', color: theme.text },
+  subtitle: { fontSize: 16, color: theme.textSecondary, marginTop: spacing.xs },
 
   selectedSection: {
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
   selectedLabel: {
-    fontSize: 11, fontWeight: '700', color: '#9ca3af',
-    textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: spacing.sm,
   },
-  chipScroll: { flexDirection: 'row', gap: 6, paddingRight: 20 },
+  chipScroll: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.xl },
   chip: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#eef2ff', borderRadius: 20,
-    paddingVertical: 6, paddingHorizontal: 13,
-    borderWidth: 1, borderColor: '#c7d2fe',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: theme.primaryLight,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: theme.accent,
   },
-  chipEmoji: { fontSize: 12, marginRight: 4 },
-  chipText: { fontSize: 13, color: '#4338ca', fontWeight: '600' },
-  chipX: { fontSize: 14, color: '#818cf8', fontWeight: '700' },
+  chipText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
 
-  searchWrap: { paddingHorizontal: 16, paddingVertical: 10 },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
   searchInput: {
-    backgroundColor: theme.card, borderRadius: 12,
-    borderWidth: 1, borderColor: '#e5e7eb',
-    paddingHorizontal: 14, paddingVertical: 11,
-    fontSize: 15, color: theme.text,
+    flex: 1,
+    paddingVertical: spacing.md,
+    fontSize: 15,
+    color: theme.text,
   },
 
-  scroll: { paddingHorizontal: 16, paddingTop: 4 },
+  scroll: { paddingHorizontal: spacing.xl, paddingTop: spacing.xs },
 
   emptyHint: {
-    alignItems: 'center', paddingVertical: 24,
-    backgroundColor: theme.card, borderRadius: 16,
-    borderWidth: 1, borderColor: '#f3f4f6',
-    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.infoBg,
+    borderRadius: radius.md,
+    borderLeftWidth: 4,
+    borderLeftColor: theme.info,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  emptyHintEmoji: { fontSize: 30, marginBottom: 8 },
-  emptyHintText: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', paddingHorizontal: 20 },
-  emptyCatalog: { textAlign: 'center', color: theme.textSecondary, marginTop: 24, fontSize: 14 },
+  emptyHintIcon: { marginRight: spacing.md },
+  emptyHintText: { flex: 1, fontSize: 13, lineHeight: 19, color: theme.infoText },
+  emptyCatalog: {
+    textAlign: 'center',
+    color: theme.textMuted,
+    marginTop: spacing.xxl,
+    fontSize: 14,
+  },
 
+  // ─── Subject sections ───────────────────────────────────────────────────
   deptSection: {
-    backgroundColor: theme.card, borderRadius: 16,
-    borderWidth: 1, borderColor: '#f3f4f6',
-    marginBottom: 10, overflow: 'hidden',
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginBottom: spacing.md,
+    overflow: 'hidden',
   },
   deptHeader: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, gap: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    gap: spacing.md,
   },
-  deptEmoji: { fontSize: 20 },
-  deptName: { flex: 1, fontSize: 15, fontWeight: '700', color: theme.text },
+  deptName: { flex: 1, fontSize: 16, fontWeight: '600', color: theme.text },
   deptBadge: {
-    backgroundColor: '#6366f1', borderRadius: 10,
-    paddingHorizontal: 8, paddingVertical: 2,
+    backgroundColor: theme.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
   },
-  deptBadgeText: { fontSize: 11, color: '#fff', fontWeight: '700' },
-  chevron: { fontSize: 22, color: '#9ca3af', fontWeight: '700' },
+  deptBadgeText: { fontSize: 11, color: '#ffffff', fontWeight: '700' },
 
-  catList: { borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  catList: { borderTopWidth: 1, borderTopColor: theme.border },
   catRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#f9fafb',
-    backgroundColor: theme.background,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
-  catRowActive: { backgroundColor: '#f5f3ff' },
-  catInfo: { flex: 1, paddingRight: 12 },
-  catTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  catName: { fontSize: 14, fontWeight: '600', color: theme.text },
-  catNameActive: { color: '#4338ca' },
+  catRowLast: { borderBottomWidth: 0 },
+  catRowActive: { backgroundColor: theme.primaryLight },
+  catInfo: { flex: 1, paddingRight: spacing.md },
+  catName: { fontSize: 15, fontWeight: '600', color: theme.text },
+  catNameActive: { color: theme.primary },
   catDesc: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
-  check: {
-    width: 24, height: 24, borderRadius: 12,
-    borderWidth: 2, borderColor: '#d1d5db',
-    alignItems: 'center', justifyContent: 'center',
+  checkEmpty: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: theme.borderStrong,
   },
-  checkActive: { backgroundColor: '#6366f1', borderColor: '#6366f1' },
-  checkMark: { color: '#fff', fontSize: 13, fontWeight: '800' },
 });

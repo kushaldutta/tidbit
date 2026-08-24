@@ -630,13 +630,13 @@ export default function FeedScreen({ navigation }) {
                   <Text style={styles.emptyEmoji}>🎓</Text>
                   <Text style={styles.emptyTitle}>No classes yet</Text>
                   <Text style={styles.emptyBody}>
-                    Join a class from Settings → My Classes to see your group feed here.
+                    Join a class from the Categories tab to see your group feed here.
                   </Text>
                   <TouchableOpacity
                     style={styles.emptyBtn}
-                    onPress={() => navigation.navigate('MyClasses')}
+                    onPress={() => navigation.navigate('Main', { screen: 'Categories' })}
                   >
-                    <Text style={styles.emptyBtnText}>Go to My Classes</Text>
+                    <Text style={styles.emptyBtnText}>Browse classes</Text>
                   </TouchableOpacity>
                 </>
               ) : (

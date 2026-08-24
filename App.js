@@ -27,7 +27,6 @@ import SignUpScreen from './src/screens/auth/SignUpScreen';
 import VerifyEmailScreen from './src/screens/auth/VerifyEmailScreen';
 import OnboardingProfileScreen from './src/screens/auth/OnboardingProfileScreen';
 import ClassSelectionScreen from './src/screens/auth/ClassSelectionScreen';
-import MyClassesScreen from './src/screens/MyClassesScreen';
 import GroupScreen from './src/screens/GroupScreen';
 import GroupSharedDecksScreen from './src/screens/GroupSharedDecksScreen';
 import GroupClassmatesScreen from './src/screens/GroupClassmatesScreen';
@@ -821,7 +820,6 @@ export default function App() {
         <Stack.Screen name="StudySession" component={StudySessionScreen} />
         <Stack.Screen name="CategoryProgress" component={CategoryProgressScreen} />
         <Stack.Screen name="CategoryDetail" component={CategoryDetailScreen} />
-        <Stack.Screen name="MyClasses" component={MyClassesScreen} />
         <Stack.Screen name="Feed" component={FeedScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Group" component={GroupScreen} />
         <Stack.Screen name="GroupSharedDecks" component={GroupSharedDecksScreen} />
