@@ -141,6 +141,7 @@ class StudyPlanService {
         limit: PLAN_CONFIG.DEFAULT_TOTAL,
         includeNew: true,
         newRatio: 1 - PLAN_CONFIG.DUE_RATIO,
+        annotateStudyModes: true,
       });
 
       const selectedDue = queue.due;
@@ -237,6 +238,7 @@ class StudyPlanService {
         limit: targetTotal,
         includeNew: true,
         newRatio: 1 - PLAN_CONFIG.DUE_RATIO,
+        annotateStudyModes: true,
       });
 
       const sessionTidbits = queue.combined.map((t) => ContentService.ensureTidbitHasId(t));

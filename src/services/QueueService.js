@@ -14,6 +14,12 @@ export const LEARN_SESSION_CARD_LIMIT = 10;
 
 const REVIEW_QUEUE_CACHE_MS = 8000;
 
+/** Candidate terms sampled per multiple-choice question (3 become distractors). */
+const DISTRACTOR_SAMPLE_SIZE = 10;
+
+/** Below this many distinct wrong terms, a card is shown rather than quizzed. */
+const MIN_REAL_DISTRACTORS = 2;
+
 function shuffleArray(array) {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -100,12 +106,21 @@ class QueueService {
     return lists.flat();
   }
 
+  /**
+   * @param {object} opts
+   * @param {boolean} [opts.annotateStudyModes] — tag each tidbit with the stage
+   *   and question style the session player should use. Off by default: the
+   *   pre-built multiple-choice question is several hundred bytes and callers
+   *   like the notification scheduler put the whole tidbit in a size-capped
+   *   push payload. Turn it on for anything feeding StudySession.
+   */
   static async buildQueue({
     categoryIds = null,
     limit = 20,
     stageFilter = null,
     includeNew = true,
     newRatio = 0.4,
+    annotateStudyModes = false,
   } = {}) {
     const categories =
       categoryIds || (await StudyPlanService.resolveStudyCategories());
@@ -143,14 +158,109 @@ class QueueService {
 
     const selectedDue = dueItems.slice(0, dueLimit);
     const selectedNew = shuffleArray(newItems).slice(0, newLimit);
-    const combined = shuffleArray([...selectedDue, ...selectedNew]).map((item) => item.tidbit);
+
+    // Distractor candidates, grouped by class. Built from the cards already
+    // loaded above so annotating costs no extra fetches.
+    const poolByCategory = new Map();
+    if (annotateStudyModes) {
+      for (const card of eligible) {
+        const pool = poolByCategory.get(card.categoryId);
+        if (pool) pool.push(card);
+        else poolByCategory.set(card.categoryId, [card]);
+      }
+    }
+
+    const annotate = (item) => (annotateStudyModes
+      ? {
+        ...item,
+        tidbit: this._annotateStudyTidbit(item, poolByCategory.get(item.card.categoryId) || []),
+      }
+      : item);
+
+    const annotatedDue = selectedDue.map(annotate);
+    const annotatedNew = selectedNew.map(annotate);
+    const combined = shuffleArray([...annotatedDue, ...annotatedNew]).map((item) => item.tidbit);
 
     return {
-      due: selectedDue.map((i) => i.tidbit),
-      fresh: selectedNew.map((i) => i.tidbit),
+      due: annotatedDue.map((i) => i.tidbit),
+      fresh: annotatedNew.map((i) => i.tidbit),
       combined,
       dueStates: selectedDue,
     };
+  }
+
+  /**
+   * Mode ladder for focused study sessions.
+   *
+   * A session's job is to introduce material and then build memory for it, so
+   * the question gets harder as the card climbs the stage ladder rather than
+   * asking for blank-page recall of something the user has never met:
+   *   new         -> flashcard, self-rated (this is the introduction)
+   *   introduced  -> multiple choice (recognition)
+   *   beyond that -> typed recall
+   */
+  static studyModeForStage(stage) {
+    if (stage === 'new') return 'flashcard';
+    if (stage === 'introduced') return 'quiz';
+    return 'recall';
+  }
+
+  /**
+   * Tag a queue item with the mode the session player should use, pre-building
+   * the multiple-choice question while the distractor pool is still in hand.
+   *
+   * The daily plan persists what this returns, so a card promoted later the
+   * same day is asked at the mode it had when the plan was built. That errs
+   * toward the easier question, which is the harmless direction.
+   */
+  static _annotateStudyTidbit(item, categoryCards) {
+    const stage = item.kind === 'due' ? effectiveStage(item.state) : 'new';
+    let studyMode = this.studyModeForStage(stage);
+
+    // Both graded modes ask for the term. With no term there is nothing to
+    // ask, so the card is simply shown.
+    if (!item.tidbit.term) studyMode = 'flashcard';
+
+    let question = null;
+    if (studyMode === 'quiz') {
+      question = this._buildTermQuestion(item.card, categoryCards);
+      if (!question) studyMode = 'flashcard';
+    }
+
+    return { ...item.tidbit, stage, studyMode, question };
+  }
+
+  /**
+   * Definition-prompt multiple choice: the stem is the definition and the
+   * options are terms, the same direction the recall step later asks in.
+   * QuizService reads front as the prompt and back as the answer, so the cards
+   * handed to it are deliberately flipped.
+   *
+   * Candidates are sampled rather than passed whole: buildQuestions builds a
+   * question per card in the pool and we only keep the first, so handing it a
+   * 500-card class would do 500x the work for one question.
+   */
+  static _buildTermQuestion(card, categoryCards) {
+    const flip = (c) => ({
+      id: c.id,
+      front: (c.back || '').trim(),
+      back: (c.front || '').trim(),
+    });
+    const self = flip(card);
+    if (!self.front || !self.back) return null;
+
+    const candidates = categoryCards
+      .filter((c) => c.id !== card.id)
+      .map(flip)
+      .filter((c) => c.back && c.back !== self.back);
+    // Too few real terms to choose between and QuizService pads the options
+    // with "None of the above" filler, which makes the answer obvious and the
+    // introduction worthless. Better to show the card than to fake a question.
+    if (new Set(candidates.map((c) => c.back)).size < MIN_REAL_DISTRACTORS) return null;
+
+    const sampled = shuffleArray(candidates).slice(0, DISTRACTOR_SAMPLE_SIZE);
+    const [question] = QuizService.buildQuestions([self, ...sampled], { preserveOrder: true });
+    return question || null;
   }
 
   static async buildCardsForLearnMode(

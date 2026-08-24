@@ -18,9 +18,12 @@ import { StudyPlanService } from '../services/StudyPlanService';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
 import { RecallService } from '../services/RecallService';
+import { QuizService } from '../services/QuizService';
 import { useTheme } from '../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
+
+const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 function formatCategoryName(category) {
   if (!category) return 'Tidbit';
@@ -28,6 +31,25 @@ function formatCategoryName(category) {
     .split('-')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+}
+
+/**
+ * Which question style this card gets. QueueService decides it from the card's
+ * stage; the fallback covers tidbits from a plan built before it did — those
+ * behave the way they always have.
+ */
+function studyModeFor(tidbit) {
+  const mode = tidbit?.studyMode;
+  // A quiz with no question survived a class too small for real distractors.
+  if (mode === 'quiz') return tidbit.question ? 'quiz' : 'flashcard';
+  if (mode === 'recall' || mode === 'flashcard') return mode;
+  return tidbit?.term ? 'recall' : 'flashcard';
+}
+
+function modeLabelFor(tidbit, mode) {
+  if (mode === 'quiz') return 'Multiple choice';
+  if (mode === 'recall') return 'Recall';
+  return tidbit?.stage && tidbit.stage !== 'new' ? 'Review' : 'New';
 }
 
 export default function StudySessionScreen({ route, navigation }) {
@@ -41,6 +63,8 @@ export default function StudySessionScreen({ route, navigation }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [userAnswer, setUserAnswer] = useState('');
   const [recallResult, setRecallResult] = useState(null);
+  const [chosenOption, setChosenOption] = useState(null);
+  const [quizResult, setQuizResult] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const flipAnim = useRef(new Animated.Value(0)).current;
 
@@ -93,6 +117,8 @@ export default function StudySessionScreen({ route, navigation }) {
         setIsFlipped(false);
         setUserAnswer('');
         setRecallResult(null);
+        setChosenOption(null);
+        setQuizResult(null);
         flipAnim.setValue(0);
       } else {
         // No more tidbits, session complete
@@ -113,8 +139,25 @@ export default function StudySessionScreen({ route, navigation }) {
         : Haptics.NotificationFeedbackType.Error,
     ).catch(() => {});
     setTimeout(() => {
-      handleTidbitAction(graded.isCorrect ? 'knew' : 'didnt');
+      handleTidbitAction(graded.isCorrect ? 'knew' : 'didnt', 'recall');
     }, 900);
+  };
+
+  const handleQuizChoose = (optionIndex) => {
+    if (quizResult || !currentTidbit?.question) return;
+    const res = QuizService.checkAnswer(currentTidbit.question, optionIndex);
+    setChosenOption(optionIndex);
+    setQuizResult(res);
+    Haptics.notificationAsync(
+      res.correct
+        ? Haptics.NotificationFeedbackType.Success
+        : Haptics.NotificationFeedbackType.Error,
+    ).catch(() => {});
+    // Longer than the recall pause: a wrong pick needs time to read the
+    // highlighted answer before the card is replaced.
+    setTimeout(() => {
+      handleTidbitAction(res.correct ? 'knew' : 'didnt', 'quiz');
+    }, 1200);
   };
 
   const handleFlip = () => {
@@ -131,7 +174,7 @@ export default function StudySessionScreen({ route, navigation }) {
     });
   };
 
-  const handleTidbitAction = async (action) => {
+  const handleTidbitAction = async (action, mode = 'session') => {
     if (!currentTidbit?.id) return;
 
     try {
@@ -150,7 +193,8 @@ export default function StudySessionScreen({ route, navigation }) {
       // Record feedback
       const updatedSession = await StudySessionService.recordTidbitFeedback(
         currentTidbit.id,
-        serviceAction
+        serviceAction,
+        { mode }
       );
 
       if (updatedSession) {
@@ -291,6 +335,9 @@ export default function StudySessionScreen({ route, navigation }) {
               onChangeAnswer={setUserAnswer}
               recallResult={recallResult}
               onRecallSubmit={handleRecallSubmit}
+              chosenOption={chosenOption}
+              quizResult={quizResult}
+              onQuizChoose={handleQuizChoose}
               styles={styles}
             />
           ) : (
@@ -316,17 +363,64 @@ function StudyTidbitCard({
   onChangeAnswer,
   recallResult,
   onRecallSubmit,
+  chosenOption,
+  quizResult,
+  onQuizChoose,
   styles,
 }) {
   const categoryName = formatCategoryName(tidbit.category);
-  const useRecall = Boolean(tidbit.term);
+  const mode = studyModeFor(tidbit);
+  const modeLabel = modeLabelFor(tidbit, mode);
 
-  if (useRecall) {
+  if (mode === 'quiz') {
+    const { question } = tidbit;
+    return (
+      <View style={styles.quizCardWrap}>
+        <View style={styles.staticCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.categoryLabel}>{categoryName}</Text>
+            <Text style={styles.modeBadge}>{modeLabel}</Text>
+          </View>
+          <Text style={styles.defLabel}>WHICH TERM FITS?</Text>
+          <Text style={styles.quizPrompt}>{question.question}</Text>
+          {question.options.map((opt, i) => {
+            const isCorrect = i === question.correctIndex;
+            const isChosen = i === chosenOption;
+            const revealed = quizResult !== null;
+            return (
+              <TouchableOpacity
+                key={`${i}-${opt}`}
+                style={[
+                  styles.optionRow,
+                  revealed && isCorrect && styles.optionCorrect,
+                  revealed && isChosen && !isCorrect && styles.optionWrong,
+                ]}
+                onPress={() => onQuizChoose(i)}
+                disabled={revealed}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.optionLetter}>{OPTION_LABELS[i]}</Text>
+                <Text style={styles.optionText}>{opt}</Text>
+              </TouchableOpacity>
+            );
+          })}
+          {quizResult && (
+            <Text style={quizResult.correct ? styles.recallOk : styles.recallBad}>
+              {quizResult.correct ? 'Correct' : `Answer: ${question.correct}`}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  }
+
+  if (mode === 'recall') {
     return (
       <View style={styles.cardContainer}>
         <View style={[styles.card, styles.cardFront]}>
           <View style={styles.cardHeader}>
             <Text style={styles.categoryLabel}>{categoryName}</Text>
+            <Text style={styles.modeBadge}>{modeLabel}</Text>
           </View>
           <Text style={styles.defLabel}>DEFINITION</Text>
           <Text style={styles.tidbitText}>{tidbit.text}</Text>
@@ -383,6 +477,7 @@ function StudyTidbitCard({
       >
         <View style={styles.cardHeader}>
           <Text style={styles.categoryLabel}>{categoryName}</Text>
+          <Text style={styles.modeBadge}>{modeLabel}</Text>
         </View>
         <TouchableOpacity
           style={styles.tidbitContent}
@@ -541,15 +636,90 @@ const makeStyles = (theme) => StyleSheet.create({
   cardBack: {
     backgroundColor: theme.background,
   },
+  quizCardWrap: {
+    width: width - 40,
+    maxWidth: 400,
+  },
+  // Grows with its content instead of being pinned inside a fixed-height
+  // container — a long definition plus four options will not fit 420pt.
+  staticCard: {
+    minHeight: 420,
+    backgroundColor: theme.card,
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
   cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
+    gap: 8,
   },
   categoryLabel: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '600',
     color: '#6366f1',
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  modeBadge: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: theme.textSecondary,
+    backgroundColor: theme.background,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+  quizPrompt: {
+    fontSize: 18,
+    lineHeight: 27,
+    color: theme.text,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    backgroundColor: theme.background,
+  },
+  optionCorrect: {
+    borderColor: '#10b981',
+    backgroundColor: '#f0fdf4',
+  },
+  optionWrong: {
+    borderColor: '#dc2626',
+    backgroundColor: '#fef2f2',
+  },
+  optionLetter: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#6366f1',
+    width: 16,
+  },
+  optionText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 21,
+    color: theme.text,
+    fontWeight: '500',
   },
   tidbitContent: {
     flex: 1,

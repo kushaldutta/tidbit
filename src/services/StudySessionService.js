@@ -66,9 +66,12 @@ class StudySessionService {
    * Record feedback for a tidbit in the current session
    * @param {string} tidbitId - Tidbit ID
    * @param {string} action - 'knew', 'didnt_know', or 'save'
+   * @param {{ mode?: 'session'|'quiz'|'recall' }} options - how the answer was
+   *   obtained. 'session' is a self-report and only ever introduces a card;
+   *   'quiz' and 'recall' are graded answers and move it up the stage ladder.
    * @returns {Promise<Object>} Updated session
    */
-  static async recordTidbitFeedback(tidbitId, action) {
+  static async recordTidbitFeedback(tidbitId, action, { mode = 'session' } = {}) {
     try {
       const session = await this.getCurrentSession();
       if (!session) {
@@ -81,8 +84,8 @@ class StudySessionService {
 
       if (action === 'knew' || action === 'didnt_know') {
         const wasCorrect = action === 'knew';
-        CardLearningService.recordReview(tidbitId, { wasCorrect, mode: 'session' }).catch(() => {});
-        SameBoatService.recordAttempt(tidbitId, wasCorrect, 'session').catch(() => {});
+        CardLearningService.recordReview(tidbitId, { wasCorrect, mode }).catch(() => {});
+        SameBoatService.recordAttempt(tidbitId, wasCorrect, mode).catch(() => {});
       }
 
       // Update session stats
