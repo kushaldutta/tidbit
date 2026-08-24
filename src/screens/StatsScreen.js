@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,6 +12,9 @@ import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from '../services/AuthService';
 import { StreakService } from '../services/StreakService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import NavRow from '../components/NavRow';
+import { spacing, radius, type, iconSize } from '../theme/tokens';
 
 function pct(n, total) {
   return total > 0 ? Math.round((n / total) * 100) : 0;
@@ -45,16 +47,30 @@ function BarChart({ data, color, labelStyle }) {
 }
 
 const barStyles = StyleSheet.create({
-  wrap: { flexDirection: 'row', alignItems: 'flex-end', gap: 6, paddingTop: 8 },
+  wrap: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm, paddingTop: spacing.sm },
   col: { flex: 1, alignItems: 'center' },
   barWrap: { height: 80, justifyContent: 'flex-end', width: '100%', alignItems: 'center' },
-  bar: { width: '70%', borderRadius: 4 },
+  bar: { width: '70%', borderRadius: radius.sm / 2 },
 });
 
-function StatCard({ title, children, styles }) {
+/** One overview tile — same icon/value/label shape as the stat tiles on Home. */
+function OverviewTile({ icon, value, label, tone, filled, styles }) {
+  return (
+    <View style={styles.overviewCard}>
+      <Icon name={icon} size={iconSize.sm} color={tone} filled={filled} />
+      <Text style={styles.overviewValue}>{value}</Text>
+      <Text style={styles.overviewLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function StatCard({ icon, title, children, styles, theme }) {
   return (
     <View style={styles.statCard}>
-      <Text style={styles.statCardTitle}>{title}</Text>
+      <View style={styles.statCardHeader}>
+        <Icon name={icon} size={iconSize.md} color={theme.textSecondary} style={styles.statCardIcon} />
+        <Text style={styles.statCardTitle}>{title}</Text>
+      </View>
       {children}
     </View>
   );
@@ -73,7 +89,7 @@ function MasteryBar({ label, value, total, color, styles }) {
   );
 }
 
-function AnalyticsContent({ navigation }) {
+export default function StatsScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -182,12 +198,13 @@ function AnalyticsContent({ navigation }) {
   if (!stats) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.topBar}>
-          <Text style={styles.headerTitle}>Analytics</Text>
-        </View>
-        <View style={styles.center}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Analytics</Text>
+            <Text style={styles.subtitle}>Last 30 days</Text>
+          </View>
           <Text style={styles.emptyNote}>Analytics unavailable — sign in and try again.</Text>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -196,68 +213,80 @@ function AnalyticsContent({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <Text style={styles.headerTitle}>Analytics</Text>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.overviewRow}>
-          {[
-            { label: 'Streak', value: `${s.currentStreak || 0}d`, emoji: '🔥' },
-            { label: 'Tidbits seen', value: s.tidbitsSeen, emoji: '👁️' },
-            { label: 'Cards mastered', value: s.cardsMastered, emoji: '🏆' },
-            { label: 'Accuracy (30d)', value: `${s.accuracy}%`, emoji: '🎯' },
-          ].map((item) => (
-            <View key={item.label} style={styles.overviewCard}>
-              <Text style={styles.overviewEmoji}>{item.emoji}</Text>
-              <Text style={styles.overviewValue}>{item.value}</Text>
-              <Text style={styles.overviewLabel}>{item.label}</Text>
-            </View>
-          ))}
+        <View style={styles.header}>
+          <Text style={styles.title}>Analytics</Text>
+          <Text style={styles.subtitle}>Last 30 days</Text>
         </View>
 
-        <StatCard title="⏱ Retention Forecast" styles={styles}>
-          <View style={styles.retentionWrap}>
-            <Text style={styles.retentionValue}>{s.retention}</Text>
-            <Text style={styles.retentionSub}>
-              Based on your {s.accuracy}% accuracy over {s.totalAttempts} attempts in the last 30 days.
-              {s.accuracy >= 70
-                ? ' You\'re retaining material well.'
-                : ' More practice will push this further.'}
-            </Text>
-          </View>
+        <View style={styles.overviewRow}>
+          <OverviewTile
+            icon="streak"
+            value={`${s.currentStreak || 0}d`}
+            label="Streak"
+            // A live streak burns warm; a zero stays quiet, same as on Home.
+            tone={s.currentStreak > 0 ? theme.warning : theme.textMuted}
+            filled={s.currentStreak > 0}
+            styles={styles}
+          />
+          <OverviewTile
+            icon="seen"
+            value={String(s.tidbitsSeen)}
+            label="Tidbits seen"
+            tone={theme.primary}
+            styles={styles}
+          />
+          <OverviewTile
+            icon="mastered"
+            value={String(s.cardsMastered)}
+            label="Cards mastered"
+            tone={theme.primary}
+            styles={styles}
+          />
+          <OverviewTile
+            icon="accuracy"
+            value={`${s.accuracy}%`}
+            label="Accuracy"
+            tone={theme.primary}
+            styles={styles}
+          />
+        </View>
+
+        <StatCard icon="due" title="Retention Forecast" styles={styles} theme={theme}>
+          <Text style={styles.retentionValue}>{s.retention}</Text>
+          <Text style={styles.retentionSub}>
+            From {s.accuracy}% accuracy across {s.totalAttempts} attempts in the last 30 days.
+          </Text>
         </StatCard>
 
-        <StatCard title="📅 Daily Activity (last 7 days)" styles={styles}>
+        <StatCard icon="stats" title="Daily Activity" styles={styles} theme={theme}>
           {s.dailyData.every(d => d.value === 0) ? (
-            <Text style={styles.emptyNote}>No attempts recorded in the last 7 days.</Text>
+            <Text style={styles.emptyNote}>No attempts in the last 7 days.</Text>
           ) : (
             <BarChart data={s.dailyData} color={theme.primary} labelStyle={styles.barLabel} />
           )}
         </StatCard>
 
-        <StatCard title="🧠 Answer Accuracy" styles={styles}>
+        <StatCard icon="accuracy" title="Answer Accuracy" styles={styles} theme={theme}>
           <MasteryBar
             label="Correct"
             value={s.correctAttempts}
             total={s.totalAttempts}
-            color="#4ade80"
+            color={theme.success}
             styles={styles}
           />
           <MasteryBar
             label="Incorrect"
             value={s.totalAttempts - s.correctAttempts}
             total={s.totalAttempts}
-            color="#f87171"
+            color={theme.danger}
             styles={styles}
           />
-          <Text style={styles.attemptNote}>
-            {s.totalAttempts} total attempts in the last 30 days
-          </Text>
+          <Text style={styles.attemptNote}>{s.totalAttempts} attempts in the last 30 days</Text>
         </StatCard>
 
         {Object.keys(s.bySource).length > 0 && (
-          <StatCard title="📊 Activity by Mode" styles={styles}>
+          <StatCard icon="study" title="Activity by Mode" styles={styles} theme={theme}>
             {Object.entries(s.bySource).map(([src, count]) => (
               <MasteryBar
                 key={src}
@@ -271,84 +300,89 @@ function AnalyticsContent({ navigation }) {
           </StatCard>
         )}
 
-        <TouchableOpacity
-          style={styles.insightsCta}
-          onPress={() => navigation.navigate('Insights')}
-          activeOpacity={0.85}
-        >
-          <View style={styles.insightsCtaBody}>
-            <View style={styles.insightsCtaTitleRow}>
-              <Text style={styles.insightsCtaTitle}>Study Insights</Text>
-              <Text style={styles.insightsCtaArrow}>›</Text>
-            </View>
-            <Text style={styles.insightsCtaSub}>Exam-day forecast & weak spots — Premium</Text>
-          </View>
-        </TouchableOpacity>
-
-        <StatCard title="🤖 AI Generations" styles={styles}>
+        <StatCard icon="ai" title="AI Generations" styles={styles} theme={theme}>
           <Text style={styles.aiUsageText}>
             {s.aiGenerations} deck{s.aiGenerations !== 1 ? 's' : ''} generated with AI (all time)
           </Text>
         </StatCard>
+
+        <NavRow
+          icon="insights"
+          title="Study Insights"
+          sub="Exam-day forecast & weak spots — Premium"
+          onPress={() => navigation.navigate('Insights')}
+          tone="accent"
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-export default function StatsScreen({ navigation }) {
-  return <AnalyticsContent navigation={navigation} />;
-}
-
 const makeStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  topBar: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.primaryLight,
-    backgroundColor: theme.background,
-  },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
-  scroll: { padding: 20, paddingBottom: 60 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
+  scroll: { padding: spacing.xl, paddingBottom: spacing.xxxl },
 
-  overviewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  header: { marginBottom: spacing.xl },
+  title: { fontSize: 42, fontWeight: 'bold', color: theme.text, marginBottom: spacing.sm },
+  subtitle: { fontSize: 16, color: theme.textSecondary },
+
+  overviewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
   overviewCard: {
     flexGrow: 1,
-    flexBasis: '45%',
+    flexBasis: '44%',
     backgroundColor: theme.card,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.sm,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    gap: spacing.xs,
   },
-  overviewEmoji: { fontSize: 22, marginBottom: 6 },
-  overviewValue: { fontSize: 22, fontWeight: '900', color: theme.text, marginBottom: 2 },
-  overviewLabel: { fontSize: 10, color: theme.textSecondary, textAlign: 'center', fontWeight: '600' },
+  overviewValue: { ...type.stat, color: theme.text },
+  overviewLabel: {
+    ...type.overline,
+    color: theme.textSecondary,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+  },
 
   statCard: {
     backgroundColor: theme.card,
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
   },
-  statCardTitle: { fontSize: 13, fontWeight: '800', color: theme.text, marginBottom: 12 },
+  statCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  statCardIcon: { marginRight: spacing.sm },
+  statCardTitle: { fontSize: 16, fontWeight: '600', color: theme.text },
 
-  retentionWrap: {},
-  retentionValue: { fontSize: 28, fontWeight: '900', color: theme.primary, marginBottom: 6 },
-  retentionSub: { fontSize: 13, color: theme.textSecondary, lineHeight: 20 },
+  retentionValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: theme.primary,
+    marginBottom: spacing.xs,
+  },
+  retentionSub: { fontSize: 13, color: theme.textSecondary, lineHeight: 19 },
 
-  masteryRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  masteryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
   masteryLabel: {
     fontSize: 12,
     color: theme.textSecondary,
@@ -359,35 +393,21 @@ const makeStyles = (theme) => StyleSheet.create({
   masteryTrack: {
     flex: 1,
     height: 8,
-    backgroundColor: theme.primaryLight,
-    borderRadius: 4,
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: radius.sm / 2,
     overflow: 'hidden',
   },
-  masteryFill: { height: 8, borderRadius: 4 },
-  masteryPct: { fontSize: 12, color: theme.text, fontWeight: '700', width: 34, textAlign: 'right' },
-
-  attemptNote: { fontSize: 11, color: theme.textSecondary, marginTop: 6 },
-  emptyNote: { fontSize: 13, color: theme.textSecondary, fontStyle: 'italic', textAlign: 'center' },
-  aiUsageText: { fontSize: 15, color: theme.text, fontWeight: '500' },
-  barLabel: { fontSize: 10, color: theme.textSecondary, marginTop: 4, textAlign: 'center' },
-  insightsCta: {
-    backgroundColor: theme.primary,
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 14,
-  },
-  insightsCtaBody: { flex: 1 },
-  insightsCtaTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  insightsCtaTitle: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  insightsCtaSub: { fontSize: 13, color: '#c7d2fe', marginTop: 4 },
-  insightsCtaArrow: {
-    fontSize: 20,
-    color: '#c7d2fe',
+  masteryFill: { height: 8, borderRadius: radius.sm / 2 },
+  masteryPct: {
+    fontSize: 12,
+    color: theme.text,
     fontWeight: '700',
-    marginLeft: 6,
-    lineHeight: 20,
+    width: 34,
+    textAlign: 'right',
   },
+
+  attemptNote: { fontSize: 12, color: theme.textMuted, marginTop: spacing.xs },
+  emptyNote: { fontSize: 13, color: theme.textMuted, textAlign: 'center' },
+  aiUsageText: { fontSize: 15, color: theme.text },
+  barLabel: { fontSize: 10, color: theme.textSecondary, marginTop: spacing.xs, textAlign: 'center' },
 });
