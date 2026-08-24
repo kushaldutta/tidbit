@@ -25,6 +25,14 @@ function shuffleArray(array) {
 }
 
 /**
+ * Callers mutate the plan they receive (markPlanCompleted, updatePlanProgress),
+ * so every caller must get its own copy. Plans are small — a few KB at most.
+ */
+function clonePlan(plan) {
+  return plan ? JSON.parse(JSON.stringify(plan)) : null;
+}
+
+/**
  * Check if a date is today (same day, month, year)
  */
 function isToday(dateString) {
@@ -88,7 +96,36 @@ class StudyPlanService {
    * Mixes due tidbits (60%) with new tidbits (40%)
    * @returns {Promise<Object>} Study plan object
    */
+  /**
+   * In-flight generation, shared across concurrent callers.
+   *
+   * On a cold start HomeScreen triggers two loads in parallel. Both missed the
+   * cache, both ran a full queue build, and both wrote the same AsyncStorage
+   * key — visible in the logs as "Regenerating"/"Generating" twice with no
+   * navigation between them. Sharing the build collapses that to one.
+   *
+   * Only the generation is coalesced, NOT getDailyPlan: its cache-hit path must
+   * keep returning an independently parsed object, or the read-modify-write in
+   * markPlanCompleted / updatePlanProgress would mutate a shared instance.
+   */
+  static _generateInFlight = null;
+
   static async generateDailyPlan() {
+    if (this._generateInFlight) {
+      return clonePlan(await this._generateInFlight);
+    }
+
+    const task = this._buildDailyPlan();
+    this._generateInFlight = task;
+    try {
+      return clonePlan(await task);
+    } finally {
+      this._generateInFlight = null;
+    }
+  }
+
+  /** The actual build. Never throws — returns null on failure. */
+  static async _buildDailyPlan() {
     try {
       console.log('[STUDY_PLAN] Generating new daily plan...');
       

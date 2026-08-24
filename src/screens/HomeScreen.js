@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
 import { CardLearningService } from '../services/CardLearningService';
@@ -28,6 +29,13 @@ import CoinBalanceChip from '../components/CoinBalanceChip';
 import BuddyRequestsCard from '../components/BuddyRequestsCard';
 import Icon from '../components/Icon';
 import { spacing, radius, type, elevation, iconSize } from '../theme/tokens';
+
+// ─── TEMPORARY DIAGNOSTIC — remove once the double-load is understood ────────
+// Distinguishes the three things that can trigger a Home data load, so the logs
+// say WHICH one fired rather than just showing doubled work.
+let __homeFocusEvents = 0;
+let __homeStatsEvents = 0;
+// ─────────────────────────────────────────────────────────────────────────────
 
 function StatTile({ icon, value, label, tone, filled, muted, styles, onPress }) {
   return (
@@ -60,25 +68,36 @@ export default function HomeScreen({ navigation }) {
   const [homeInsight, setHomeInsight] = useState(null);
   const [upcomingExam, setUpcomingExam] = useState(null);
 
-  useEffect(() => {
-    loadData();
-    loadDevMode();
-    loadStudyPlan();
-    loadCategoryProgress();
-    const unsubscribe = navigation.addListener('focus', () => {
+  // Reload whenever Home gains focus, including the initial mount.
+  //
+  // This used to be a mount effect that ran all four loaders AND registered a
+  // navigation 'focus' listener that ran the same four. The listener fires at
+  // mount too, so every cold start did the whole load twice — two plan reads,
+  // two enrollment syncs, two queue builds. Confirmed from logs: one
+  // "effect run #1" immediately followed by "focus event #1".
+  //
+  // useFocusEffect covers both cases with a single trigger, and matches what
+  // ReviewQueueScreen / GamesScreen already do.
+  useFocusEffect(
+    useCallback(() => {
+      __homeFocusEvents += 1;
+      console.log(`[HOME_DIAG] focus load #${__homeFocusEvents}`);
       loadData();
       loadDevMode();
       loadStudyPlan();
       loadCategoryProgress();
-    });
+    }, []),
+  );
+
+  // Stays subscribed for the screen's whole life, not just while focused.
+  useEffect(() => {
     const statsSub = DeviceEventEmitter.addListener('statsUpdated', () => {
+      __homeStatsEvents += 1;
+      console.log(`[HOME_DIAG] statsUpdated event #${__homeStatsEvents} -> loadData`);
       loadData();
     });
-    return () => {
-      unsubscribe();
-      statsSub.remove();
-    };
-  }, [navigation]);
+    return () => statsSub.remove();
+  }, []);
 
   const loadDevMode = async () => {
     const enabled = await StorageService.getDevModeEnabled();

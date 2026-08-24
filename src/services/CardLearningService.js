@@ -724,24 +724,39 @@ class CardLearningService {
   static async pruneUnresolvableStates(contentIds) {
     if (!contentIds?.length) return 0;
 
-    const keys = [];
-    let pruned = 0;
-
+    const candidates = [];
     for (const id of new Set(contentIds)) {
       if (!id || isUuid(id)) continue;
       const state = await this.getState(id);
       if (state?.isSaved) continue;
+      candidates.push(id);
+    }
+    if (!candidates.length) return 0;
+
+    // Report what was actually deleted, not what was considered. Concurrent
+    // callers can compute the same candidate list from the same pre-prune
+    // snapshot, and multiRemove on an already-removed key is a silent no-op —
+    // counting candidates made the log overstate the real figure.
+    const keys = [];
+    for (const id of candidates) {
       keys.push(localKey(id));
       keys.push(`${LEGACY_SR_PREFIX}${id}`);
-      pruned += 1;
     }
 
-    if (!keys.length) return 0;
-
     try {
-      await AsyncStorage.multiRemove(keys);
-      console.log(`[CardLearning] Pruned ${pruned} unresolvable state(s)`);
-      return pruned;
+      const existing = (await AsyncStorage.multiGet(keys))
+        .filter(([, raw]) => raw != null)
+        .map(([key]) => key);
+      if (!existing.length) return 0;
+
+      await AsyncStorage.multiRemove(existing);
+
+      // One state may own up to two keys, so count distinct content ids.
+      const removedIds = new Set(
+        existing.map((k) => k.replace(LOCAL_PREFIX, '').replace(LEGACY_SR_PREFIX, '')),
+      );
+      console.log(`[CardLearning] Pruned ${removedIds.size} unresolvable state(s)`);
+      return removedIds.size;
     } catch (e) {
       console.warn('[CardLearning] prune failed:', e.message);
       return 0;
