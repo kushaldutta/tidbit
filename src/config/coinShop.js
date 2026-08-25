@@ -11,7 +11,7 @@ export const SHOP_ITEMS = {
     id: SHOP_ITEM.THEME_SUNSET,
     kind: 'theme',
     themeId: 'sunset',
-    emoji: '🌅',
+    icon: 'palette',
     title: 'Sunset theme',
     blurb: 'Warm colors for late-night sessions',
     cost: 80,
@@ -19,9 +19,9 @@ export const SHOP_ITEMS = {
 };
 
 export const COMING_SOON_ITEMS = [
-  { emoji: '🖼️', title: 'Avatar frame', cost: 50, blurb: 'Shows next to your name in class' },
-  { emoji: '❤️', title: 'Duel extra life', cost: 40, blurb: 'One miss forgiven in Speed Duel' },
-  { emoji: '🏅', title: 'Custom title', cost: 100, blurb: 'A badge on the class feed' },
+  { icon: 'profile', title: 'Avatar frame', cost: 50, blurb: 'Shows next to your name in class' },
+  { icon: 'speedDuel', title: 'Duel extra life', cost: 40, blurb: 'One miss forgiven in Speed Duel' },
+  { icon: 'trophy', title: 'Custom title', cost: 100, blurb: 'A badge on the class feed' },
 ];
 
 /** Classic is always free. Coin-unlockable ids. Everything else is Premium. */

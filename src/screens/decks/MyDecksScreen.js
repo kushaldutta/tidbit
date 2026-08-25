@@ -13,6 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { DeckService } from '../../services/DeckService';
 import { useTheme } from '../../context/ThemeContext';
+import Icon from '../../components/Icon';
+import NavRow from '../../components/NavRow';
+import { spacing, radius, iconSize } from '../../theme/tokens';
 
 export default function MyDecksScreen({ navigation }) {
   const { theme } = useTheme();
@@ -105,7 +108,7 @@ export default function MyDecksScreen({ navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color="#6366f1" />
+        <ActivityIndicator color={theme.primary} />
       </SafeAreaView>
     );
   }
@@ -144,7 +147,7 @@ export default function MyDecksScreen({ navigation }) {
           }
           activeOpacity={0.85}
         >
-          <Text style={styles.createCardEmoji}>＋</Text>
+          <Icon name="add" size={iconSize.lg} color={theme.primary} style={styles.createCardIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.createCardTitle}>Create a deck</Text>
             <Text style={styles.createCardSubtitle}>
@@ -233,31 +236,19 @@ export default function MyDecksScreen({ navigation }) {
             <Text style={styles.subtitle}>
               Your custom decks and curated preset decks for your classes.
             </Text>
-            {/* AI generation entry point */}
-            <TouchableOpacity
-              style={styles.aiBtn}
+            <NavRow
+              icon="ai"
+              title="Generate with AI"
+              sub="Turn a topic or notes into a full deck"
               onPress={() => navigation.navigate('AIGeneration')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.aiBtnEmoji}>🤖</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.aiBtnTitle}>Generate with AI</Text>
-                <Text style={styles.aiBtnSub}>Turn a topic or notes into a full deck instantly</Text>
-              </View>
-              <Text style={styles.aiBtnArrow}>›</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.aiBtn, { backgroundColor: '#1a0a2e', marginTop: 10 }]}
+              tone="accent"
+            />
+            <NavRow
+              icon="snap"
+              title="Snap-a-Page"
+              sub="Photograph your notes to get flashcards"
               onPress={() => navigation.navigate('SnapPage')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.aiBtnEmoji}>📸</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.aiBtnTitle}>Snap-a-Page</Text>
-                <Text style={styles.aiBtnSub}>Photo your notes → instant flashcards</Text>
-              </View>
-              <Text style={styles.aiBtnArrow}>›</Text>
-            </TouchableOpacity>
+            />
           </View>
         }
       />
@@ -267,91 +258,80 @@ export default function MyDecksScreen({ navigation }) {
 
 const makeStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.background },
-  list: { padding: 16, paddingBottom: 48 },
-  header: { marginBottom: 8 },
-  title: { fontSize: 28, fontWeight: '700', color: theme.text },
-  subtitle: { fontSize: 14, color: theme.textSecondary, marginTop: 4, marginBottom: 16 },
-  aiBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#0f0a2e', borderRadius: 16, padding: 16, marginTop: 4,
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.background,
   },
-  aiBtnEmoji: { fontSize: 28 },
-  aiBtnTitle: { fontSize: 15, fontWeight: '800', color: '#fff', marginBottom: 2 },
-  aiBtnSub: { fontSize: 12, color: '#a5b4fc' },
-  aiBtnArrow: { fontSize: 24, color: '#a5b4fc', fontWeight: '700' },
+  list: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+
+  header: { marginBottom: spacing.sm },
+  title: { fontSize: 42, fontWeight: 'bold', color: theme.text, marginBottom: spacing.sm },
+  subtitle: { fontSize: 16, color: theme.textSecondary, marginBottom: spacing.xl },
+
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginTop: 24,
-    marginBottom: 12,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: theme.text,
+    color: theme.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  sectionCount: { fontSize: 13, color: theme.textSecondary, fontWeight: '600' },
+  sectionCount: { fontSize: 13, color: theme.textMuted, fontWeight: '600' },
+
   deckCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.card,
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 10,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
   },
-  deckCardMain: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  deckActions: {
-    flexDirection: 'column',
-    gap: 6,
-    marginLeft: 8,
-  },
+  deckCardMain: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  deckActions: { flexDirection: 'column', gap: spacing.sm, marginLeft: spacing.sm },
   learnBtn: {
-    backgroundColor: '#6366f1',
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    backgroundColor: theme.primary,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
-  learnBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  learnBtnText: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
   deleteBtn: {
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderWidth: 1,
-    borderColor: '#fca5a5',
-    backgroundColor: '#fef2f2',
+    borderColor: theme.danger,
+    backgroundColor: theme.dangerBg,
   },
-  deleteBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '600' },
-  deckEmoji: { fontSize: 32, marginRight: 14 },
+  deleteBtnText: { color: theme.danger, fontSize: 12, fontWeight: '600' },
+  // Deck cover emoji are user-chosen content, not UI icons — they stay emoji.
+  deckEmoji: { fontSize: 32, marginRight: spacing.lg },
   deckTitle: { fontSize: 16, fontWeight: '600', color: theme.text },
   deckDescription: { fontSize: 13, color: theme.textSecondary, marginTop: 2 },
-  deckMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 4 },
+  deckMeta: { fontSize: 12, color: theme.textMuted, marginTop: spacing.xs },
+
   createCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#eef2ff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 10,
+    backgroundColor: theme.primaryLight,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    marginBottom: spacing.md,
     borderWidth: 1.5,
-    borderColor: '#c7d2fe',
+    borderColor: theme.accent,
     borderStyle: 'dashed',
   },
-  createCardEmoji: {
-    fontSize: 36,
-    color: '#6366f1',
-    marginRight: 14,
-    fontWeight: '300',
-  },
-  createCardTitle: { fontSize: 16, fontWeight: '600', color: '#4338ca' },
-  createCardSubtitle: { fontSize: 13, color: '#6366f1', marginTop: 2 },
+  createCardIcon: { marginRight: spacing.md },
+  createCardTitle: { fontSize: 16, fontWeight: '600', color: theme.primary },
+  createCardSubtitle: { fontSize: 13, color: theme.primary, marginTop: 2 },
 });

@@ -135,7 +135,7 @@ export default function EditProfileScreen({ navigation }) {
                       schoolId === s.id && styles.optionChipTextActive,
                     ]}
                   >
-                    {s.emoji} {s.label}
+                    {s.label}
                   </Text>
                 </TouchableOpacity>
               ))}

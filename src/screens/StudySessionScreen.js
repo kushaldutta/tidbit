@@ -20,6 +20,8 @@ import { StorageService } from '../services/StorageService';
 import { RecallService } from '../services/RecallService';
 import { QuizService } from '../services/QuizService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 const { width, height } = Dimensions.get('window');
 
@@ -251,7 +253,7 @@ export default function StudySessionScreen({ route, navigation }) {
     return (
       <View style={styles.container}>
         <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>🎉 Session Complete!</Text>
+          <Text style={styles.summaryTitle}>Session complete</Text>
           
           <View style={styles.summaryStats}>
             <View style={styles.summaryStatCard}>
@@ -339,6 +341,7 @@ export default function StudySessionScreen({ route, navigation }) {
               quizResult={quizResult}
               onQuizChoose={handleQuizChoose}
               styles={styles}
+              theme={theme}
             />
           ) : (
             <View style={styles.loadingContainer}>
@@ -367,6 +370,7 @@ function StudyTidbitCard({
   quizResult,
   onQuizChoose,
   styles,
+  theme,
 }) {
   const categoryName = formatCategoryName(tidbit.category);
   const mode = studyModeFor(tidbit);
@@ -435,7 +439,7 @@ function StudyTidbitCard({
               <TextInput
                 style={styles.recallInput}
                 placeholder="Type the term…"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={theme.textMuted}
                 value={userAnswer}
                 onChangeText={onChangeAnswer}
                 autoCapitalize="none"
@@ -526,14 +530,16 @@ function StudyTidbitCard({
             style={[styles.actionButton, styles.actionButtonKnew]}
             onPress={() => onAction('knew')}
           >
-            <Text style={styles.actionButtonText}>✅ I knew it</Text>
+            <Icon name="check" size={iconSize.md} color={theme.success} filled />
+            <Text style={styles.actionButtonText}>I knew it</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonDidnt]}
             onPress={() => onAction('didnt')}
           >
-            <Text style={styles.actionButtonText}>❓ I didn't</Text>
+            <Icon name="wrong" size={iconSize.md} color={theme.warning} />
+            <Text style={styles.actionButtonText}>I didn't</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -562,7 +568,7 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingBottom: 16,
     backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: theme.border,
   },
   closeHeaderButton: {
     position: 'absolute',
@@ -571,14 +577,14 @@ const makeStyles = (theme) => StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: theme.surfaceAlt,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
   },
   closeHeaderText: {
     fontSize: 18,
-    color: '#6b7280',
+    color: theme.textSecondary,
     fontWeight: '600',
   },
   progressContainer: {
@@ -593,13 +599,13 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.border,
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 3,
   },
   studyArea: {
@@ -664,7 +670,7 @@ const makeStyles = (theme) => StyleSheet.create({
     flexShrink: 1,
     fontSize: 12,
     fontWeight: '600',
-    color: '#6366f1',
+    color: theme.primary,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -701,17 +707,17 @@ const makeStyles = (theme) => StyleSheet.create({
     backgroundColor: theme.background,
   },
   optionCorrect: {
-    borderColor: '#10b981',
-    backgroundColor: '#f0fdf4',
+    borderColor: theme.success,
+    backgroundColor: theme.successBg,
   },
   optionWrong: {
-    borderColor: '#dc2626',
-    backgroundColor: '#fef2f2',
+    borderColor: theme.danger,
+    backgroundColor: theme.dangerBg,
   },
   optionLetter: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#6366f1',
+    color: theme.primary,
     width: 16,
   },
   optionText: {
@@ -760,8 +766,8 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   lockBtnDisabled: { opacity: 0.4 },
   lockBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  recallOk: { color: '#16a34a', fontWeight: '800', fontSize: 16, textAlign: 'center', marginTop: 12 },
-  recallBad: { color: '#dc2626', fontWeight: '800', fontSize: 16, textAlign: 'center', marginTop: 12 },
+  recallOk: { color: theme.success, fontWeight: '800', fontSize: 16, textAlign: 'center', marginTop: 12 },
+  recallBad: { color: theme.danger, fontWeight: '800', fontSize: 16, textAlign: 'center', marginTop: 12 },
   termText: {
     fontSize: 26,
     lineHeight: 34,
@@ -796,33 +802,32 @@ const makeStyles = (theme) => StyleSheet.create({
     marginTop: 'auto',
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: theme.border,
   },
   flipHintText: {
     fontSize: 14,
-    color: '#6366f1',
+    color: theme.primary,
     textAlign: 'center',
     fontWeight: '500',
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1.5,
   },
   actionButtonKnew: {
-    borderColor: '#10b981',
-    backgroundColor: '#f0fdf4',
+    borderColor: theme.success,
+    backgroundColor: theme.successBg,
   },
   actionButtonDidnt: {
-    borderColor: '#f59e0b',
-    backgroundColor: '#fffbeb',
+    borderColor: theme.warning,
+    backgroundColor: theme.warningBg,
   },
   actionButtonText: {
     fontSize: 16,
@@ -836,7 +841,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   flipBackText: {
     fontSize: 14,
-    color: '#6366f1',
+    color: theme.primary,
     textAlign: 'center',
     fontWeight: '500',
   },
@@ -881,7 +886,7 @@ const makeStyles = (theme) => StyleSheet.create({
   summaryStatNumber: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#6366f1',
+    color: theme.primary,
     marginBottom: 8,
   },
   summaryStatLabel: {
@@ -910,7 +915,7 @@ const makeStyles = (theme) => StyleSheet.create({
   accuracyValue: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#10b981',
+    color: theme.success,
   },
   closeButton: {
     backgroundColor: theme.primary,

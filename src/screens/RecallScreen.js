@@ -18,6 +18,8 @@ import { RecallService } from '../services/RecallService';
 import { SameBoatService } from '../services/SameBoatService';
 import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 // Default: show definition, user types the term. Future: user-selectable direction.
 const RECALL_WRITE_TERM = true;
@@ -37,21 +39,21 @@ function SameBoatBanner({ stat, styles, theme }) {
   const wrongPct = Math.round(100 - (stat.pctCorrect ?? 0));
   const rightPct = Math.round(stat.pctCorrect ?? 0);
 
-  let emoji, msg, bg, textColor;
+  let icon, msg, bg, textColor;
   if (wrongPct >= 60) {
-    emoji = '🤝'; msg = `${wrongPct}% of your classmates missed this too`;
+    icon = 'buddy'; msg = `${wrongPct}% of your classmates missed this too`;
     bg = theme.dangerBg; textColor = theme.dangerText;
   } else if (wrongPct >= 30) {
-    emoji = '📊'; msg = `${rightPct}% of classmates got this right`;
+    icon = 'stats'; msg = `${rightPct}% of classmates got this right`;
     bg = theme.warningBg; textColor = theme.warningText;
   } else {
-    emoji = '🏆'; msg = `${rightPct}% of classmates got this — nice work`;
+    icon = 'trophy'; msg = `${rightPct}% of classmates got this — nice work`;
     bg = theme.successBg; textColor = theme.successText;
   }
 
   return (
     <View style={[styles.sameBoat, { backgroundColor: bg }]}>
-      <Text style={styles.sameBoatEmoji}>{emoji}</Text>
+      <Icon name={icon} size={iconSize.md} color={textColor} style={styles.sameBoatIcon} />
       <View style={{ flex: 1 }}>
         <Text style={[styles.sameBoatMsg, { color: textColor }]}>{msg}</Text>
         <Text style={styles.sameBoatSub}>{stat.attempts} attempt{stat.attempts !== 1 ? 's' : ''}</Text>
@@ -264,7 +266,7 @@ export default function RecallScreen({ route, navigation }) {
   if (cards.length === 0) {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.emptyEmoji}>📭</Text>
+        <Icon name="check" size={iconSize.hero} color={theme.success} filled style={styles.emptyIcon} />
         <Text style={styles.emptyText}>This deck has no cards yet.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -280,10 +282,10 @@ export default function RecallScreen({ route, navigation }) {
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => { Speech.stop(); navigation.goBack(); }}>
-          <Text style={styles.exitText}>✕ Exit</Text>
+          <Text style={styles.exitText}>Exit</Text>
         </TouchableOpacity>
         <Text style={styles.progress}>{index + 1} / {cards.length}</Text>
-        <Text style={styles.scoreText}>✓ {score.correct}</Text>
+        <Text style={styles.scoreText}>{score.correct} correct</Text>
       </View>
 
       {/* Progress bar */}
@@ -293,7 +295,7 @@ export default function RecallScreen({ route, navigation }) {
 
       {/* Audio mode toggle */}
       <View style={styles.audioToggleRow}>
-        <Text style={styles.audioToggleLabel}>🔊 Audio mode</Text>
+        <Text style={styles.audioToggleLabel}>Audio mode</Text>
         <Switch
           value={audioMode}
           onValueChange={(v) => {
@@ -325,7 +327,7 @@ export default function RecallScreen({ route, navigation }) {
             {audioMode && (
               <TouchableOpacity style={styles.speakBtn} onPress={speakQuestion}>
                 <Text style={styles.speakBtnText}>
-                  {isSpeaking ? '🔊 Speaking…' : '🔊 Repeat'}
+                  {isSpeaking ? 'Speaking…' : 'Repeat'}
                 </Text>
               </TouchableOpacity>
             )}
@@ -352,10 +354,10 @@ export default function RecallScreen({ route, navigation }) {
             <View>
               <View style={[styles.gradeBanner, { borderColor: gradeColor() }]}>
                 <Text style={[styles.gradeText, { color: gradeColor() }]}>
-                  {gradeResult.grade === 'exact' && '✓ Perfect!'}
-                  {gradeResult.grade === 'close' && '✓ Close enough!'}
-                  {gradeResult.grade === 'partial' && '⚡ Almost — check spelling'}
-                  {gradeResult.grade === 'wrong' && '✗ Not quite'}
+                  {gradeResult.grade === 'exact' && 'Perfect'}
+                  {gradeResult.grade === 'close' && 'Close enough'}
+                  {gradeResult.grade === 'partial' && 'Almost — check spelling'}
+                  {gradeResult.grade === 'wrong' && 'Not quite'}
                 </Text>
                 <Text style={styles.yourAnswerLabel}>You wrote:</Text>
                 <Text style={styles.yourAnswerText}>{userAnswer}</Text>
@@ -385,7 +387,7 @@ export default function RecallScreen({ route, navigation }) {
                     styles.overrideBtnText,
                     gradeResult.isCorrect ? styles.overrideBtnTextWrong : styles.overrideBtnTextCorrect,
                   ]}>
-                    {gradeResult.isCorrect ? '✗ Actually I got it wrong' : '✓ Actually I got it right'}
+                    {gradeResult.isCorrect ? 'Actually I got it wrong' : 'Actually I got it right'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -394,7 +396,7 @@ export default function RecallScreen({ route, navigation }) {
 
               <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
                 <Text style={styles.nextBtnText}>
-                  {index + 1 < cards.length ? 'Next →' : 'See results'}
+                  {index + 1 < cards.length ? 'Next' : 'See results'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -511,7 +513,7 @@ const makeStyles = (theme) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     borderRadius: 14, padding: 14, marginBottom: 12,
   },
-  sameBoatEmoji: { fontSize: 24 },
+  sameBoatIcon: { fontSize: 24 },
   sameBoatMsg: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   sameBoatSub: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
@@ -550,7 +552,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   nextBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
+  emptyIcon: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 16, color: theme.textSecondary, marginBottom: 16 },
   backLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },
 });

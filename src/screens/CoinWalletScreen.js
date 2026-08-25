@@ -17,6 +17,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
 import { CoinService } from '../services/CoinService';
 import { SHOP_ITEMS, SHOP_ITEM, COMING_SOON_ITEMS } from '../config/coinShop';
+import Icon from '../components/Icon';
+import { spacing, radius, iconSize } from '../theme/tokens';
 
 function sourceLabel(type) {
   const map = {
@@ -128,14 +130,14 @@ export default function CoinWalletScreen({ navigation }) {
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ flex: 1 }} color="#d97706" />
+        <ActivityIndicator style={{ flex: 1 }} color={theme.warning} />
       ) : (
         <ScrollView
           contentContainerStyle={styles.scroll}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#d97706" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={theme.warning} />}
         >
           <View style={styles.hero}>
-            <Text style={styles.heroEmoji}>🪙</Text>
+            <Icon name="coins" size={iconSize.hero} color={theme.warningText} style={styles.heroIcon} />
             <Text style={styles.heroAmount}>{balance ?? 0}</Text>
             <Text style={styles.heroLabel}>Study Coins</Text>
             <Text style={styles.heroSub}>
@@ -144,14 +146,13 @@ export default function CoinWalletScreen({ navigation }) {
           </View>
 
           <Text style={styles.sectionTitle}>Shop</Text>
-          <Text style={styles.sectionSub}>Sunset is live. More cosmetics later.</Text>
           <TouchableOpacity
             style={styles.soonRow}
             onPress={buySunset}
             activeOpacity={0.85}
             disabled={buying}
           >
-            <Text style={styles.soonEmoji}>{sunset.emoji}</Text>
+            <Icon name={sunset.icon} size={iconSize.lg} color={theme.textSecondary} style={styles.soonIcon} />
             <View style={{ flex: 1 }}>
               <Text style={styles.soonTitle}>{sunset.title}</Text>
               <Text style={styles.soonBlurb}>{sunset.blurb}</Text>
@@ -163,13 +164,12 @@ export default function CoinWalletScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Coming soon</Text>
-          <Text style={styles.sectionSub}>Keep stacking. These unlock when the shop grows.</Text>
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Coming soon</Text>
           {COMING_SOON_ITEMS.map((item) => {
             const canAfford = (balance ?? 0) >= item.cost;
             return (
               <View key={item.title} style={styles.soonRow}>
-                <Text style={styles.soonEmoji}>{item.emoji}</Text>
+                <Icon name={item.icon} size={iconSize.lg} color={theme.textMuted} style={styles.soonIcon} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.soonTitle}>{item.title}</Text>
                   <Text style={styles.soonBlurb}>{item.blurb}</Text>
@@ -183,7 +183,7 @@ export default function CoinWalletScreen({ navigation }) {
             );
           })}
 
-          <Text style={[styles.sectionTitle, { marginTop: 22 }]}>Recent</Text>
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Recent</Text>
           {ledger.length === 0 ? (
             <Text style={styles.empty}>Play a Daily Challenge or Speed Duel to start earning.</Text>
           ) : (
@@ -212,79 +212,101 @@ const makeStyles = (theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: theme.primaryLight,
+    borderBottomColor: theme.border,
     backgroundColor: theme.card,
   },
   back: { fontSize: 16, fontWeight: '600', color: theme.primary, width: 56 },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: theme.text },
-  scroll: { padding: 16, paddingBottom: 40 },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 17,
+    fontWeight: '700',
+    color: theme.text,
+  },
+  scroll: { padding: spacing.xl, paddingBottom: spacing.xxxl },
+
   hero: {
-    backgroundColor: '#fffbeb',
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: theme.warningBg,
+    borderRadius: radius.md,
+    padding: spacing.xxl,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#fcd34d',
-    marginBottom: 22,
+    borderColor: theme.warning,
+    marginBottom: spacing.xxl,
   },
-  heroEmoji: { fontSize: 40, marginBottom: 6 },
-  heroAmount: { fontSize: 48, fontWeight: '900', color: '#92400e', fontVariant: ['tabular-nums'] },
-  heroLabel: { fontSize: 14, fontWeight: '800', color: '#b45309', letterSpacing: 0.6, marginTop: 2 },
+  heroIcon: { marginBottom: spacing.sm },
+  heroAmount: {
+    fontSize: 48,
+    fontWeight: '700',
+    color: theme.warningText,
+    fontVariant: ['tabular-nums'],
+  },
+  heroLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.warningText,
+    letterSpacing: 0.6,
+    marginTop: 2,
+  },
   heroSub: {
     fontSize: 13,
-    color: '#92400e',
+    color: theme.warningText,
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: spacing.md,
     lineHeight: 19,
-    opacity: 0.85,
   },
+
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
     color: theme.textSecondary,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: spacing.md,
   },
-  sectionSub: { fontSize: 13, color: theme.textSecondary, marginBottom: 12 },
+  sectionTitleSpaced: { marginTop: spacing.xl },
+
   soonRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.card,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
-    gap: 12,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  soonEmoji: { fontSize: 24 },
-  soonTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
+  soonIcon: { marginRight: spacing.md },
+  soonTitle: { fontSize: 15, fontWeight: '600', color: theme.text },
   soonBlurb: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+
   costPill: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     minWidth: 44,
     alignItems: 'center',
   },
-  costPillReady: { backgroundColor: '#fef3c7' },
-  costPillOwned: { backgroundColor: '#dcfce7' },
-  costText: { fontWeight: '800', color: '#6b7280' },
-  costTextReady: { color: '#92400e' },
-  costTextOwned: { color: '#166534' },
-  empty: { fontSize: 14, color: theme.textSecondary, marginTop: 8 },
+  costPillReady: { backgroundColor: theme.warningBg },
+  costPillOwned: { backgroundColor: theme.successBg },
+  costText: { fontWeight: '700', color: theme.textMuted },
+  costTextReady: { color: theme.warningText },
+  costTextOwned: { color: theme.successText },
+
+  empty: { fontSize: 14, color: theme.textMuted, marginTop: spacing.sm },
   ledgerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.primaryLight,
+    borderBottomColor: theme.border,
   },
   ledgerNote: { fontSize: 15, fontWeight: '600', color: theme.text },
   ledgerMeta: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
-  ledgerAmt: { fontSize: 16, fontWeight: '800', color: '#b45309' },
-  ledgerAmtSpend: { color: '#6b7280' },
+  ledgerAmt: { fontSize: 16, fontWeight: '700', color: theme.warningText },
+  ledgerAmtSpend: { color: theme.textMuted },
 });

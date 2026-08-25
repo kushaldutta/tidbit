@@ -17,6 +17,8 @@ import { RecallService } from '../services/RecallService';
 import { SameBoatService } from '../services/SameBoatService';
 import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -183,7 +185,7 @@ export default function ReviewSessionScreen({ route, navigation }) {
   if (items.length === 0) {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={styles.emptyEmoji}>📭</Text>
+        <Icon name="check" size={iconSize.hero} color={theme.success} filled style={styles.emptyIcon} />
         <Text style={styles.emptyText}>
           {topicDrill
             ? 'No cards in this topic yet.'
@@ -202,10 +204,10 @@ export default function ReviewSessionScreen({ route, navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕ Exit</Text>
+          <Text style={styles.exitText}>Exit</Text>
         </TouchableOpacity>
         <Text style={styles.progress}>{index + 1} / {items.length}</Text>
-        <Text style={styles.scoreText}>✓ {score.correct}</Text>
+        <Text style={styles.scoreText}>{score.correct} correct</Text>
       </View>
 
       <View style={styles.progressTrack}>
@@ -330,7 +332,7 @@ export default function ReviewSessionScreen({ route, navigation }) {
           {answered && (
             <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
               <Text style={styles.nextBtnText}>
-                {index + 1 < items.length ? 'Next →' : 'See results'}
+                {index + 1 < items.length ? 'Next' : 'See results'}
               </Text>
             </TouchableOpacity>
           )}
@@ -355,7 +357,7 @@ const makeStyles = (theme) => StyleSheet.create({
   scoreText: { fontSize: 15, fontWeight: '700', color: theme.primary },
   progressTrack: {
     height: 4,
-    backgroundColor: theme.primaryLight || '#e5e7eb',
+    backgroundColor: theme.border,
     marginHorizontal: 20,
     borderRadius: 2,
   },
@@ -363,7 +365,7 @@ const makeStyles = (theme) => StyleSheet.create({
   scroll: { padding: 20, paddingBottom: 40 },
   modeBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: theme.primaryLight || '#eef2ff',
+    backgroundColor: theme.primaryLight,
     color: theme.primary,
     fontSize: 12,
     fontWeight: '700',
@@ -406,8 +408,8 @@ const makeStyles = (theme) => StyleSheet.create({
     borderColor: 'transparent',
   },
   optionSelected: { borderColor: theme.primary },
-  optionCorrect: { borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
-  optionWrong: { borderColor: '#ef4444', backgroundColor: '#fef2f2' },
+  optionCorrect: { borderColor: theme.success, backgroundColor: theme.successBg },
+  optionWrong: { borderColor: theme.danger, backgroundColor: theme.dangerBg },
   optionLabel: { fontSize: 16, fontWeight: '800', color: theme.primary, width: 28 },
   optionText: { flex: 1, fontSize: 15, color: theme.text },
   input: {
@@ -418,11 +420,11 @@ const makeStyles = (theme) => StyleSheet.create({
     color: theme.text,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: theme.primaryLight || '#e5e7eb',
+    borderColor: theme.border,
   },
   feedbackCard: { borderRadius: 12, padding: 16, marginBottom: 16 },
-  feedbackCorrect: { backgroundColor: '#f0fdf4' },
-  feedbackWrong: { backgroundColor: '#fef2f2' },
+  feedbackCorrect: { backgroundColor: theme.successBg },
+  feedbackWrong: { backgroundColor: theme.dangerBg },
   feedbackTitle: { fontSize: 16, fontWeight: '800', marginBottom: 6 },
   feedbackAnswer: { fontSize: 15, color: theme.text },
   nextBtn: {
@@ -434,7 +436,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   nextBtnDisabled: { opacity: 0.5 },
   nextBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  emptyEmoji: { fontSize: 48, marginBottom: 12 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 16 },
   backLink: { fontSize: 16, color: theme.primary, fontWeight: '600' },
 });

@@ -16,6 +16,8 @@ import { AuthService } from '../services/AuthService';
 import API_CONFIG from '../config/api';
 import PremiumGate from '../components/PremiumGate';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { spacing, radius, iconSize } from '../theme/tokens';
 
 const MAX_PAGES = 6;
 
@@ -178,8 +180,8 @@ function SnapPageInner({ navigation }) {
         {!generatedCards ? (
           <>
             <View style={styles.hero}>
-              <Text style={styles.heroEmoji}>📸</Text>
-              <Text style={styles.heroTitle}>Photo → Flashcards</Text>
+              <Icon name="snap" size={iconSize.hero} color={theme.primary} style={styles.heroIcon} />
+              <Text style={styles.heroTitle}>Photo to flashcards</Text>
               <Text style={styles.heroSub}>
                 Add up to {MAX_PAGES} pages from notes or a textbook. AI scales card count with how many pages you submit (~30 cards per page).
               </Text>
@@ -191,7 +193,7 @@ function SnapPageInner({ navigation }) {
                   <View key={`${uri}-${index}`} style={styles.previewWrap}>
                     <Image source={{ uri }} style={styles.previewImage} resizeMode="cover" />
                     <TouchableOpacity style={styles.retakeBtn} onPress={() => removeImage(index)}>
-                      <Text style={styles.retakeBtnText}>✕</Text>
+                      <Icon name="close" size={iconSize.sm} color={theme.danger} />
                     </TouchableOpacity>
                     <Text style={styles.pageLabel}>Page {index + 1}</Text>
                   </View>
@@ -199,7 +201,7 @@ function SnapPageInner({ navigation }) {
               </ScrollView>
             ) : (
               <View style={styles.imagePlaceholder}>
-                <Text style={styles.placeholderEmoji}>🖼️</Text>
+                <Icon name="snap" size={iconSize.xl} color={theme.textMuted} style={styles.placeholderIcon} />
                 <Text style={styles.placeholderText}>No pages selected</Text>
               </View>
             )}
@@ -215,7 +217,7 @@ function SnapPageInner({ navigation }) {
                 disabled={imageUris.length >= MAX_PAGES}
                 activeOpacity={0.8}
               >
-                <Text style={styles.pickBtnEmoji}>📷</Text>
+                <Icon name="snap" size={iconSize.lg} color={theme.primary} />
                 <Text style={styles.pickBtnText}>Camera</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -224,7 +226,7 @@ function SnapPageInner({ navigation }) {
                 disabled={imageUris.length >= MAX_PAGES}
                 activeOpacity={0.8}
               >
-                <Text style={styles.pickBtnEmoji}>🖼️</Text>
+                <Icon name="decks" size={iconSize.lg} color={theme.primary} />
                 <Text style={styles.pickBtnText}>Add photos</Text>
               </TouchableOpacity>
             </View>
@@ -237,11 +239,11 @@ function SnapPageInner({ navigation }) {
             >
               {generating ? (
                 <View style={styles.generatingRow}>
-                  <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.generateBtnText}>  Analysing {imageUris.length} page{imageUris.length === 1 ? '' : 's'}…</Text>
+                  <ActivityIndicator color="#ffffff" size="small" />
+                  <Text style={styles.generateBtnText}>Analysing {imageUris.length} page{imageUris.length === 1 ? '' : 's'}…</Text>
                 </View>
               ) : (
-                <Text style={styles.generateBtnText}>✨ Generate Cards</Text>
+                <Text style={styles.generateBtnText}>Generate Cards</Text>
               )}
             </TouchableOpacity>
 
@@ -254,7 +256,7 @@ function SnapPageInner({ navigation }) {
         ) : (
           <>
             <View style={styles.successBanner}>
-              <Text style={styles.successEmoji}>🎉</Text>
+              <Icon name="check" size={iconSize.lg} color={theme.success} filled style={styles.successIcon} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.successTitle}>{generatedTitle}</Text>
                 <Text style={styles.successSub}>
@@ -274,10 +276,10 @@ function SnapPageInner({ navigation }) {
             )}
 
             <TouchableOpacity style={styles.studyBtn} onPress={handleViewDeck} activeOpacity={0.85}>
-              <Text style={styles.studyBtnText}>View & edit deck →</Text>
+              <Text style={styles.studyBtnText}>View & edit deck</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.anotherBtn} onPress={handleReset} activeOpacity={0.8}>
-              <Text style={styles.anotherBtnText}>📸 Snap more pages</Text>
+              <Text style={styles.anotherBtnText}>Snap more pages</Text>
             </TouchableOpacity>
           </>
         )}
@@ -297,84 +299,138 @@ export default function SnapPageScreen({ navigation, route }) {
 const makeStyles = (theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
   topBar: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#f3f4f6',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
     backgroundColor: theme.card,
   },
   backText: { fontSize: 15, color: theme.primary, fontWeight: '600', width: 60 },
-  headerTitle: { fontSize: 17, fontWeight: '800', color: theme.text },
-  scroll: { padding: 20, paddingBottom: 60 },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: theme.text },
+  scroll: { padding: spacing.xl, paddingBottom: spacing.xxxl },
 
-  hero: { alignItems: 'center', marginBottom: 24 },
-  heroEmoji: { fontSize: 52, marginBottom: 12 },
-  heroTitle: { fontSize: 24, fontWeight: '900', color: theme.text, marginBottom: 8 },
-  heroSub: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 22 },
+  hero: { alignItems: 'center', marginBottom: spacing.xxl },
+  heroIcon: { marginBottom: spacing.md },
+  heroTitle: { fontSize: 24, fontWeight: '700', color: theme.text, marginBottom: spacing.sm },
+  heroSub: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 21 },
 
-  previewRow: { gap: 12, paddingBottom: 8 },
+  previewRow: { gap: spacing.md, paddingBottom: spacing.sm },
   previewWrap: { width: 160, alignItems: 'center' },
-  previewImage: { width: 160, height: 210, borderRadius: 12, backgroundColor: theme.card },
+  previewImage: { width: 160, height: 210, borderRadius: radius.md, backgroundColor: theme.card },
   retakeBtn: {
-    position: 'absolute', top: 8, right: 8,
-    backgroundColor: '#fef2f2', borderRadius: 14, width: 28, height: 28,
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    backgroundColor: theme.dangerBg,
+    borderRadius: radius.pill,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.danger,
   },
-  retakeBtnText: { color: '#dc2626', fontWeight: '700', fontSize: 14 },
-  pageLabel: { marginTop: 6, fontSize: 12, color: theme.textSecondary, fontWeight: '600' },
+  pageLabel: { marginTop: spacing.sm, fontSize: 12, color: theme.textSecondary, fontWeight: '600' },
 
   imagePlaceholder: {
-    height: 160, borderRadius: 16, borderWidth: 2, borderColor: '#e5e7eb',
-    borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center',
-    marginBottom: 8, backgroundColor: theme.card,
+    height: 160,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: theme.borderStrong,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
+    backgroundColor: theme.card,
   },
-  placeholderEmoji: { fontSize: 36, marginBottom: 8 },
-  placeholderText: { color: theme.textSecondary, fontSize: 14 },
-  pageCountText: { textAlign: 'center', color: theme.textSecondary, fontSize: 13, marginBottom: 16 },
+  placeholderIcon: { marginBottom: spacing.sm },
+  placeholderText: { color: theme.textMuted, fontSize: 14 },
+  pageCountText: {
+    textAlign: 'center',
+    color: theme.textSecondary,
+    fontSize: 13,
+    marginBottom: spacing.lg,
+  },
 
-  pickRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  pickRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.xl },
   pickBtn: {
-    flex: 1, backgroundColor: theme.card, borderRadius: 14, borderWidth: 2,
-    borderColor: '#e5e7eb', padding: 16, alignItems: 'center', gap: 6,
+    flex: 1,
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   pickBtnDisabled: { opacity: 0.45 },
-  pickBtnEmoji: { fontSize: 26 },
   pickBtnText: { fontSize: 13, fontWeight: '600', color: theme.text },
 
   generateBtn: {
-    backgroundColor: theme.primary, borderRadius: 16, paddingVertical: 17,
+    backgroundColor: theme.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    shadowColor: theme.primary, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35, shadowRadius: 12, elevation: 6,
   },
-  generateBtnDisabled: { backgroundColor: '#a5b4fc', shadowOpacity: 0 },
-  generateBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  generatingRow: { flexDirection: 'row', alignItems: 'center' },
-  generatingHint: { textAlign: 'center', color: theme.textSecondary, fontSize: 13, marginTop: 12 },
+  generateBtnDisabled: { backgroundColor: theme.accent },
+  generateBtnText: { color: '#ffffff', fontWeight: '600', fontSize: 16 },
+  generatingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  generatingHint: {
+    textAlign: 'center',
+    color: theme.textMuted,
+    fontSize: 13,
+    marginTop: spacing.md,
+  },
 
   successBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    backgroundColor: '#f0fdf4', borderRadius: 16, padding: 16,
-    borderWidth: 1.5, borderColor: '#86efac', marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.successBg,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderWidth: 1.5,
+    borderColor: theme.success,
+    marginBottom: spacing.xl,
   },
-  successEmoji: { fontSize: 32 },
-  successTitle: { fontSize: 16, fontWeight: '800', color: '#166534', marginBottom: 2 },
-  successSub: { fontSize: 13, color: '#16a34a' },
+  successIcon: { marginRight: spacing.md },
+  successTitle: { fontSize: 16, fontWeight: '700', color: theme.successText, marginBottom: 2 },
+  successSub: { fontSize: 13, color: theme.successText },
 
   cardRow: {
-    backgroundColor: theme.card, borderRadius: 12, padding: 14,
-    marginBottom: 8, borderWidth: 1, borderColor: '#e5e7eb',
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  cardFront: { fontSize: 14, fontWeight: '700', color: theme.text, marginBottom: 4 },
+  cardFront: { fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: spacing.xs },
   cardBack: { fontSize: 13, color: theme.textSecondary },
-  moreCards: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', marginBottom: 16 },
+  moreCards: {
+    fontSize: 13,
+    color: theme.textMuted,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
 
   studyBtn: {
-    backgroundColor: theme.primary, borderRadius: 16, paddingVertical: 16,
-    alignItems: 'center', marginBottom: 12,
+    backgroundColor: theme.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    marginBottom: spacing.md,
   },
-  studyBtnText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  studyBtnText: { color: '#ffffff', fontWeight: '600', fontSize: 16 },
   anotherBtn: {
-    backgroundColor: theme.primaryLight, borderRadius: 16, paddingVertical: 14, alignItems: 'center',
+    backgroundColor: theme.primaryLight,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md + 2,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.accent,
   },
-  anotherBtnText: { color: theme.primary, fontWeight: '700', fontSize: 15 },
+  anotherBtnText: { color: theme.primary, fontWeight: '600', fontSize: 15 },
 });

@@ -270,7 +270,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
             <Text style={styles.lbTitle}>Class best</Text>
             {leaderboard.slice(0, 3).map((e, i) => (
               <Text key={e.userId} style={styles.lbLine}>
-                {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} {e.displayName} · {e.score}m
+                {i + 1}. {e.displayName} · {e.score}m
               </Text>
             ))}
           </View>
@@ -291,7 +291,8 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
           </Text>
           {result?.coins > 0 && (
             <TouchableOpacity onPress={() => navigation.navigate('CoinWallet')}>
-              <Text style={styles.coinLine}>🪙 +{result.coins} Study Coins · see your pile ›</Text>
+              <Text style={styles.coinLine}>+{result.coins} Study Coins</Text>
+              <Text style={styles.coinLineSub}>See your pile</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.goBtn} onPress={startRun} activeOpacity={0.85}>
@@ -332,7 +333,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
             <Text style={styles.exitText}>✕</Text>
           </TouchableOpacity>
           <Text style={styles.hudDist}>{Math.floor(distance)}m</Text>
-          <Text style={styles.hudHits}>{correct} ✓</Text>
+          <Text style={styles.hudHits}>{correct} dodged</Text>
         </View>
 
         <View style={styles.stage}>
@@ -420,7 +421,8 @@ const styles = StyleSheet.create({
   resultsScroll: { alignItems: 'center', padding: 24, paddingBottom: 48 },
   resultsScore: { fontSize: 56, fontWeight: '900', color: '#fbbf24' },
   resultsLabel: { fontSize: 15, color: '#94a3b8', marginBottom: 8 },
-  coinLine: { fontSize: 18, fontWeight: '800', color: '#fcd34d', marginVertical: 8 },
+  coinLine: { fontSize: 18, fontWeight: '800', color: '#fcd34d', marginTop: 8, textAlign: 'center' },
+  coinLineSub: { fontSize: 14, color: '#94a3b8', marginBottom: 8, textAlign: 'center' },
   lbCard: {
     width: '100%',
     backgroundColor: '#122033',
