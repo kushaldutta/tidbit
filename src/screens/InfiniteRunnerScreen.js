@@ -6,9 +6,13 @@
  * Score = distance. Class leaderboard.
  *
  * Deliberately theme-independent: this is a game canvas, not app chrome. The
- * dark stage and amber score are the art direction and stay fixed across
+ * ink stage and amber accent are the art direction and stay fixed across
  * themes. Everything the player returns to (Home, wallet, leaderboards) is
  * themed.
+ *
+ * The runner is drawn from Views as a thick-stroke pictogram rather than an
+ * emoji — emoji render differently on every OS, so they cannot be art-directed,
+ * and a system glyph as the hero of a game reads as a placeholder.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -22,7 +26,7 @@ import {
   Easing,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { RunnerService } from '../services/RunnerService';
@@ -35,7 +39,46 @@ import { GAME_TYPE } from '../config/gameCatalog';
 const { width: SCREEN_W } = Dimensions.get('window');
 const HIT_X = 58;
 const START_X = SCREEN_W + 24;
-const CHAR_X = 22;
+const CHAR_X = 26;
+
+/** Ground line height inside the stage. Runner and obstacles both sit on it. */
+const GROUND = 56;
+/** Parallax tick pitch — must equal the ground loop distance or the seam shows. */
+const TICK_PITCH = 48;
+/** Haze moves at half speed for depth, so it needs its own matching pitch. */
+const HAZE_PITCH = 24;
+
+const INK = {
+  bg: '#0B1220',
+  stage: '#0E1626',
+  panel: '#17223A',
+  line: '#243350',
+  dim: '#8494B0',
+  text: '#EEF2F9',
+};
+const AMBER = '#F5A524';
+const AMBER_HI = '#FFC85C';
+const HIT_OK = '#3DD68C';
+const HIT_BAD = '#FF6B6B';
+
+/**
+ * The player: a thick-stroke pictogram, legs driven by `stride`. At stride 0 the
+ * pose is already mid-run, so it reads as motion even on the static intro.
+ */
+function RunnerFigure({ stride }) {
+  const legFront = stride.interpolate({ inputRange: [0, 1], outputRange: ['-28deg', '18deg'] });
+  const legBack = stride.interpolate({ inputRange: [0, 1], outputRange: ['24deg', '-22deg'] });
+  const arm = stride.interpolate({ inputRange: [0, 1], outputRange: ['26deg', '-20deg'] });
+  return (
+    <View style={styles.figure}>
+      <View style={styles.figHead} />
+      <View style={styles.figTorso} />
+      <Animated.View style={[styles.figArm, { transform: [{ rotate: arm }] }]} />
+      <Animated.View style={[styles.figLeg, { transform: [{ rotate: legFront }] }]} />
+      <Animated.View style={[styles.figLeg, styles.figLegBack, { transform: [{ rotate: legBack }] }]} />
+    </View>
+  );
+}
 
 function shuffle(arr) {
   const a = [...arr];
@@ -48,6 +91,7 @@ function shuffle(arr) {
 
 export default function InfiniteRunnerScreen({ route, navigation }) {
   const { classId, categorySlug, classCode } = route.params || {};
+  const insets = useSafeAreaInsets();
 
   const [phase, setPhase] = useState('loading'); // loading | ready | playing | results | error
   const [cards, setCards] = useState([]);
@@ -62,8 +106,10 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
   const obstacleX = useRef(new Animated.Value(START_X)).current;
   const charY = useRef(new Animated.Value(0)).current;
   const groundX = useRef(new Animated.Value(0)).current;
+  const stride = useRef(new Animated.Value(0)).current;
   const bobLoop = useRef(null);
   const groundLoop = useRef(null);
+  const strideLoop = useRef(null);
   const obstacleRef = useRef(null);
   const travelAnim = useRef(null);
   const crashRef = useRef(null);
@@ -95,6 +141,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
     travelAnim.current?.stop();
     bobLoop.current?.stop();
     groundLoop.current?.stop();
+    strideLoop.current?.stop();
   };
 
   const startBob = () => {
@@ -119,6 +166,15 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
       }),
     );
     groundLoop.current.start();
+
+    stride.setValue(0);
+    strideLoop.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(stride, { toValue: 1, duration: 165, easing: Easing.linear, useNativeDriver: true }),
+        Animated.timing(stride, { toValue: 0, duration: 165, easing: Easing.linear, useNativeDriver: true }),
+      ]),
+    );
+    strideLoop.current.start();
   };
 
   const jump = () => {
@@ -239,7 +295,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
   if (phase === 'loading') {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color="#fbbf24" size="large" />
+        <ActivityIndicator color={AMBER} size="large" />
       </SafeAreaView>
     );
   }
@@ -247,7 +303,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
   if (phase === 'error') {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.bigEmoji}>🏃</Text>
+        <Icon name="warning" size={iconSize.hero} color={AMBER} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -258,56 +314,78 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
 
   if (phase === 'ready') {
     return (
-      <SafeAreaView style={styles.center}>
-        <TouchableOpacity style={styles.exitAbs} onPress={() => navigation.goBack()}>
-          <Icon name="close" size={iconSize.md} color="#94a3b8" />
-        </TouchableOpacity>
-        <Text style={styles.bigEmoji}>🏃</Text>
-        <Text style={styles.readyTitle}>Infinite Runner</Text>
-        <Text style={styles.readySub}>{classCode || 'Your class'}</Text>
-        <Text style={styles.readyDesc}>
-          Definitions fly at you. Tap the matching term to dodge.{'\n'}
-          Miss or wait too long — wipe out. How far can you run?
-        </Text>
-        <TouchableOpacity style={styles.goBtn} onPress={startRun} activeOpacity={0.85}>
-          <Text style={styles.goBtnText}>Run</Text>
-        </TouchableOpacity>
-        {leaderboard.length > 0 && (
-          <View style={styles.lbPreview}>
-            <Text style={styles.lbTitle}>Class best</Text>
-            {leaderboard.slice(0, 3).map((e, i) => (
-              <Text key={e.userId} style={styles.lbLine}>
-                {i + 1}. {e.displayName} · {e.score}m
-              </Text>
-            ))}
+      <View style={styles.playRoot}>
+        <SafeAreaView style={styles.readyRoot} edges={['top', 'bottom']}>
+          <TouchableOpacity style={styles.exitAbs} onPress={() => navigation.goBack()}>
+            <Icon name="close" size={iconSize.md} color={INK.dim} />
+          </TouchableOpacity>
+
+          <View style={styles.readyBody}>
+            <View style={styles.readyStage}>
+              <View style={styles.readyGround} />
+              <View style={styles.readyFigureSlot}>
+                <RunnerFigure stride={stride} />
+              </View>
+            </View>
+
+            <Text style={styles.readyTitle}>Infinite Runner</Text>
+            <Text style={styles.readySub}>{classCode || 'Your class'}</Text>
+            <Text style={styles.readyDesc}>
+              Tap the matching term before the definition reaches you.
+            </Text>
+
+            <TouchableOpacity style={styles.goBtn} onPress={startRun} activeOpacity={0.85}>
+              <Text style={styles.goBtnText}>Run</Text>
+            </TouchableOpacity>
           </View>
-        )}
-      </SafeAreaView>
+
+          {leaderboard.length > 0 && (
+            <View style={styles.lbPreview}>
+              <Text style={styles.lbTitle}>Class best</Text>
+              {leaderboard.slice(0, 3).map((e, i) => (
+                <View key={e.userId} style={styles.lbPreviewRow}>
+                  <Text style={styles.lbRank}>{i + 1}</Text>
+                  <Text style={styles.lbName} numberOfLines={1}>{e.displayName}</Text>
+                  <Text style={styles.lbScore}>{e.score}m</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </SafeAreaView>
+      </View>
     );
   }
 
   if (phase === 'results') {
     const meters = Math.floor(result?.meters ?? distance);
     return (
-      <SafeAreaView style={styles.center}>
+      <SafeAreaView style={styles.resultsRoot}>
         <ScrollView contentContainerStyle={styles.resultsScroll}>
-          <Text style={styles.bigEmoji}>{meters >= 1000 ? '🔥' : meters >= 300 ? '🏃' : '💥'}</Text>
-          <Text style={styles.resultsScore}>{meters}m</Text>
-          <Text style={styles.resultsLabel}>
-            {correct} dodge{correct === 1 ? '' : 's'} · {result?.reason === 'wrong' ? 'wrong term' : 'too slow'}
+          <Text style={styles.resultsKicker}>
+            {result?.reason === 'wrong' ? 'Wrong term' : 'Too slow'}
           </Text>
+          <View style={styles.resultsScoreRow}>
+            <Text style={styles.resultsScore}>{meters}</Text>
+            <Text style={styles.resultsUnit}>m</Text>
+          </View>
+          <Text style={styles.resultsLabel}>
+            {correct} dodge{correct === 1 ? '' : 's'}
+          </Text>
+
           {result?.coins > 0 && (
-            <TouchableOpacity onPress={() => navigation.navigate('CoinWallet')}>
+            <TouchableOpacity style={styles.coinChip} onPress={() => navigation.navigate('CoinWallet')}>
+              <Icon name="coins" size={iconSize.sm} color={AMBER_HI} />
               <Text style={styles.coinLine}>+{result.coins} Study Coins</Text>
-              <Text style={styles.coinLineSub}>See your pile</Text>
             </TouchableOpacity>
           )}
+
           <TouchableOpacity style={styles.goBtn} onPress={startRun} activeOpacity={0.85}>
             <Text style={styles.goBtnText}>Run again</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Text style={styles.backLink}>Done</Text>
           </TouchableOpacity>
+
           <View style={styles.lbCard}>
             <Text style={styles.lbTitle}>{classCode || 'Class'} distance</Text>
             {leaderboard.length === 0 ? (
@@ -315,7 +393,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
             ) : (
               leaderboard.map((e, i) => (
                 <View key={e.userId} style={[styles.lbRow, e.isMe && styles.lbRowMe]}>
-                  <Text style={styles.lbRank}>{i + 1}</Text>
+                  <Text style={[styles.lbRank, e.isMe && styles.lbNameMe]}>{i + 1}</Text>
                   <Text style={[styles.lbName, e.isMe && styles.lbNameMe]} numberOfLines={1}>
                     {e.displayName}
                   </Text>
@@ -331,55 +409,83 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
 
   // ─── Playing ─────────────────────────────────────────────────
 
+  // Ticks move at full speed; the haze band behind them is interpolated to a
+  // third of that, so the stage reads as having depth without a second loop.
+  const hazeX = groundX.interpolate({
+    inputRange: [-TICK_PITCH, 0],
+    outputRange: [-HAZE_PITCH, 0],
+  });
+
   return (
     <View style={styles.playRoot}>
-      <LinearGradient colors={['#071018', '#122033', '#1a2a22']} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={styles.hud}>
-          <TouchableOpacity onPress={() => { stopLoops(); navigation.goBack(); }}>
-            <Icon name="close" size={iconSize.md} color="#94a3b8" />
+          <TouchableOpacity
+            onPress={() => { stopLoops(); navigation.goBack(); }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Icon name="close" size={iconSize.md} color={INK.dim} />
           </TouchableOpacity>
-          <Text style={styles.hudDist}>{Math.floor(distance)}m</Text>
-          <Text style={styles.hudHits}>{correct} dodged</Text>
+          <View style={styles.hudScore}>
+            <Text style={styles.hudDist}>{Math.floor(distance)}</Text>
+            <Text style={styles.hudUnit}>m</Text>
+          </View>
+          <View style={styles.hudChip}>
+            <Text style={styles.hudHits}>{correct}</Text>
+            <Text style={styles.hudChipLabel}>dodged</Text>
+          </View>
         </View>
 
         <View style={styles.stage}>
-          <Animated.View
-            style={[
-              styles.groundHash,
-              { transform: [{ translateX: groundX }] },
-            ]}
-          >
-            {Array.from({ length: 16 }).map((_, i) => (
-              <View key={i} style={styles.hash} />
+          <LinearGradient
+            colors={['rgba(245,165,36,0)', 'rgba(245,165,36,0.10)']}
+            style={styles.horizonGlow}
+            pointerEvents="none"
+          />
+          <Animated.View style={[styles.hazeRow, { transform: [{ translateX: hazeX }] }]}>
+            {Array.from({ length: 24 }).map((_, i) => (
+              <View key={i} style={[styles.haze, { height: 10 + ((i * 7) % 22) }]} />
             ))}
           </Animated.View>
 
-          <Animated.Text
-            style={[styles.character, { transform: [{ translateY: charY }] }]}
+          <View style={styles.groundLine} />
+          <View style={styles.groundFill} />
+          <Animated.View style={[styles.tickRow, { transform: [{ translateX: groundX }] }]}>
+            {Array.from({ length: 20 }).map((_, i) => (
+              <View key={i} style={styles.tick} />
+            ))}
+          </Animated.View>
+
+          <Animated.View
+            style={[styles.player, { transform: [{ translateY: charY }] }]}
           >
-            🏃
-          </Animated.Text>
+            <RunnerFigure stride={stride} />
+          </Animated.View>
 
           {obstacle && (
             <Animated.View
               style={[
-                styles.obstacle,
-                flash === 'ok' && styles.obstacleOk,
-                flash === 'bad' && styles.obstacleBad,
+                styles.gate,
+                flash === 'ok' && styles.gateOk,
+                flash === 'bad' && styles.gateBad,
                 { transform: [{ translateX: obstacleX }] },
               ]}
             >
-              <Text style={styles.obstacleLabel}>DODGE</Text>
-              <Text style={styles.obstaclePrompt} numberOfLines={5}>
+              <View
+                style={[
+                  styles.gateEdge,
+                  flash === 'ok' && styles.gateEdgeOk,
+                  flash === 'bad' && styles.gateEdgeBad,
+                ]}
+              />
+              <Text style={styles.gatePrompt} numberOfLines={4}>
                 {obstacle.prompt}
               </Text>
             </Animated.View>
           )}
         </View>
 
-        <View style={styles.controls}>
-          <Text style={styles.controlsHint}>Tap the term</Text>
+        <View style={[styles.controls, { paddingBottom: Math.max(insets.bottom, 14) + 10 }]}>
           {(obstacle?.options || ['', '', '']).map((opt, i) => (
             <TouchableOpacity
               key={`${obstacle?.card?.id || 'x'}-${i}`}
@@ -398,117 +504,218 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  playRoot: { flex: 1, backgroundColor: INK.bg },
   center: {
     flex: 1,
-    backgroundColor: '#071018',
+    backgroundColor: INK.bg,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+    gap: 12,
   },
-  playRoot: { flex: 1, backgroundColor: '#071018' },
-  bigEmoji: { fontSize: 64, textAlign: 'center', marginBottom: 8 },
-  readyTitle: { fontSize: 28, fontWeight: '800', color: '#f8fafc', marginBottom: 4 },
-  readySub: { fontSize: 16, color: '#94a3b8', marginBottom: 14 },
-  readyDesc: { fontSize: 15, color: '#cbd5e1', textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  errorText: { color: INK.text, fontSize: 16, textAlign: 'center' },
+  backLink: { color: AMBER, fontSize: 16, fontWeight: '600', marginTop: 16, textAlign: 'center' },
+  exitAbs: { position: 'absolute', top: 12, left: 12, padding: 8, zIndex: 5 },
+
+  // ─── The runner pictogram ───────────────────────────────────────────────
+  figure: { width: 34, height: 42 },
+  figHead: {
+    position: 'absolute', top: 0, left: 13,
+    width: 10, height: 10, borderRadius: 5, backgroundColor: AMBER,
+  },
+  figTorso: {
+    position: 'absolute', top: 11, left: 15,
+    width: 6, height: 15, borderRadius: 3, backgroundColor: AMBER,
+  },
+  figArm: {
+    position: 'absolute', top: 13, left: 8,
+    width: 12, height: 5, borderRadius: 2.5, backgroundColor: AMBER,
+  },
+  figLeg: {
+    position: 'absolute', top: 24, left: 14,
+    width: 6, height: 17, borderRadius: 3, backgroundColor: AMBER,
+  },
+  figLegBack: { backgroundColor: '#B87615' },
+
+  // ─── Ready ──────────────────────────────────────────────────────────────
+  readyRoot: { flex: 1, justifyContent: 'space-between', paddingBottom: 24 },
+  readyBody: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  readyStage: {
+    width: '100%',
+    height: 120,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  readyGround: {
+    position: 'absolute', bottom: 0, left: 24, right: 24,
+    height: 2, borderRadius: 1, backgroundColor: INK.line,
+  },
+  readyFigureSlot: { marginBottom: 2 },
+  readyTitle: { fontSize: 30, fontWeight: '700', color: INK.text, letterSpacing: -0.3 },
+  readySub: {
+    fontSize: 13, fontWeight: '600', color: AMBER,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 6,
+  },
+  readyDesc: {
+    fontSize: 15, color: INK.dim, textAlign: 'center',
+    lineHeight: 21, marginTop: 16,
+  },
   goBtn: {
-    backgroundColor: '#f59e0b',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    marginTop: 8,
+    backgroundColor: AMBER,
+    borderRadius: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 52,
+    marginTop: 28,
   },
-  goBtnText: { color: '#111827', fontSize: 18, fontWeight: '800' },
-  errorText: { color: '#e2e8f0', fontSize: 16, textAlign: 'center', marginBottom: 12 },
-  backLink: { color: '#fbbf24', fontSize: 16, fontWeight: '700', marginTop: 16 },
-  exitAbs: { position: 'absolute', top: 16, left: 16, padding: 8 },
-  exitText: { color: '#94a3b8', fontSize: 22, fontWeight: '700' },
-  lbPreview: { marginTop: 28, alignItems: 'center' },
-  lbTitle: { fontSize: 13, fontWeight: '800', color: '#94a3b8', marginBottom: 8, letterSpacing: 0.4 },
-  lbLine: { color: '#e2e8f0', fontSize: 14, marginBottom: 4 },
-  resultsScroll: { alignItems: 'center', padding: 24, paddingBottom: 48 },
-  resultsScore: { fontSize: 56, fontWeight: '900', color: '#fbbf24' },
-  resultsLabel: { fontSize: 15, color: '#94a3b8', marginBottom: 8 },
-  coinLine: { fontSize: 18, fontWeight: '800', color: '#fcd34d', marginTop: 8, textAlign: 'center' },
-  coinLineSub: { fontSize: 14, color: '#94a3b8', marginBottom: 8, textAlign: 'center' },
+  goBtnText: { color: INK.bg, fontSize: 17, fontWeight: '700', letterSpacing: 0.2 },
+
+  // ─── Leaderboards ───────────────────────────────────────────────────────
+  lbPreview: { paddingHorizontal: 32, gap: 2 },
+  lbPreviewRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, gap: 12 },
+  lbTitle: {
+    fontSize: 11, fontWeight: '700', color: INK.dim,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8,
+  },
   lbCard: {
     width: '100%',
-    backgroundColor: '#122033',
-    borderRadius: 16,
+    backgroundColor: INK.panel,
+    borderRadius: 14,
     padding: 16,
-    marginTop: 24,
+    marginTop: 32,
   },
-  lbEmpty: { color: '#94a3b8', fontSize: 14 },
-  lbRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#1e293b' },
-  lbRowMe: { backgroundColor: '#1e3a2f' },
-  lbRank: { width: 28, color: '#94a3b8', fontWeight: '800' },
-  lbName: { flex: 1, color: '#e2e8f0', fontSize: 15 },
-  lbNameMe: { color: '#fbbf24', fontWeight: '800' },
-  lbScore: { color: '#e2e8f0', fontWeight: '700' },
+  lbEmpty: { color: INK.dim, fontSize: 14 },
+  lbRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: INK.line,
+  },
+  lbRowMe: { backgroundColor: 'rgba(245,165,36,0.08)' },
+  lbRank: { width: 18, color: INK.dim, fontWeight: '600', fontSize: 13 },
+  lbName: { flex: 1, color: INK.text, fontSize: 15 },
+  lbNameMe: { color: AMBER_HI, fontWeight: '700' },
+  lbScore: { color: INK.text, fontWeight: '600', fontVariant: ['tabular-nums'] },
+
+  // ─── Results ────────────────────────────────────────────────────────────
+  resultsRoot: { flex: 1, backgroundColor: INK.bg },
+  resultsScroll: { alignItems: 'center', padding: 32, paddingBottom: 48 },
+  resultsKicker: {
+    fontSize: 11, fontWeight: '700', color: HIT_BAD,
+    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12,
+  },
+  resultsScoreRow: { flexDirection: 'row', alignItems: 'baseline' },
+  resultsScore: {
+    fontSize: 64, fontWeight: '700', color: AMBER,
+    fontVariant: ['tabular-nums'], letterSpacing: -1.5,
+  },
+  resultsUnit: { fontSize: 24, fontWeight: '600', color: AMBER, marginLeft: 3 },
+  resultsLabel: { fontSize: 15, color: INK.dim, marginTop: 4 },
+  coinChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    backgroundColor: 'rgba(245,165,36,0.12)',
+    borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14,
+    marginTop: 20,
+  },
+  coinLine: { fontSize: 14, fontWeight: '600', color: AMBER_HI },
+
+  // ─── HUD ────────────────────────────────────────────────────────────────
   hud: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
-  hudDist: { fontSize: 28, fontWeight: '900', color: '#fbbf24', fontVariant: ['tabular-nums'] },
-  hudHits: { fontSize: 16, fontWeight: '800', color: '#86efac' },
+  hudScore: { flexDirection: 'row', alignItems: 'baseline' },
+  hudDist: {
+    fontSize: 30, fontWeight: '700', color: INK.text,
+    fontVariant: ['tabular-nums'], letterSpacing: -0.5,
+  },
+  hudUnit: { fontSize: 14, fontWeight: '600', color: INK.dim, marginLeft: 2 },
+  hudChip: {
+    flexDirection: 'row', alignItems: 'baseline', gap: 4,
+    backgroundColor: INK.panel,
+    borderRadius: 999,
+    paddingVertical: 5, paddingHorizontal: 11,
+  },
+  hudHits: { fontSize: 14, fontWeight: '700', color: AMBER, fontVariant: ['tabular-nums'] },
+  hudChipLabel: { fontSize: 11, color: INK.dim, fontWeight: '500' },
+
+  // ─── Stage ──────────────────────────────────────────────────────────────
   stage: {
-    height: 280,
-    marginHorizontal: 8,
-    borderRadius: 16,
-    backgroundColor: '#0f1c28',
+    flex: 1,
+    marginHorizontal: 12,
+    marginTop: 4,
+    borderRadius: 18,
+    backgroundColor: INK.stage,
     overflow: 'hidden',
-    justifyContent: 'flex-end',
   },
-  groundHash: {
+  horizonGlow: {
+    position: 'absolute', left: 0, right: 0, bottom: GROUND, height: 90,
+  },
+  hazeRow: {
+    position: 'absolute', bottom: GROUND, left: 0,
+    flexDirection: 'row', alignItems: 'flex-end', gap: HAZE_PITCH - 10,
+  },
+  haze: { width: 10, borderTopLeftRadius: 3, borderTopRightRadius: 3, backgroundColor: '#152037' },
+  groundLine: {
+    position: 'absolute', left: 0, right: 0, bottom: GROUND - 2,
+    height: 2, backgroundColor: INK.line,
+  },
+  groundFill: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: GROUND,
+    backgroundColor: '#0A1120',
+  },
+  tickRow: {
+    position: 'absolute', bottom: GROUND - 16, left: 0,
+    flexDirection: 'row', gap: TICK_PITCH - 20,
+  },
+  tick: { width: 20, height: 3, borderRadius: 1.5, backgroundColor: '#1E2C46' },
+
+  player: { position: 'absolute', left: CHAR_X, bottom: GROUND, zIndex: 3 },
+
+  // The obstacle no longer announces "DODGE" — the rule is taught once on the
+  // intro screen, not stamped on every object that flies past.
+  gate: {
     position: 'absolute',
-    bottom: 36,
     left: 0,
+    bottom: GROUND,
+    width: 180,
+    minHeight: 116,
     flexDirection: 'row',
-    gap: 24,
-  },
-  hash: { width: 22, height: 4, backgroundColor: '#334155', borderRadius: 2 },
-  character: {
-    position: 'absolute',
-    left: CHAR_X,
-    bottom: 44,
-    fontSize: 42,
-    zIndex: 3,
-  },
-  obstacle: {
-    position: 'absolute',
-    left: 0,
-    bottom: 52,
-    width: 168,
-    minHeight: 132,
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: '#f59e0b',
-    padding: 10,
+    backgroundColor: INK.panel,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    overflow: 'hidden',
     zIndex: 2,
   },
-  obstacleOk: { borderColor: '#22c55e', backgroundColor: '#14532d' },
-  obstacleBad: { borderColor: '#ef4444', backgroundColor: '#7f1d1d' },
-  obstacleLabel: { fontSize: 10, fontWeight: '800', color: '#fbbf24', letterSpacing: 1, marginBottom: 4 },
-  obstaclePrompt: { fontSize: 13, fontWeight: '600', color: '#f8fafc', lineHeight: 18 },
-  controls: {
+  gateOk: { backgroundColor: 'rgba(61,214,140,0.14)' },
+  gateBad: { backgroundColor: 'rgba(255,107,107,0.16)' },
+  gateEdge: { width: 5, backgroundColor: AMBER },
+  gateEdgeOk: { backgroundColor: HIT_OK },
+  gateEdgeBad: { backgroundColor: HIT_BAD },
+  gatePrompt: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20,
-    justifyContent: 'flex-end',
-    gap: 10,
+    fontSize: 14,
+    fontWeight: '500',
+    color: INK.text,
+    lineHeight: 19,
+    padding: 12,
   },
-  controlsHint: { color: '#64748b', fontSize: 12, fontWeight: '700', textAlign: 'center', marginBottom: 4 },
+
+  // ─── Controls ───────────────────────────────────────────────────────────
+  controls: {
+    paddingHorizontal: 12,
+    paddingTop: 14,
+    // paddingBottom is applied inline from the safe-area inset.
+    gap: 9,
+  },
   optBtn: {
-    backgroundColor: '#1e293b',
-    borderRadius: 14,
-    paddingVertical: 14,
+    backgroundColor: INK.panel,
+    borderRadius: 12,
+    paddingVertical: 15,
     paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: '#334155',
+    alignItems: 'center',
   },
-  optText: { color: '#f8fafc', fontSize: 16, fontWeight: '700', textAlign: 'center' },
+  optText: { color: INK.text, fontSize: 16, fontWeight: '600', textAlign: 'center' },
 });
