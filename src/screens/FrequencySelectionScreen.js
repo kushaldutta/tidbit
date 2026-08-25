@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
+import { AnalyticsService } from '../services/AnalyticsService';
 import { useTheme } from '../context/ThemeContext';
 import Icon from '../components/Icon';
 import { spacing, radius, type, elevation, iconSize } from '../theme/tokens';
@@ -28,6 +29,7 @@ export default function FrequencySelectionScreen({ navigation }) {
   };
 
   const handleNext = () => {
+    AnalyticsService.track('frequency_selected', { interval_minutes: selectedInterval });
     navigation.navigate('PermissionRequest');
   };
 

@@ -103,7 +103,7 @@ export default function ThemePickerScreen({ navigation }) {
       `${t.label} is included with Tidbit Premium. Sunset can be unlocked with Study Coins.`,
       [
         { text: 'Not now', style: 'cancel' },
-        { text: 'Upgrade', onPress: () => navigation.navigate('Paywall') },
+        { text: 'Upgrade', onPress: () => navigation.navigate('Paywall', { source: 'theme_picker' }) },
       ],
     );
   };

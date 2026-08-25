@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ClassService } from '../../services/ClassService';
+import { AnalyticsService } from '../../services/AnalyticsService';
 import CatalogSegmentedControl from '../../components/CatalogSegmentedControl';
 import { DEFAULT_SCHOOL_ID, getSchool } from '../../config/schools';
 import { useTheme } from '../../context/ThemeContext';
@@ -104,6 +105,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
         const allIds = await ClassService.getMyClassIds();
         await ClassService.replaceCategoriesToEnrollment(allIds);
       }
+      AnalyticsService.track('classes_selected', { count: classIds.length });
       // Move to notification setup — PermissionRequestScreen will mark onboarding done.
       navigation.navigate('FrequencySelection');
     } catch (e) {

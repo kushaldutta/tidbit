@@ -3,12 +3,16 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { spacing, radius, type, elevation } from '../theme/tokens';
+import { AnalyticsService } from '../services/AnalyticsService';
 
 export default function WelcomeScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
 
   const handleGetStarted = () => {
+    // Funnel step 0. Fires pre-auth, so the row carries a null user_id and is
+    // joined to later steps by session_id.
+    AnalyticsService.track('onboarding_started', {});
     navigation.navigate('Login');
   };
 

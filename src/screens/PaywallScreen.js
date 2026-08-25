@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EntitlementService } from '../services/EntitlementService';
 import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../constants/legalUrls';
 import { useTheme } from '../context/ThemeContext';
+import { AnalyticsService } from '../services/AnalyticsService';
 import Icon from '../components/Icon';
 import { spacing, radius, elevation, iconSize } from '../theme/tokens';
 
@@ -47,6 +48,13 @@ export default function PaywallScreen({ navigation, route }) {
   const styles = makeStyles(theme);
 
   const onSuccess = route?.params?.onSuccess;
+  // RevenueCat reports who bought. It cannot report who looked and left, which
+  // is the number that separates a pricing problem from a pitch problem.
+  const paywallSource = route?.params?.source ?? 'unknown';
+
+  useEffect(() => {
+    AnalyticsService.track('paywall_viewed', { source: paywallSource });
+  }, [paywallSource]);
 
   useEffect(() => {
     EntitlementService.getOffering().then((o) => {
@@ -80,10 +88,15 @@ export default function PaywallScreen({ navigation, route }) {
       return;
     }
     setPurchasing(true);
+    AnalyticsService.track('purchase_started', { source: paywallSource, plan: selectedPlan });
     try {
       const info = await EntitlementService.purchasePackage(selectedPackage);
       const isActive = info.entitlements.active[ENTITLEMENT_ID] !== undefined;
       if (isActive) {
+        AnalyticsService.track('purchase_completed', {
+          source: paywallSource,
+          plan: selectedPlan,
+        });
         Alert.alert('Welcome to Premium', 'Your subscription is now active.', [
           {
             text: 'Let\'s go',
@@ -95,7 +108,11 @@ export default function PaywallScreen({ navigation, route }) {
         ]);
       }
     } catch (err) {
-      if (err?.userCancelled) return;
+      if (err?.userCancelled) {
+        AnalyticsService.track('purchase_cancelled', { source: paywallSource, plan: selectedPlan });
+        return;
+      }
+      AnalyticsService.track('purchase_failed', { source: paywallSource, plan: selectedPlan });
       Alert.alert('Purchase failed', err.message || 'Something went wrong. Please try again.');
     } finally {
       setPurchasing(false);

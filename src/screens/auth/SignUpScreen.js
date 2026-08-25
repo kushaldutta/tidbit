@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { AuthService } from '../../services/AuthService';
+import { AnalyticsService } from '../../services/AnalyticsService';
 import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../../constants/legalUrls';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -53,6 +54,10 @@ export default function SignUpScreen({ navigation }) {
     setLoading(true);
     try {
       const result = await AuthService.signUpWithEmail({ email, password });
+      AnalyticsService.track('signup_completed', {
+        method: 'email',
+        needs_verification: Boolean(result?.needsEmailVerification),
+      });
       if (result?.needsEmailVerification) {
         navigation.navigate('VerifyEmail', {
           email: email.trim().toLowerCase(),

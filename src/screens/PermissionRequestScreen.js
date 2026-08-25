@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { StorageService } from '../services/StorageService';
 import { NotificationService } from '../services/NotificationService';
 import { SyncService } from '../services/SyncService';
+import { AnalyticsService } from '../services/AnalyticsService';
 import { useTheme } from '../context/ThemeContext';
 import Icon from '../components/Icon';
 import { spacing, radius, type, elevation, iconSize } from '../theme/tokens';
@@ -30,6 +31,12 @@ export default function PermissionRequestScreen({ navigation, returningUser, onD
     try {
       const { status } = await Notifications.requestPermissionsAsync();
       setPermissionStatus(status);
+      // The single most consequential onboarding step: notifications are the
+      // passive loop, so a low grant rate explains a lot downstream.
+      AnalyticsService.track('notification_permission', {
+        status,
+        returning_user: Boolean(returningUser),
+      });
 
       if (status === 'granted') {
         // Configure notification channel for Android

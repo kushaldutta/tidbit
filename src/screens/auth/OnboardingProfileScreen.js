@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../../services/AuthService';
 import { ProfileService } from '../../services/ProfileService';
+import { AnalyticsService } from '../../services/AnalyticsService';
 import { SCHOOLS } from '../../config/schools';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -58,6 +59,7 @@ export default function OnboardingProfileScreen({ navigation }) {
         school_id: schoolId,
         grad_year: gradYear,
       });
+      AnalyticsService.track('profile_completed', { school: schoolId, grad_year: gradYear });
       // App.js will re-check profile completion and route to class selection.
       navigation.replace('ClassSelection', { schoolId });
     } catch (err) {

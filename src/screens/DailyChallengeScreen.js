@@ -26,6 +26,7 @@ import { AuthService } from '../services/AuthService';
 import { CardLearningService } from '../services/CardLearningService';
 import CoinBalanceChip from '../components/CoinBalanceChip';
 import Icon from '../components/Icon';
+import { AnalyticsService } from '../services/AnalyticsService';
 import { iconSize } from '../theme/tokens';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
@@ -98,10 +99,28 @@ export default function DailyChallengeScreen({ route, navigation }) {
     let cancelled = false;
     (async () => {
       const ch = await DailyChallengeService.getTodayChallenge(categorySlug);
-      if (cancelled || !ch) { setPhase('error'); return; }
+      if (cancelled || !ch) {
+        setPhase('error');
+        // No preset deck, or fewer than 2 cards. Home offers the challenge for
+        // every content-backed class, so this is a real dead end worth counting.
+        AnalyticsService.track('feature_unavailable', {
+          feature: 'daily_challenge',
+          reason: 'no_challenge',
+          category: categorySlug,
+        });
+        return;
+      }
 
       const cardList = await DailyChallengeService.getChallengeCards(ch);
-      if (cancelled || !cardList.length) { setPhase('error'); return; }
+      if (cancelled || !cardList.length) {
+        setPhase('error');
+        AnalyticsService.track('feature_unavailable', {
+          feature: 'daily_challenge',
+          reason: 'no_cards',
+          category: categorySlug,
+        });
+        return;
+      }
 
       // Check if already completed today
       const myRun = await DailyChallengeService.getMyRun(ch.id);
@@ -129,6 +148,11 @@ export default function DailyChallengeScreen({ route, navigation }) {
       setAnswers(myRun.entries);
       setQuestionIndex(nextIndex);
       setPhase('playing');
+      AnalyticsService.track('daily_challenge_started', {
+        category: categorySlug,
+        resumed: nextIndex > 0,
+        question_count: cardList.length,
+      });
     })();
     return () => { cancelled = true; };
   }, [categorySlug]);
@@ -234,6 +258,11 @@ export default function DailyChallengeScreen({ route, navigation }) {
     if (next >= cards.length) {
       // All answered — claim rewards and show summary
       setPhase('summary');
+      AnalyticsService.track('daily_challenge_completed', {
+        category: categorySlug,
+        points: totalPoints,
+        question_count: cards.length,
+      });
       const awarded = await DailyChallengeService.tryClaimRewards(challenge.id);
       const already = await CoinService.alreadyCredited(
         'daily_challenge_participation',

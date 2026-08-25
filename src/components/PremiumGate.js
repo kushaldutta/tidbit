@@ -83,7 +83,7 @@ export default function PremiumGate({ children, navigation, feature = 'This feat
         </Text>
         <TouchableOpacity
           style={styles.upgradeBtn}
-          onPress={() => navigation?.navigate('Paywall')}
+          onPress={() => navigation?.navigate('Paywall', { source: `gate:${feature}` })}
           activeOpacity={0.85}
         >
           <Text style={styles.upgradeBtnText}>Upgrade to Premium</Text>

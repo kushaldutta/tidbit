@@ -346,12 +346,12 @@ export default function SettingsScreen({ navigation }) {
         },
         {
           text: 'View Premium Features',
-          onPress: () => navigation.navigate('Paywall'),
+          onPress: () => navigation.navigate('Paywall', { source: 'settings_manage' }),
         },
         { text: 'Cancel', style: 'cancel' },
       ]);
     } else {
-      navigation.navigate('Paywall');
+      navigation.navigate('Paywall', { source: 'settings' });
     }
   };
   const formatHour = (hour) => {

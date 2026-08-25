@@ -22,6 +22,7 @@ import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
 import { useTheme } from '../context/ThemeContext';
 import Icon from '../components/Icon';
+import { AnalyticsService } from '../services/AnalyticsService';
 import { iconSize, radius } from '../theme/tokens';
 
 /**
@@ -287,7 +288,23 @@ export default function LearnModePickerScreen({ route, navigation }) {
 
   const handleModeSelect = (mode) => {
     if (!selectedDeck) return;
-    if (scopedCardCount < mode.minCards) return;
+    if (scopedCardCount < mode.minCards) {
+      // Chose a mode the deck is too small for — a dead end from the user's
+      // side even though the button is visibly disabled.
+      AnalyticsService.track('feature_unavailable', {
+        feature: 'learn_mode',
+        reason: 'too_few_cards',
+        mode: mode.id,
+        card_count: scopedCardCount,
+      });
+      return;
+    }
+    AnalyticsService.track('study_session_started', {
+      mode: mode.id,
+      card_count: scopedCardCount,
+      scoped: Boolean(studyScope),
+    });
+    AnalyticsService.trackOnce('first_study_started', { mode: mode.id });
     navigation.navigate(mode.id, {
       deckId: selectedDeck.id,
       deckTitle: selectedDeck.title,

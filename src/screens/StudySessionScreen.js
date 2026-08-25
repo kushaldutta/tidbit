@@ -21,6 +21,7 @@ import { RecallService } from '../services/RecallService';
 import { QuizService } from '../services/QuizService';
 import { useTheme } from '../context/ThemeContext';
 import Icon from '../components/Icon';
+import { AnalyticsService } from '../services/AnalyticsService';
 import { iconSize } from '../theme/tokens';
 
 const { width, height } = Dimensions.get('window');
@@ -94,6 +95,13 @@ export default function StudySessionScreen({ route, navigation }) {
       }
       if (session) {
         setSessionStats(session.stats);
+        AnalyticsService.track('study_session_started', {
+          mode: 'session',
+          from_daily_plan: fromDailyPlan,
+          card_count: initialTidbits.length,
+        });
+        // Closes the onboarding funnel — only the first one counts.
+        AnalyticsService.trackOnce('first_study_started', { mode: 'session' });
         // Load first tidbit
         loadNextTidbit();
         
@@ -237,6 +245,12 @@ export default function StudySessionScreen({ route, navigation }) {
 
         setIsComplete(true);
         setShowSummary(true);
+        AnalyticsService.track('study_session_completed', {
+          mode: 'session',
+          from_daily_plan: fromDailyPlan,
+          completed: finalSession.stats.completed,
+          knew: finalSession.stats.knew,
+        });
         
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }

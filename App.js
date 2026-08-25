@@ -56,6 +56,7 @@ import SpeedDuelScreen from './src/screens/SpeedDuelScreen';
 import InfiniteRunnerScreen from './src/screens/InfiniteRunnerScreen';
 import CoinWalletScreen from './src/screens/CoinWalletScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
+import { AnalyticsService } from './src/services/AnalyticsService';
 import BuddyRequestsScreen from './src/screens/BuddyRequestsScreen';
 import TidbitModal from './src/components/TidbitModal';
 import Icon from './src/components/Icon';
@@ -375,7 +376,11 @@ export default function App() {
         }
         EntitlementService.init().catch(() => {});
         const userId = AuthService.getUserId();
-        if (userId) EntitlementService.identifyUser(userId).catch(() => {});
+        if (userId) {
+          EntitlementService.identifyUser(userId).catch(() => {});
+          // Funnel events buffered before sign-in belong to this user.
+          AnalyticsService.attributeQueuedTo(userId);
+        }
         const { CardLearningService } = require('./src/services/CardLearningService');
         CardLearningService.initForUser().catch(() => {});
         await SyncService.onAuthenticated();
@@ -592,8 +597,22 @@ export default function App() {
             console.log('[NOTIFICATION_RESPONSE] ✅ category present:', categoryId);
           }
           
+          // Closes the middle of the notification funnel: 032 records what we
+          // sent and card_attempts records what got answered, but until now
+          // nothing recorded the tap itself.
+          const isActionPress =
+            actionIdentifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER;
+          AnalyticsService.track(
+            isActionPress ? 'notification_action' : 'notification_opened',
+            {
+              action: isActionPress ? actionIdentifier : 'open',
+              category: data?.category ?? null,
+              has_category_id: Boolean(categoryId),
+            },
+          );
+
           // Check if this is an action button press
-          if (actionIdentifier && actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) {
+          if (isActionPress) {
             // Handle action button press
             const tidbitId = data?.tidbitId;
             
@@ -684,10 +703,24 @@ export default function App() {
     
     init();
 
+    // Cold start. This is the retention baseline and the one metric that cannot
+    // be backfilled — user_stats.last_active_date only moves when someone
+    // actually studies, so it cannot see an open that went nowhere.
+    AnalyticsService.track('app_opened', { trigger: 'cold_start' });
+
     // Listen for app state changes
     const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState.match(/inactive|background/)) {
+        // Last chance to send before the OS may suspend us.
+        AnalyticsService.flush().catch(() => {});
+      }
       setAppState((prevState) => {
         if (prevState.match(/inactive|background/) && nextAppState === 'active') {
+          // Only count a foreground as a new open once the session has aged
+          // out, or every glance at the app would inflate DAU.
+          if (AnalyticsService.isNewSession()) {
+            AnalyticsService.track('app_opened', { trigger: 'foreground' });
+          }
           // App came to foreground
           // NOTE: We no longer automatically show tidbits on unlock
           // Tidbits only show when user explicitly requests them (via "Get Tidbit Now" or notification tap)

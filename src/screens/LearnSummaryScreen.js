@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import Icon from '../components/Icon';
+import { AnalyticsService } from '../services/AnalyticsService';
 import { spacing, radius, iconSize } from '../theme/tokens';
 
 /**
@@ -41,6 +42,11 @@ export default function LearnSummaryScreen({ route, navigation }) {
   const styles = makeStyles(theme);
   const { deckTitle, correct, total, mode, deckId, studyScope } = route.params;
   const cfg = MODE_CONFIG[mode] || MODE_CONFIG.quiz;
+
+  // Every learn mode funnels here, so this is the one honest completion point.
+  useEffect(() => {
+    AnalyticsService.track('study_session_completed', { mode, correct, total });
+  }, [mode, correct, total]);
 
   return (
     <SafeAreaView style={styles.container}>
