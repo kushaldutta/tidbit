@@ -27,8 +27,6 @@ function sourceLabel(type) {
     speed_duel: 'Speed Duel',
     runner: 'Infinite Runner',
     achievement: 'Achievement',
-    jeopardy: 'Jeopardy',
-    wordle: 'Daily Term',
     shop: 'Shop',
   };
   return map[type] || type.replace(/_/g, ' ');
@@ -145,7 +143,20 @@ export default function CoinWalletScreen({ navigation }) {
             </Text>
           </View>
 
-          <Text style={styles.sectionTitle}>Shop</Text>
+          <TouchableOpacity
+            style={styles.navRow}
+            onPress={() => navigation.navigate('Achievements')}
+            activeOpacity={0.85}
+          >
+            <Icon name="trophy" size={iconSize.lg} color={theme.primary} style={styles.soonIcon} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.soonTitle}>Achievements</Text>
+              <Text style={styles.soonBlurb}>Every badge you have earned, and what is next</Text>
+            </View>
+            <Icon name="chevron" size={iconSize.md} color={theme.textMuted} />
+          </TouchableOpacity>
+
+          <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Shop</Text>
           <TouchableOpacity
             style={styles.soonRow}
             onPress={buySunset}
@@ -276,6 +287,15 @@ const makeStyles = (theme) => StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.lg,
     marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: theme.border,
   },

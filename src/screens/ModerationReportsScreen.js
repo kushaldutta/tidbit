@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 import { ReportService } from '../services/ReportService';
 
 const CATEGORY_LABELS = Object.fromEntries(
@@ -155,7 +157,7 @@ export default function ModerationReportsScreen({ navigation }) {
           )}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>✓</Text>
+              <Icon name="check" size={iconSize.hero} color={theme.success} style={styles.emptyIcon} />
               <Text style={styles.emptyTitle}>No pending reports</Text>
               <Text style={styles.emptyBody}>
                 New user reports will show up here for you to review.
@@ -238,7 +240,7 @@ const makeStyles = (theme) => StyleSheet.create({
   resolveBtnText: { fontSize: 14, fontWeight: '600', color: '#fff' },
   btnDisabled: { opacity: 0.5 },
   empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 32 },
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: theme.text, marginBottom: 6 },
   emptyBody: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 20 },
 });

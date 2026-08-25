@@ -38,7 +38,6 @@ export const THEMES = {
   default: buildTheme({
     id: 'default',
     label: 'Classic',
-    emoji: '🟣',
     primary: '#6366f1',
     primaryDark: '#4338ca',
     primaryLight: '#eef2ff',
@@ -54,7 +53,6 @@ export const THEMES = {
     {
       id: 'midnight',
       label: 'Midnight',
-      emoji: '🌙',
       primary: '#818cf8',
       primaryDark: '#6366f1',
       primaryLight: '#1e1b4b',
@@ -85,7 +83,6 @@ export const THEMES = {
   forest: buildTheme({
     id: 'forest',
     label: 'Forest',
-    emoji: '🌿',
     primary: '#16a34a',
     primaryDark: '#15803d',
     primaryLight: '#f0fdf4',
@@ -100,7 +97,6 @@ export const THEMES = {
   sunset: buildTheme({
     id: 'sunset',
     label: 'Sunset',
-    emoji: '🌅',
     primary: '#f97316',
     primaryDark: '#ea580c',
     primaryLight: '#fff7ed',
@@ -115,7 +111,6 @@ export const THEMES = {
   ocean: buildTheme({
     id: 'ocean',
     label: 'Ocean',
-    emoji: '🌊',
     primary: '#0ea5e9',
     primaryDark: '#0284c7',
     primaryLight: '#f0f9ff',

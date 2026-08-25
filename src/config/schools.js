@@ -6,7 +6,6 @@ export const SCHOOLS = [
     segmentLabel: 'UC Berkeley',
     browseSubtitle: 'Browse Berkeley classes to enroll in tidbits and study groups.',
     searchPlaceholder: 'Search Berkeley classes…',
-    emoji: '🐻',
     showInOnboarding: true,
   },
   {
@@ -15,7 +14,6 @@ export const SCHOOLS = [
     segmentLabel: 'AP Courses',
     browseSubtitle: 'Browse AP courses to enroll in tidbits and study groups.',
     searchPlaceholder: 'Search AP courses…',
-    emoji: '📚',
     showInOnboarding: true,
   },
   {
@@ -24,7 +22,6 @@ export const SCHOOLS = [
     segmentLabel: 'Miscellaneous',
     browseSubtitle: 'General topics and community decks — no class required.',
     searchPlaceholder: 'Search topics…',
-    emoji: '💡',
     showInOnboarding: false,
   },
 ];

@@ -24,6 +24,7 @@ import { SameBoatService } from '../services/SameBoatService';
 import { InsightsService } from '../services/InsightsService';
 import { DailyChallengeService } from '../services/DailyChallengeService';
 import { StreakService } from '../services/StreakService';
+import { AchievementService } from '../services/AchievementService';
 import { useTheme } from '../context/ThemeContext';
 import CoinBalanceChip from '../components/CoinBalanceChip';
 import BuddyRequestsCard from '../components/BuddyRequestsCard';
@@ -149,6 +150,8 @@ export default function HomeScreen({ navigation }) {
   const loadData = async () => {
     // Load groups in background — don't block the rest of the screen
     GroupService.getMyGroups().then(setGroups).catch(() => {});
+    // Cumulative-state achievements (Century). Self-throttled to once per session.
+    AchievementService.syncMilestones().catch(() => {});
 
     const classIds = await ClassService.getMyClassIds();
     await ClassService.ensureCategoriesSyncedToEnrollments();

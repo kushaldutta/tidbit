@@ -15,6 +15,8 @@ import { QuizService } from '../services/QuizService';
 import { SameBoatService } from '../services/SameBoatService';
 import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
@@ -26,21 +28,21 @@ function SameBoatBanner({ stat, styles, theme }) {
   const wrongPct = Math.round(100 - (stat.pctCorrect ?? 0));
   const rightPct = Math.round(stat.pctCorrect ?? 0);
 
-  let emoji, msg, bg, textColor;
+  let icon, msg, bg, textColor;
   if (wrongPct >= 60) {
-    emoji = '🤝'; msg = `${wrongPct}% of your classmates got this wrong too`;
+    icon = 'buddy'; msg = `${wrongPct}% of your classmates got this wrong too`;
     bg = theme.dangerBg; textColor = theme.dangerText;
   } else if (wrongPct >= 30) {
-    emoji = '📊'; msg = `${rightPct}% of your classmates got this right`;
+    icon = 'accuracy'; msg = `${rightPct}% of your classmates got this right`;
     bg = theme.warningBg; textColor = theme.warningText;
   } else {
-    emoji = '🏆'; msg = `${rightPct}% of classmates got this right — tough one?`;
+    icon = 'trophy'; msg = `${rightPct}% of classmates got this right — tough one?`;
     bg = theme.successBg; textColor = theme.successText;
   }
 
   return (
     <View style={[styles.sameBoat, { backgroundColor: bg }]}>
-      <Text style={styles.sameBoatEmoji}>{emoji}</Text>
+      <Icon name={icon} size={iconSize.lg} color={textColor} />
       <View style={{ flex: 1 }}>
         <Text style={[styles.sameBoatMsg, { color: textColor }]}>{msg}</Text>
         <Text style={styles.sameBoatSub}>{stat.attempts} classmate attempt{stat.attempts !== 1 ? 's' : ''}</Text>
@@ -193,7 +195,7 @@ export default function QuizScreen({ route, navigation }) {
   if (questions.length === 0) {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.emptyEmoji}>📭</Text>
+        <Icon name="deck" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
         <Text style={styles.emptyText}>No cards available for this review session.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -209,10 +211,13 @@ export default function QuizScreen({ route, navigation }) {
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕ Exit</Text>
+          <View style={styles.exitRow}>
+            <Icon name="close" size={iconSize.sm} color={theme.textSecondary} />
+            <Text style={styles.exitText}>Exit</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.progress}>{index + 1} / {questions.length}</Text>
-        <Text style={styles.scoreText}>✓ {score.correct}</Text>
+        <Text style={styles.scoreText}>{score.correct} correct</Text>
       </View>
 
       {/* Progress bar */}
@@ -285,9 +290,16 @@ export default function QuizScreen({ route, navigation }) {
           {answered && (
             <View>
               <View style={[styles.resultBanner, result.correct ? styles.resultCorrect : styles.resultWrong]}>
-                <Text style={styles.resultText}>
-                  {result.correct ? '✓ Correct!' : '✗ Incorrect'}
-                </Text>
+                <View style={styles.resultRow}>
+                  <Icon
+                    name={result.correct ? 'check' : 'wrong'}
+                    size={iconSize.md}
+                    color={result.correct ? theme.successText : theme.dangerText}
+                  />
+                  <Text style={styles.resultText}>
+                    {result.correct ? 'Correct' : 'Incorrect'}
+                  </Text>
+                </View>
                 {!result.correct && (
                   <Text style={styles.resultCorrectAnswer}>
                     Correct: {currentQ.correct}
@@ -318,6 +330,7 @@ const makeStyles = (theme) => StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 12,
   },
+  exitRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   exitText: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
   progress: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
   scoreText: { fontSize: 14, color: theme.success, fontWeight: '700' },
@@ -375,6 +388,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   resultCorrect: { backgroundColor: theme.successBg, borderWidth: 1.5, borderColor: theme.success },
   resultWrong: { backgroundColor: theme.dangerBg, borderWidth: 1.5, borderColor: theme.danger },
+  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   resultText: { fontSize: 16, fontWeight: '800', color: theme.text, marginBottom: 4 },
   resultCorrectAnswer: { fontSize: 14, color: theme.textSecondary },
 
@@ -382,7 +396,6 @@ const makeStyles = (theme) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     borderRadius: 14, padding: 14, marginBottom: 12,
   },
-  sameBoatEmoji: { fontSize: 24 },
   sameBoatMsg: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
   sameBoatSub: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
@@ -392,7 +405,7 @@ const makeStyles = (theme) => StyleSheet.create({
   },
   nextBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyText: { fontSize: 16, color: theme.textSecondary, marginBottom: 16 },
   backLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },
 });

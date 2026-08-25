@@ -18,6 +18,9 @@ import {
   View, Text, StyleSheet, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import { EntitlementService } from '../services/EntitlementService';
+import { useTheme } from '../context/ThemeContext';
+import Icon from './Icon';
+import { spacing, radius, elevation, iconSize } from '../theme/tokens';
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
@@ -57,11 +60,13 @@ export function usePremium(navigation) {
 
 export default function PremiumGate({ children, navigation, feature = 'This feature' }) {
   const { isPremium, loading } = usePremium(navigation);
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color="#6366f1" />
+        <ActivityIndicator color={theme.primary} />
       </View>
     );
   }
@@ -71,7 +76,7 @@ export default function PremiumGate({ children, navigation, feature = 'This feat
   return (
     <View style={styles.lockedWrap}>
       <View style={styles.lockedCard}>
-        <Text style={styles.lockEmoji}>🔒</Text>
+        <Icon name="lock" size={iconSize.hero} color={theme.primary} style={styles.lockIcon} />
         <Text style={styles.lockedTitle}>Premium Feature</Text>
         <Text style={styles.lockedDesc}>
           {feature} is part of Tidbit Premium. Upgrade to unlock AI generation, analytics, custom themes, and more.
@@ -81,35 +86,52 @@ export default function PremiumGate({ children, navigation, feature = 'This feat
           onPress={() => navigation?.navigate('Paywall')}
           activeOpacity={0.85}
         >
-          <Text style={styles.upgradeBtnText}>✨ Upgrade to Premium</Text>
+          <Text style={styles.upgradeBtnText}>Upgrade to Premium</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   lockedWrap: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    padding: 32, backgroundColor: '#f9fafb',
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xxxl,
+    backgroundColor: theme.background,
   },
   lockedCard: {
-    backgroundColor: '#fff', borderRadius: 24, padding: 28,
-    alignItems: 'center', width: '100%',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08, shadowRadius: 16, elevation: 6,
+    backgroundColor: theme.card,
+    borderRadius: radius.lg,
+    padding: spacing.xxl,
+    alignItems: 'center',
+    width: '100%',
+    borderWidth: 1,
+    borderColor: theme.border,
+    ...elevation.raised,
   },
-  lockEmoji: { fontSize: 48, marginBottom: 12 },
-  lockedTitle: { fontSize: 22, fontWeight: '800', color: '#111827', marginBottom: 8 },
+  lockIcon: { marginBottom: spacing.md },
+  lockedTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: theme.text,
+    marginBottom: spacing.sm,
+  },
   lockedDesc: {
-    fontSize: 14, color: '#6b7280', textAlign: 'center',
-    lineHeight: 22, marginBottom: 24,
+    fontSize: 14,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.xxl,
   },
   upgradeBtn: {
-    backgroundColor: '#6366f1', borderRadius: 14,
-    paddingVertical: 14, paddingHorizontal: 32,
+    backgroundColor: theme.primary,
+    borderRadius: radius.card,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.xxxl,
   },
   upgradeBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });

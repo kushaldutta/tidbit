@@ -13,6 +13,8 @@ import { QueueService, LEARN_SESSION_CARD_LIMIT } from '../services/QueueService
 import { ContentService } from '../services/ContentService';
 import { StudyDeckService } from '../services/StudyDeckService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 function modeBreakdown(items) {
   let quiz = 0;
@@ -117,7 +119,7 @@ export default function ReviewQueueScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scroll}>
         {groups.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyEmoji}>✓</Text>
+            <Icon name="check" size={iconSize.hero} color={theme.success} style={styles.emptyIcon} />
             <Text style={styles.emptyText}>You're caught up on reviews.</Text>
           </View>
         ) : (
@@ -170,7 +172,7 @@ const makeStyles = (theme) => StyleSheet.create({
   reviewAllPrimarySub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
   scroll: { padding: 20, paddingTop: 12, paddingBottom: 40 },
   empty: { alignItems: 'center', paddingTop: 60 },
-  emptyEmoji: { fontSize: 48, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyText: { fontSize: 16, color: theme.textSecondary },
   groupCard: {
     backgroundColor: theme.card,

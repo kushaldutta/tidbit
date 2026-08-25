@@ -4,11 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StorageService } from '../services/StorageService';
 import { ContentService } from '../services/ContentService';
 import { NotificationService } from '../services/NotificationService';
+import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { spacing, radius, elevation, iconSize } from '../theme/tokens';
 
 export default function CategorySelectionScreen({ navigation }) {
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [availableCategories, setAvailableCategories] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
   useEffect(() => {
     loadCategories();
@@ -101,7 +106,7 @@ export default function CategorySelectionScreen({ navigation }) {
           <TextInput
             style={styles.searchInput}
             placeholder="Search categories..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
@@ -144,7 +149,7 @@ export default function CategorySelectionScreen({ navigation }) {
                   <Switch
                     value={isSelected}
                     onValueChange={() => toggleCategory(category.id)}
-                    trackColor={{ false: '#e5e7eb', true: '#6366f1' }}
+                    trackColor={{ false: theme.border, true: theme.primary }}
                     thumbColor="#ffffff"
                   />
                 </View>
@@ -156,8 +161,9 @@ export default function CategorySelectionScreen({ navigation }) {
 
         {selectedCategories.length === 0 && (
           <View style={styles.warningBox}>
+            <Icon name="warning" size={iconSize.md} color={theme.warningText} />
             <Text style={styles.warningText}>
-              ⚠️ Please select at least one category to continue
+              Please select at least one category to continue
             </Text>
           </View>
         )}
@@ -183,86 +189,82 @@ export default function CategorySelectionScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: theme.background,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 32,
-    paddingTop: 20,
+    padding: spacing.xxxl,
+    paddingTop: spacing.xl,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 12,
+    color: theme.text,
+    marginBottom: spacing.md,
   },
   subtitle: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
     lineHeight: 24,
   },
   infoBox: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    backgroundColor: theme.infoBg,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xxl,
     borderLeftWidth: 4,
-    borderLeftColor: '#6366f1',
+    borderLeftColor: theme.info,
   },
   infoText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#1e40af',
+    color: theme.infoText,
   },
   searchContainer: {
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   searchInput: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     fontSize: 16,
-    color: '#1f2937',
+    color: theme.text,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
   },
   categoriesList: {
-    marginBottom: 24,
+    marginBottom: spacing.xxl,
   },
   emptyState: {
-    padding: 24,
+    padding: spacing.xxl,
     alignItems: 'center',
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
   },
   categoryCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: theme.card,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    borderColor: theme.border,
+    ...elevation.card,
   },
   categoryCardSelected: {
-    borderColor: '#6366f1',
-    backgroundColor: '#f5f3ff',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
   categoryContent: {
     flexDirection: 'row',
@@ -271,52 +273,49 @@ const styles = StyleSheet.create({
   },
   categoryInfo: {
     flex: 1,
-    marginRight: 16,
+    marginRight: spacing.lg,
   },
   categoryName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 4,
+    color: theme.text,
+    marginBottom: spacing.xs,
   },
   categoryNameSelected: {
-    color: '#6366f1',
+    color: theme.primary,
   },
   categoryDescription: {
     fontSize: 14,
-    color: '#6b7280',
+    color: theme.textSecondary,
     lineHeight: 20,
   },
   warningBox: {
-    backgroundColor: '#fef3c7',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: theme.warningBg,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.xxl,
     borderLeftWidth: 4,
-    borderLeftColor: '#f59e0b',
+    borderLeftColor: theme.warning,
   },
   warningText: {
+    flex: 1,
     fontSize: 14,
-    color: '#92400e',
+    color: theme.warningText,
     lineHeight: 20,
   },
   nextButton: {
-    backgroundColor: '#6366f1',
-    paddingVertical: 16,
+    backgroundColor: theme.primary,
+    paddingVertical: spacing.lg,
     paddingHorizontal: 48,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
-    shadowColor: '#6366f1',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    ...elevation.raised,
   },
   nextButtonDisabled: {
-    backgroundColor: '#e5e7eb',
+    backgroundColor: theme.surfaceAlt,
     shadowOpacity: 0,
     elevation: 0,
   },
@@ -326,7 +325,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   nextButtonTextDisabled: {
-    color: '#9ca3af',
+    color: theme.textMuted,
   },
 });
-

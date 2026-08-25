@@ -13,38 +13,41 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { DeckService } from '../services/DeckService';
 import { SameBoatService } from '../services/SameBoatService';
 import { CardLearningService } from '../services/CardLearningService';
+import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { spacing, radius, elevation, iconSize } from '../theme/tokens';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Same-Boat banner ────────────────────────────────────────────────────────
 
-function SameBoatBanner({ stat }) {
+function SameBoatBanner({ stat, styles, theme }) {
   if (!stat || stat.attempts < 2) return null;
 
   const pct = stat.pctCorrect ?? 0;
   const wrongPct = Math.round(100 - pct);
-  let message, emoji, bg, textColor;
+  let message, icon, bg, textColor;
 
   if (wrongPct >= 60) {
     message = `${wrongPct}% of your classmates got this wrong too`;
-    emoji = '🤝';
-    bg = '#fef2f2';
-    textColor = '#991b1b';
+    icon = 'buddy';
+    bg = theme.dangerBg;
+    textColor = theme.dangerText;
   } else if (wrongPct >= 30) {
     message = `${Math.round(pct)}% of your classmates got this right`;
-    emoji = '📊';
-    bg = '#fffbeb';
-    textColor = '#92400e';
+    icon = 'accuracy';
+    bg = theme.warningBg;
+    textColor = theme.warningText;
   } else {
     message = `${Math.round(pct)}% of your classmates got this right — tricky one?`;
-    emoji = '🏆';
-    bg = '#f0fdf4';
-    textColor = '#166534';
+    icon = 'trophy';
+    bg = theme.successBg;
+    textColor = theme.successText;
   }
 
   return (
     <View style={[styles.sameBoatBanner, { backgroundColor: bg }]}>
-      <Text style={styles.sameBoatEmoji}>{emoji}</Text>
+      <Icon name={icon} size={iconSize.lg} color={textColor} />
       <View style={styles.sameBoatTextWrap}>
         <Text style={[styles.sameBoatMessage, { color: textColor }]}>{message}</Text>
         <Text style={styles.sameBoatAttempts}>{stat.attempts} classmate attempt{stat.attempts !== 1 ? 's' : ''}</Text>
@@ -57,6 +60,8 @@ function SameBoatBanner({ stat }) {
 
 export default function GroupDeckStudyScreen({ route, navigation }) {
   const { deckId, deckTitle, classId, groupId, code, title, restartKey } = route.params;
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
   const [cards, setCards] = useState([]);
   const [index, setIndex] = useState(0);
@@ -150,7 +155,7 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator color="#6366f1" />
+        <ActivityIndicator color={theme.primary} />
       </SafeAreaView>
     );
   }
@@ -158,7 +163,7 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
   if (cards.length === 0) {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.emptyEmoji}>📭</Text>
+        <Icon name="deck" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
         <Text style={styles.emptyText}>This deck has no cards yet.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -172,7 +177,10 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕ Exit</Text>
+          <View style={styles.exitRow}>
+            <Icon name="close" size={iconSize.sm} color={theme.textSecondary} />
+            <Text style={styles.exitText}>Exit</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.progressText}>
           {index + 1} / {cards.length}
@@ -222,7 +230,7 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
       </View>
 
       {/* Same-Boat stat (shown after flip) */}
-      {flipped && <SameBoatBanner stat={sameBoatStat} />}
+      {flipped && <SameBoatBanner stat={sameBoatStat} styles={styles} theme={theme} />}
 
       {/* Answer buttons (shown after flip) */}
       {flipped && (
@@ -232,14 +240,16 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
             onPress={() => handleAnswer(false)}
             activeOpacity={0.85}
           >
-            <Text style={styles.answerBtnText}>✗  Didn't know</Text>
+            <Icon name="wrong" size={iconSize.md} color={theme.dangerText} />
+            <Text style={styles.answerBtnText}>Didn't know</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.answerBtn, styles.answerBtnRight]}
             onPress={() => handleAnswer(true)}
             activeOpacity={0.85}
           >
-            <Text style={styles.answerBtnText}>✓  Knew it</Text>
+            <Icon name="check" size={iconSize.md} color={theme.successText} />
+            <Text style={styles.answerBtnText}>Knew it</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -247,42 +257,45 @@ export default function GroupDeckStudyScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
   center: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#f9fafb',
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.background,
   },
 
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
   },
-  exitText: { fontSize: 14, color: '#6b7280', fontWeight: '600' },
-  progressText: { fontSize: 14, color: '#374151', fontWeight: '600' },
+  exitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  exitText: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
+  progressText: { fontSize: 14, color: theme.textSecondary, fontWeight: '600' },
 
   progressTrack: {
     height: 3,
-    backgroundColor: '#e5e7eb',
-    marginHorizontal: 20,
+    backgroundColor: theme.border,
+    marginHorizontal: spacing.xl,
     borderRadius: 2,
   },
   progressFill: {
     height: 3,
-    backgroundColor: '#6366f1',
+    backgroundColor: theme.primary,
     borderRadius: 2,
   },
 
   deckTitle: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: theme.textMuted,
     fontWeight: '600',
     textAlign: 'center',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -291,74 +304,82 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: spacing.xl,
   },
   card: {
     position: 'absolute',
     width: SCREEN_W - 40,
     minHeight: 220,
-    borderRadius: 20,
-    padding: 28,
+    borderRadius: radius.lg,
+    padding: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
     backfaceVisibility: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    borderWidth: 1,
+    borderColor: theme.border,
+    ...elevation.raised,
   },
-  cardFront: { backgroundColor: '#fff' },
-  cardBack: { backgroundColor: '#eef2ff' },
+  cardFront: { backgroundColor: theme.card },
+  cardBack: { backgroundColor: theme.primaryLight },
   cardLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#9ca3af',
+    color: theme.textMuted,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   cardText: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111827',
+    color: theme.text,
     textAlign: 'center',
     lineHeight: 32,
   },
-  tapHint: { marginTop: 28 },
-  tapHintText: { fontSize: 13, color: '#6366f1', fontWeight: '600' },
+  tapHint: { marginTop: spacing.xxl },
+  tapHintText: { fontSize: 13, color: theme.primary, fontWeight: '600' },
 
   sameBoatBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginBottom: 12,
-    borderRadius: 14,
-    padding: 14,
-    gap: 12,
+    marginHorizontal: spacing.xl,
+    marginBottom: spacing.md,
+    borderRadius: radius.card,
+    padding: spacing.md,
+    gap: spacing.md,
   },
-  sameBoatEmoji: { fontSize: 24 },
   sameBoatTextWrap: { flex: 1 },
   sameBoatMessage: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  sameBoatAttempts: { fontSize: 12, color: '#9ca3af', marginTop: 2 },
+  sameBoatAttempts: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
 
   answerRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    gap: 12,
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
   },
   answerBtn: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 16,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    borderRadius: radius.card,
   },
-  answerBtnWrong: { backgroundColor: '#fef2f2', borderWidth: 1.5, borderColor: '#fca5a5' },
-  answerBtnRight: { backgroundColor: '#f0fdf4', borderWidth: 1.5, borderColor: '#86efac' },
-  answerBtnText: { fontSize: 15, fontWeight: '700', color: '#374151' },
+  answerBtnWrong: {
+    backgroundColor: theme.dangerBg,
+    borderWidth: 1.5,
+    borderColor: theme.danger,
+  },
+  answerBtnRight: {
+    backgroundColor: theme.successBg,
+    borderWidth: 1.5,
+    borderColor: theme.success,
+  },
+  answerBtnText: { fontSize: 15, fontWeight: '700', color: theme.text },
 
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
-  emptyText: { fontSize: 16, color: '#6b7280', marginBottom: 16 },
-  backLink: { fontSize: 15, color: '#6366f1', fontWeight: '600' },
+  emptyIcon: { marginBottom: spacing.md },
+  emptyText: { fontSize: 16, color: theme.textSecondary, marginBottom: spacing.lg },
+  backLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },
 });

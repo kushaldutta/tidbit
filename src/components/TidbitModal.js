@@ -15,6 +15,8 @@ import { SpacedRepetitionService } from '../services/SpacedRepetitionService';
 import { ContentService } from '../services/ContentService';
 import { StorageService } from '../services/StorageService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from './Icon';
+import { iconSize } from '../theme/tokens';
 
 const { width, height: windowHeight } = Dimensions.get('window');
 
@@ -279,9 +281,9 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
                     {learningState && (
                       <View style={[styles.masteryBadge, getMasteryBadgeStyle(learningState.masteryLevel)]}>
                         <Text style={styles.masteryBadgeText}>
-                          {learningState.masteryLevel === 'mastered' ? '⭐ Mastered' : 
-                           learningState.masteryLevel === 'learning' ? '📚 Learning' : 
-                           '🆕 New'}
+                          {learningState.masteryLevel === 'mastered' ? 'Mastered'
+                            : learningState.masteryLevel === 'learning' ? 'Learning'
+                              : 'New'}
                         </Text>
                       </View>
                     )}
@@ -356,22 +358,29 @@ export default function TidbitModal({ tidbit, onDismiss, onNextTidbit }) {
                     style={[styles.actionButton, styles.actionButtonKnew]}
                     onPress={() => handleAction('knew')}
                   >
-                    <Text style={styles.actionButtonText}>✅ I knew it</Text>
+                    <Icon name="check" size={iconSize.md} color={theme.successText} />
+                    <Text style={styles.actionButtonText}>I knew it</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.actionButton, styles.actionButtonDidnt]}
                     onPress={() => handleAction('didnt')}
                   >
-                    <Text style={styles.actionButtonText}>❓ I didn't</Text>
+                    <Icon name="wrong" size={iconSize.md} color={theme.warningText} />
+                    <Text style={styles.actionButtonText}>I didn't</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={[styles.actionButton, styles.actionButtonSave]}
                     onPress={() => handleAction(isSaved ? 'unsave' : 'save')}
                   >
+                    <Icon
+                      name={isSaved ? 'close' : 'add'}
+                      size={iconSize.md}
+                      color={theme.textSecondary}
+                    />
                     <Text style={styles.actionButtonText}>
-                      {isSaved ? '🗑️ Unsave' : '💾 Save'}
+                      {isSaved ? 'Unsave' : 'Save'}
                     </Text>
                   </TouchableOpacity>
 
@@ -556,6 +565,10 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingVertical: 4,
   },
   actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,

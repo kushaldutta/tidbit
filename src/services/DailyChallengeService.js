@@ -16,6 +16,7 @@ import { AuthService } from './AuthService';
 import { ContentService } from './ContentService';
 import { RecallService } from './RecallService';
 import { CoinService } from './CoinService';
+import { AchievementService } from './AchievementService';
 
 export const CHALLENGE_QUESTION_COUNT = 10;
 export const RECALL_POINTS = 3;
@@ -316,6 +317,7 @@ class DailyChallengeService {
     if (!SUPABASE_CONFIGURED || !challengeId) return false;
     const myRun = await this.getMyRun(challengeId);
     if (!myRun.completed) return false;
+    AchievementService.unlock('daily_challenger').catch(() => {});
     return CoinService.credit(
       COIN_PARTICIPATION,
       'daily_challenge_participation',

@@ -28,6 +28,8 @@ import CommentThread from '../components/CommentThread';
 import { ReportService } from '../services/ReportService';
 import { BlockService } from '../services/BlockService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -59,7 +61,7 @@ function Avatar({ name, size = 36, anon = false }) {
   if (anon) {
     return (
       <View style={[avatarStyles.avatar, { width: size, height: size, borderRadius: size / 2, backgroundColor: '#6b7280' }]}>
-        <Text style={{ fontSize: size * 0.45 }}>🎭</Text>
+        <Icon name="lock" size={size * 0.5} color="#fff" />
       </View>
     );
   }
@@ -174,7 +176,7 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
         <View style={styles.postMeta}>
           <View style={styles.postMetaRow}>
             <Text style={styles.postAuthor}>
-              {isAnon ? 'Anonymous 🎭' : (post.authorName || 'Tidbit User')}
+              {isAnon ? 'Anonymous' : (post.authorName || 'Tidbit User')}
             </Text>
             {isAnon && (
               <View style={styles.anonBadge}>
@@ -183,7 +185,7 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
             )}
             {isActivity && (
               <View style={styles.activityBadge}>
-                <Text style={styles.activityBadgeText}>⚡ activity</Text>
+                <Text style={styles.activityBadgeText}>activity</Text>
               </View>
             )}
           </View>
@@ -346,10 +348,10 @@ function ComposeModal({ visible, groups, onClose, onPost }) {
               style={styles.modalInput}
               placeholder={
                 anonymous
-                  ? 'Ask your dumb question... (no one will know it\'s you 🎭)'
+                  ? 'Ask your dumb question... (no one will know it\'s you)'
                   : 'Share a note, resource, or question with your class...'
               }
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={theme.textMuted}
               value={text}
               onChangeText={setText}
               multiline
@@ -360,7 +362,7 @@ function ComposeModal({ visible, groups, onClose, onPost }) {
             {/* Anonymous toggle */}
             <View style={styles.anonRow}>
               <View style={styles.anonInfo}>
-                <Text style={styles.anonLabel}>🃏 Dumb Question Mode</Text>
+                <Text style={styles.anonLabel}>Dumb Question Mode</Text>
                 <Text style={styles.anonSubtitle}>
                   Post anonymously — your name won't be shown. No dumb questions.
                 </Text>
@@ -368,7 +370,7 @@ function ComposeModal({ visible, groups, onClose, onPost }) {
               <Switch
                 value={anonymous}
                 onValueChange={setAnonymous}
-                trackColor={{ false: '#e5e7eb', true: '#6366f1' }}
+                trackColor={{ false: theme.border, true: theme.primary }}
                 thumbColor="#fff"
               />
             </View>
@@ -376,7 +378,7 @@ function ComposeModal({ visible, groups, onClose, onPost }) {
             {anonymous && (
               <View style={styles.anonWarning}>
                 <Text style={styles.anonWarningText}>
-                  🎭 This will be posted as "Anonymous". Your classmates won't see your name.
+                  This will be posted as "Anonymous". Your classmates won't see your name.
                 </Text>
               </View>
             )}
@@ -627,7 +629,7 @@ export default function FeedScreen({ navigation }) {
             <View style={styles.empty}>
               {groups.length === 0 ? (
                 <>
-                  <Text style={styles.emptyEmoji}>🎓</Text>
+                  <Icon name="classes" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
                   <Text style={styles.emptyTitle}>No classes yet</Text>
                   <Text style={styles.emptyBody}>
                     Join a class from the Categories tab to see your group feed here.
@@ -641,7 +643,7 @@ export default function FeedScreen({ navigation }) {
                 </>
               ) : (
                 <>
-                  <Text style={styles.emptyEmoji}>💬</Text>
+                  <Icon name="comment" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
                   <Text style={styles.emptyTitle}>Nothing yet</Text>
                   <Text style={styles.emptyBody}>
                     Be the first to post something to your class groups!
@@ -796,7 +798,7 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#fde68a',
   },
-  activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '700' },
+  activityBadgeText: { fontSize: 10, color: theme.warningText, fontWeight: '700' },
   postMenuBtn: {
     marginLeft: 4,
     paddingVertical: 4,
@@ -828,7 +830,7 @@ const makeStyles = (theme) => StyleSheet.create({
 
   // ── empty state ───────────────────────────────────────────────────────────
   empty: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 32 },
-  emptyEmoji: { fontSize: 48, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: theme.text, marginBottom: 8 },
   emptyBody: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   emptyBtn: {

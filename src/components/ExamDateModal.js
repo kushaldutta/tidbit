@@ -17,6 +17,9 @@ import {
 import { InsightsService } from '../services/InsightsService';
 import { ContentService } from '../services/ContentService';
 import { DeckService } from '../services/DeckService';
+import { useTheme } from '../context/ThemeContext';
+import Icon from './Icon';
+import { spacing, radius, iconSize } from '../theme/tokens';
 
 const LABELS = ['Midterm', 'Final', 'Exam'];
 
@@ -40,6 +43,8 @@ export default function ExamDateModal({
   const [sections, setSections] = useState([]);
   const [loadingSections, setLoadingSections] = useState(false);
   const [chosen, setChosen] = useState(() => new Set());
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
   useEffect(() => {
     if (visible) {
@@ -150,7 +155,7 @@ export default function ExamDateModal({
             value={date}
             onChangeText={setDate}
             placeholder="2026-10-15"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={theme.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -163,7 +168,7 @@ export default function ExamDateModal({
           </View>
 
           {loadingSections && (
-            <ActivityIndicator style={{ marginVertical: 12 }} color="#4f46e5" />
+            <ActivityIndicator style={{ marginVertical: spacing.md }} color={theme.primary} />
           )}
 
           {!loadingSections && sections.length > 0 && (
@@ -190,7 +195,7 @@ export default function ExamDateModal({
                       accessibilityState={{ checked: on }}
                     >
                       <View style={[styles.checkbox, on && styles.checkboxOn]}>
-                        {on ? <Text style={styles.checkmark}>✓</Text> : null}
+                        {on ? <Icon name="check" size={iconSize.sm} color="#fff" /> : null}
                       </View>
                       <Text style={styles.scopeTitle} numberOfLines={2}>
                         {section.title}
@@ -237,86 +242,100 @@ export default function ExamDateModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.overlay },
   sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: theme.card,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
     // Capped so a class with many sections cannot push the sheet off screen.
     maxHeight: '88%',
   },
-  sheetContent: { padding: 22, paddingBottom: 36 },
-  title: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  sub: { fontSize: 13, color: '#6b7280', marginTop: 4, marginBottom: 16 },
-  row: { flexDirection: 'row', gap: 8, marginBottom: 14, flexWrap: 'wrap' },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+  sheetContent: { padding: spacing.xxl, paddingBottom: spacing.xxxl },
+  title: { fontSize: 20, fontWeight: '700', color: theme.text },
+  sub: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
   },
-  chipOn: { backgroundColor: '#e0e7ff' },
-  chipText: { fontWeight: '700', color: '#4b5563' },
-  chipTextOn: { color: '#4338ca' },
-  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#6b7280', marginBottom: 6 },
+  row: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md, flexWrap: 'wrap' },
+  chip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: theme.surfaceAlt,
+  },
+  chipOn: { backgroundColor: theme.primaryLight },
+  chipText: { fontWeight: '700', color: theme.textSecondary },
+  chipTextOn: { color: theme.primary },
+  fieldLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.textSecondary,
+    marginBottom: spacing.xs,
+  },
   input: {
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: theme.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
     fontSize: 16,
-    color: '#111827',
-    marginBottom: 10,
+    color: theme.text,
+    marginBottom: spacing.sm,
   },
   quick: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: theme.surfaceAlt,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  quickText: { fontWeight: '600', color: '#374151', fontSize: 13 },
+  quickText: { fontWeight: '600', color: theme.textSecondary, fontSize: 13 },
   scopeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: spacing.xs,
   },
-  selectAll: { fontSize: 13, fontWeight: '700', color: '#4f46e5' },
+  selectAll: { fontSize: 13, fontWeight: '700', color: theme.primary },
   scopeList: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
+    borderColor: theme.border,
+    borderRadius: radius.md,
   },
   scopeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 10,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
   },
   checkbox: {
     width: 20,
     height: 20,
-    borderRadius: 6,
+    borderRadius: radius.sm,
     borderWidth: 2,
-    borderColor: '#d1d5db',
+    borderColor: theme.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: { backgroundColor: '#4f46e5', borderColor: '#4f46e5' },
-  checkmark: { color: '#fff', fontSize: 12, fontWeight: '900', lineHeight: 14 },
-  scopeTitle: { flex: 1, fontSize: 14, color: '#111827', fontWeight: '600' },
-  scopeCount: { fontSize: 12, color: '#9ca3af', fontWeight: '600' },
-  scopeNote: { fontSize: 12, color: '#6b7280', marginTop: 8 },
+  checkboxOn: { backgroundColor: theme.primary, borderColor: theme.primary },
+  scopeTitle: { flex: 1, fontSize: 14, color: theme.text, fontWeight: '600' },
+  scopeCount: { fontSize: 12, color: theme.textMuted, fontWeight: '600' },
+  scopeNote: { fontSize: 12, color: theme.textSecondary, marginTop: spacing.sm },
   saveBtn: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 14,
-    paddingVertical: 14,
+    backgroundColor: theme.primary,
+    borderRadius: radius.card,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
-  saveText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  clear: { textAlign: 'center', color: '#6b7280', fontWeight: '600', marginTop: 14 },
+  saveText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  clear: {
+    textAlign: 'center',
+    color: theme.textSecondary,
+    fontWeight: '600',
+    marginTop: spacing.md,
+  },
 });

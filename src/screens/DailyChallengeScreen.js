@@ -25,6 +25,8 @@ import { RecallService } from '../services/RecallService';
 import { AuthService } from '../services/AuthService';
 import { CardLearningService } from '../services/CardLearningService';
 import CoinBalanceChip from '../components/CoinBalanceChip';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
@@ -32,10 +34,9 @@ const OPTION_LABELS = ['A', 'B', 'C', 'D'];
 
 function LeaderboardRow({ rank, entry, myUserId }) {
   const isMe = entry.userId === myUserId;
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
   return (
     <View style={[lbStyles.row, isMe && lbStyles.rowMe]}>
-      <Text style={lbStyles.rank}>{medal}</Text>
+      <Text style={lbStyles.rank}>{rank}.</Text>
       <Text style={[lbStyles.name, isMe && lbStyles.nameMe]} numberOfLines={1}>
         {isMe ? 'You' : entry.displayName}
       </Text>
@@ -265,7 +266,7 @@ export default function DailyChallengeScreen({ route, navigation }) {
   if (phase === 'error') {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={styles.errorEmoji}>😕</Text>
+        <Icon name="dailyChallenge" size={iconSize.hero} color={theme.textMuted} style={styles.errorIcon} />
         <Text style={styles.errorText}>No challenge available yet for this class.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -283,7 +284,10 @@ export default function DailyChallengeScreen({ route, navigation }) {
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.topBar}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.exitText}>✕ Done</Text>
+            <View style={styles.exitRow}>
+              <Icon name="close" size={iconSize.sm} color={theme.textSecondary} />
+              <Text style={styles.exitText}>Done</Text>
+            </View>
           </TouchableOpacity>
           <Text style={styles.topTitle}>{categoryName} Challenge</Text>
           <CoinBalanceChip navigation={navigation} />
@@ -291,16 +295,22 @@ export default function DailyChallengeScreen({ route, navigation }) {
 
         <ScrollView contentContainerStyle={styles.summaryScroll}>
           <View style={styles.summaryHeader}>
-            <Text style={styles.summaryEmoji}>
-              {pct === 100 ? '🏆' : pct >= 70 ? '🌟' : pct >= 40 ? '💪' : '📖'}
-            </Text>
+            <Icon
+              name={pct === 100 ? 'trophy' : pct >= 70 ? 'mastered' : pct >= 40 ? 'startLearning' : 'study'}
+              size={iconSize.hero}
+              color={theme.primary}
+              style={styles.summaryIcon}
+            />
             <Text style={styles.summaryScore}>{totalPoints} pts</Text>
             <Text style={styles.summaryOf}>out of {maxPoints} possible</Text>
           </View>
 
           {coinsAwarded > 0 && (
             <View style={styles.coinBanner}>
-              <Text style={styles.coinBannerText}>🪙 +{coinsAwarded} Study Coins</Text>
+              <View style={styles.coinBannerRow}>
+                <Icon name="coins" size={iconSize.md} color={theme.warningText} />
+                <Text style={styles.coinBannerText}>+{coinsAwarded} Study Coins</Text>
+              </View>
               <TouchableOpacity onPress={() => navigation.navigate('CoinWallet')}>
                 <Text style={styles.coinBannerLink}>See your pile ›</Text>
               </TouchableOpacity>
@@ -343,7 +353,7 @@ export default function DailyChallengeScreen({ route, navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕</Text>
+          <Icon name="close" size={iconSize.md} color={theme.textSecondary} />
         </TouchableOpacity>
         <View style={styles.progressWrap}>
           <Text style={styles.progressText}>{progress}</Text>
@@ -495,7 +505,7 @@ const makeStyles = (theme) => StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   loadingText: { marginTop: 12, fontSize: 15, color: theme.textSecondary },
-  errorEmoji: { fontSize: 48, marginBottom: 12 },
+  errorIcon: { marginBottom: 12 },
   errorText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 16 },
   backLink: { fontSize: 16, color: theme.primary, fontWeight: '600' },
 
@@ -507,7 +517,8 @@ const makeStyles = (theme) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.primaryLight || '#e5e7eb',
   },
-  exitText: { fontSize: 15, color: theme.textSecondary, fontWeight: '600', width: 40 },
+  exitRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  exitText: { fontSize: 15, color: theme.textSecondary, fontWeight: '600' },
   topTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '800', color: theme.text },
   progressWrap: { flex: 1, alignItems: 'center' },
   progressText: { fontSize: 13, fontWeight: '600', color: theme.textSecondary, marginBottom: 4 },
@@ -616,18 +627,19 @@ const makeStyles = (theme) => StyleSheet.create({
   // Summary
   summaryScroll: { padding: 20, paddingBottom: 60 },
   summaryHeader: { alignItems: 'center', marginBottom: 20 },
-  summaryEmoji: { fontSize: 64, marginBottom: 8 },
+  summaryIcon: { marginBottom: 8 },
   summaryScore: { fontSize: 52, fontWeight: '900', color: theme.primary },
   summaryOf: { fontSize: 15, color: theme.textSecondary, marginTop: 4 },
   coinBanner: {
-    backgroundColor: '#fef9c3',
+    backgroundColor: theme.warningBg,
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
     marginBottom: 20,
   },
-  coinBannerText: { fontSize: 16, fontWeight: '700', color: '#92400e' },
-  coinBannerLink: { fontSize: 13, fontWeight: '700', color: '#b45309', marginTop: 6 },
+  coinBannerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  coinBannerText: { fontSize: 16, fontWeight: '700', color: theme.warningText },
+  coinBannerLink: { fontSize: 13, fontWeight: '700', color: theme.warningText, marginTop: 6 },
   leaderboardCard: {
     backgroundColor: theme.card,
     borderRadius: 16,

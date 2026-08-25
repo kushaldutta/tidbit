@@ -7,6 +7,9 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { spacing, radius, iconSize } from '../theme/tokens';
 
 export default function GroupDeckStudySummaryScreen({ route, navigation }) {
   const {
@@ -18,6 +21,8 @@ export default function GroupDeckStudySummaryScreen({ route, navigation }) {
     title,
     results = [],
   } = route.params;
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
   const studyParams = { deckId, deckTitle, classId, groupId, code, title };
 
@@ -40,32 +45,32 @@ export default function GroupDeckStudySummaryScreen({ route, navigation }) {
   const didntKnow = results.length - knew;
   const pct = results.length > 0 ? Math.round((knew / results.length) * 100) : 0;
 
-  let grade, gradeColor, gradeMsg;
-  if (pct >= 80) { grade = '🏆'; gradeColor = '#166534'; gradeMsg = 'Excellent!'; }
-  else if (pct >= 60) { grade = '👍'; gradeColor = '#92400e'; gradeMsg = 'Good job!'; }
-  else { grade = '💪'; gradeColor = '#991b1b'; gradeMsg = 'Keep practicing!'; }
+  let gradeIcon, gradeColor, gradeMsg;
+  if (pct >= 80) { gradeIcon = 'trophy'; gradeColor = theme.successText; gradeMsg = 'Excellent!'; }
+  else if (pct >= 60) { gradeIcon = 'check'; gradeColor = theme.warningText; gradeMsg = 'Good job!'; }
+  else { gradeIcon = 'startLearning'; gradeColor = theme.dangerText; gradeMsg = 'Keep practicing!'; }
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         {/* Hero */}
-        <Text style={styles.gradeEmoji}>{grade}</Text>
+        <Icon name={gradeIcon} size={iconSize.hero} color={gradeColor} style={styles.gradeIcon} />
         <Text style={[styles.gradeMsg, { color: gradeColor }]}>{gradeMsg}</Text>
         <Text style={styles.deckTitle}>{deckTitle}</Text>
 
         {/* Stats */}
         <View style={styles.statsRow}>
-          <View style={[styles.statBox, { backgroundColor: '#f0fdf4' }]}>
+          <View style={[styles.statBox, { backgroundColor: theme.successBg }]}>
             <Text style={styles.statNum}>{knew}</Text>
-            <Text style={styles.statLabel}>Knew it ✓</Text>
+            <Text style={styles.statLabel}>Knew it</Text>
           </View>
-          <View style={[styles.statBox, { backgroundColor: '#fff7ed' }]}>
+          <View style={[styles.statBox, { backgroundColor: theme.warningBg }]}>
             <Text style={styles.statNum}>{pct}%</Text>
             <Text style={styles.statLabel}>Accuracy</Text>
           </View>
-          <View style={[styles.statBox, { backgroundColor: '#fef2f2' }]}>
+          <View style={[styles.statBox, { backgroundColor: theme.dangerBg }]}>
             <Text style={styles.statNum}>{didntKnow}</Text>
-            <Text style={styles.statLabel}>Didn't know ✗</Text>
+            <Text style={styles.statLabel}>Didn't know</Text>
           </View>
         </View>
 
@@ -95,57 +100,72 @@ export default function GroupDeckStudySummaryScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  content: { alignItems: 'center', padding: 28, paddingTop: 48 },
+const makeStyles = (theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  content: { alignItems: 'center', padding: spacing.xxl, paddingTop: 48 },
 
-  gradeEmoji: { fontSize: 56, marginBottom: 8 },
-  gradeMsg: { fontSize: 28, fontWeight: '800', marginBottom: 4 },
-  deckTitle: { fontSize: 14, color: '#9ca3af', marginBottom: 32, textAlign: 'center' },
+  gradeIcon: { marginBottom: spacing.sm },
+  gradeMsg: { fontSize: 28, fontWeight: '700', marginBottom: spacing.xs },
+  deckTitle: {
+    fontSize: 14,
+    color: theme.textMuted,
+    marginBottom: spacing.xxxl,
+    textAlign: 'center',
+  },
 
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 28,
+    gap: spacing.md,
+    marginBottom: spacing.xxl,
     width: '100%',
   },
   statBox: {
     flex: 1,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: radius.card,
+    padding: spacing.lg,
     alignItems: 'center',
   },
-  statNum: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 4 },
-  statLabel: { fontSize: 11, color: '#6b7280', fontWeight: '600', textAlign: 'center' },
+  statNum: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: theme.text,
+    marginBottom: spacing.xs,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: theme.textSecondary,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 
   sameBoatNote: {
     fontSize: 13,
-    color: '#6b7280',
+    color: theme.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 36,
-    backgroundColor: '#eef2ff',
-    borderRadius: 12,
-    padding: 14,
+    marginBottom: spacing.xxxl,
+    backgroundColor: theme.primaryLight,
+    borderRadius: radius.md,
+    padding: spacing.md,
   },
 
   primaryBtn: {
-    backgroundColor: '#6366f1',
-    borderRadius: 16,
-    paddingVertical: 16,
+    backgroundColor: theme.primary,
+    borderRadius: radius.card,
+    paddingVertical: spacing.lg,
     width: '100%',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   primaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   secondaryBtn: {
-    borderRadius: 16,
-    paddingVertical: 14,
+    borderRadius: radius.card,
+    paddingVertical: spacing.md,
     width: '100%',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
+    borderColor: theme.border,
   },
-  secondaryBtnText: { color: '#6366f1', fontWeight: '600', fontSize: 15 },
+  secondaryBtnText: { color: theme.primary, fontWeight: '600', fontSize: 15 },
 });

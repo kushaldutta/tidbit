@@ -19,6 +19,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { DeckService } from '../../services/DeckService';
 import { GroupService } from '../../services/GroupService';
 import { useTheme } from '../../context/ThemeContext';
+import Icon from '../../components/Icon';
+import { iconSize } from '../../theme/tokens';
 
 const EMOJI_OPTIONS = ['📚', '🧠', '🔬', '🧪', '🧮', '📐', '🎨', '🌍', '⚡️', '💡', '🎯', '🏛️'];
 const FILTER_ALL = 'all';
@@ -542,7 +544,12 @@ export default function DeckEditorScreen({ route, navigation }) {
                           activeOpacity={0.75}
                         >
                           <View style={styles.shareRowLeft}>
-                            <Text style={styles.shareGroupEmoji}>👥</Text>
+                            <Icon
+                              name="members"
+                              size={iconSize.lg}
+                              color={theme.textSecondary}
+                              style={styles.shareGroupIcon}
+                            />
                             <View>
                               <Text style={styles.shareGroupName}>{group.title}</Text>
                               <Text style={styles.shareGroupMeta}>
@@ -566,7 +573,7 @@ export default function DeckEditorScreen({ route, navigation }) {
                                   isShared && styles.shareToggleTextActive,
                                 ]}
                               >
-                                {isShared ? 'Shared ✓' : 'Share'}
+                                {isShared ? 'Shared' : 'Share'}
                               </Text>
                             </View>
                           )}
@@ -580,7 +587,7 @@ export default function DeckEditorScreen({ route, navigation }) {
                   onPress={() => navigation.navigate('LearnModePicker', { deckId, deckTitle: title })}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.learnBtnText}>🎯 Learn this deck</Text>
+                  <Text style={styles.learnBtnText}>Learn this deck</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.deleteButton} onPress={handleDeleteDeck}>
                   <Text style={styles.deleteButtonText}>Delete deck</Text>
@@ -857,7 +864,7 @@ const makeStyles = (theme) => StyleSheet.create({
     marginBottom: 8,
   },
   shareRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  shareGroupEmoji: { fontSize: 22 },
+  shareGroupIcon: { marginRight: 4 },
   shareGroupName: { fontSize: 15, fontWeight: '600', color: theme.text },
   shareGroupMeta: { fontSize: 12, color: theme.textMuted, marginTop: 2 },
   shareToggle: {

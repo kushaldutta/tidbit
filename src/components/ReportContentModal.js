@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ReportService } from '../services/ReportService';
+import { useTheme } from '../context/ThemeContext';
+import { spacing, radius } from '../theme/tokens';
 
 export default function ReportContentModal({
   visible,
@@ -24,6 +26,8 @@ export default function ReportContentModal({
   const [category, setCategory] = useState('inappropriate');
   const [details, setDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
   useEffect(() => {
     if (visible) {
@@ -103,7 +107,7 @@ export default function ReportContentModal({
                   ? 'Describe the issue…'
                   : 'Anything else we should know?'
               }
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={theme.textMuted}
               value={details}
               onChangeText={setDetails}
               multiline
@@ -130,69 +134,75 @@ export default function ReportContentModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   flex: { flex: 1 },
-  container: { flex: 1, backgroundColor: '#fff' },
-  scrollContent: { paddingHorizontal: 24, paddingBottom: 16 },
+  container: { flex: 1, backgroundColor: theme.card },
+  scrollContent: { paddingHorizontal: spacing.xxl, paddingBottom: spacing.lg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 12,
+    paddingHorizontal: spacing.xxl,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
   },
-  title: { fontSize: 20, fontWeight: '700', color: '#111827', flex: 1, marginRight: 12 },
-  cancelText: { fontSize: 16, color: '#6b7280', fontWeight: '500' },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.text,
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  cancelText: { fontSize: 16, color: theme.textSecondary, fontWeight: '500' },
   description: {
     fontSize: 15,
-    color: '#6b7280',
+    color: theme.textSecondary,
     lineHeight: 22,
-    marginBottom: 20,
+    marginBottom: spacing.xl,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 10,
-    marginTop: 4,
+    color: theme.textSecondary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: theme.surfaceAlt,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   chipActive: {
-    backgroundColor: '#eef2ff',
-    borderColor: '#6366f1',
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primary,
   },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#4b5563' },
-  chipTextActive: { color: '#4338ca' },
+  chipText: { fontSize: 13, fontWeight: '600', color: theme.textSecondary },
+  chipTextActive: { color: theme.primary },
   input: {
     minHeight: 96,
-    backgroundColor: '#f9fafb',
+    backgroundColor: theme.background,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: theme.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     fontSize: 16,
-    color: '#111827',
+    color: theme.text,
     textAlignVertical: 'top',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   confirmBtn: {
-    marginHorizontal: 24,
-    marginBottom: 8,
-    backgroundColor: '#6366f1',
+    marginHorizontal: spacing.xxl,
+    marginBottom: spacing.sm,
+    backgroundColor: theme.primary,
     paddingVertical: 15,
-    borderRadius: 12,
+    borderRadius: radius.md,
     alignItems: 'center',
   },
   confirmBtnDisabled: { opacity: 0.5 },

@@ -7,15 +7,7 @@ export const GAME_TYPE = {
   SPEED_RUN: 'speed_run',
   MATCH: 'match',
   SPEED_DUEL: 'speed_duel',
-  WORDLE: 'wordle',
-  JEOPARDY: 'jeopardy',
-  BATTLE_ROYALE: 'battle_royale',
-  DUNGEON: 'dungeon',
   RUNNER: 'runner',
-  TOWER_DEFENSE: 'tower_defense',
-  RHYTHM: 'rhythm',
-  BOSS: 'boss',
-  CITY: 'city',
 };
 
 /**

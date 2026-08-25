@@ -17,6 +17,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 import { GroupChallengeService } from '../services/GroupChallengeService';
 import { ClassService } from '../services/ClassService';
 import { AuthService } from '../services/AuthService';
@@ -79,7 +81,7 @@ function ChallengeCard({ challenge, progress, onContribute, theme, styles }) {
       )}
       {pct >= 100 && (
         <View style={styles.completedBadge}>
-          <Text style={styles.completedText}>🎉 Goal Reached!</Text>
+          <Text style={styles.completedText}>Goal reached</Text>
         </View>
       )}
     </View>
@@ -264,7 +266,7 @@ export default function GroupChallengeScreen({ route, navigation }) {
             {lb.slice(0, 10).map((entry) => (
               <View key={entry.userId} style={styles.lbRow}>
                 <Text style={[styles.lbRank, entry.rank <= 3 && styles.lbRankTop]}>
-                  {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                  #{entry.rank}
                 </Text>
                 <Text style={[styles.lbName, entry.userId === myUserId && styles.lbNameMe]}>
                   {entry.displayName}{entry.userId === myUserId ? ' (you)' : ''}
@@ -303,7 +305,7 @@ export default function GroupChallengeScreen({ route, navigation }) {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.accent} />}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Text style={styles.emptyEmoji}>🏆</Text>
+              <Icon name="trophy" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
               <Text style={styles.emptyTitle}>No active challenges</Text>
               <Text style={styles.emptySubtitle}>Create one to rally your classmates!</Text>
               <TouchableOpacity style={styles.emptyBtn} onPress={() => setShowCreateModal(true)}>
@@ -429,7 +431,7 @@ function makeStyles(theme) {
       paddingVertical: 9,
       alignItems: 'center',
     },
-    completedText: { color: '#065f46', fontSize: 14, fontWeight: '700' },
+    completedText: { color: theme.successText, fontSize: 14, fontWeight: '700' },
 
     leaderboardToggle: { paddingVertical: 6, paddingHorizontal: 4 },
     leaderboardToggleText: { fontSize: 13, color: theme.textSecondary, fontWeight: '500' },
@@ -449,7 +451,7 @@ function makeStyles(theme) {
     lbTotal: { fontSize: 14, fontWeight: '700', color: theme.text, minWidth: 36, textAlign: 'right' },
 
     emptyState: { alignItems: 'center', paddingTop: 64, gap: 10 },
-    emptyEmoji: { fontSize: 48 },
+    emptyIcon: { marginBottom: 4 },
     emptyTitle: { fontSize: 18, fontWeight: '700', color: theme.text },
     emptySubtitle: { fontSize: 14, color: theme.textSecondary, textAlign: 'center' },
     emptyBtn: {

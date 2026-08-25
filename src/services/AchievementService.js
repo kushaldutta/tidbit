@@ -1,10 +1,29 @@
 /**
  * AchievementService — unlock titles next to your name.
  * Catalog lives in `achievements`; earning is insert-once on user_achievements.
+ *
+ * Display metadata (icon, locked-state copy) lives in
+ * src/config/achievementCatalog.js — keep the two in sync when adding a slug.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
 import { CoinService } from './CoinService';
+
+const NIGHT_OWL_KEY = '@tidbit:night_owl_dates';
+const NIGHT_OWL_NIGHTS = 3;
+const MASTERY_MILESTONE = 100;
+
+/** Local calendar date, so "last night at 1am" counts as its own night. */
+function dateKey(at) {
+  const y = at.getFullYear();
+  const m = String(at.getMonth() + 1).padStart(2, '0');
+  const d = String(at.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Once per app session — these checks are idempotent but not free. */
+let milestonesChecked = false;
 
 class AchievementService {
   static async unlock(slug, { classId = null } = {}) {
@@ -61,6 +80,56 @@ class AchievementService {
       icon: r.achievements?.icon,
       kind: r.achievements?.kind,
     }));
+  }
+
+  /**
+   * Milestones that depend on cumulative server state rather than a single
+   * action. Cheap enough to run once per session on Home load.
+   */
+  static async syncMilestones({ force = false } = {}) {
+    if (!SUPABASE_CONFIGURED) return;
+    if (milestonesChecked && !force) return;
+    const userId = AuthService.getUserId();
+    if (!userId) return;
+    milestonesChecked = true;
+
+    try {
+      const { data } = await supabase
+        .from('user_stats')
+        .select('cards_mastered')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if ((data?.cards_mastered ?? 0) >= MASTERY_MILESTONE) {
+        await this.unlock('first_100_mastered');
+      }
+    } catch (err) {
+      console.warn('[AchievementService] syncMilestones failed:', err.message);
+      milestonesChecked = false;
+    }
+  }
+
+  /**
+   * Called on every recorded study moment. Studying between midnight and 4am
+   * on three separate nights earns Night Owl.
+   */
+  static async recordNightOwl(at = new Date()) {
+    const hour = at.getHours();
+    if (hour >= 4) return false;
+    try {
+      const raw = await AsyncStorage.getItem(NIGHT_OWL_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const nights = new Set(Array.isArray(parsed) ? parsed : []);
+      const before = nights.size;
+      nights.add(dateKey(at));
+      if (nights.size === before) return false;
+
+      const list = [...nights].slice(-NIGHT_OWL_NIGHTS);
+      await AsyncStorage.setItem(NIGHT_OWL_KEY, JSON.stringify(list));
+      if (list.length >= NIGHT_OWL_NIGHTS) return this.unlock('night_owl');
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   static async countWins(gameType) {

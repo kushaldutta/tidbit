@@ -36,6 +36,8 @@ import { InsightsService } from '../services/InsightsService';
 import SectionPickerModal from '../components/SectionPickerModal';
 import ExamDateModal from '../components/ExamDateModal';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -174,7 +176,7 @@ function PostCard({ post, myUserId, isModerator, onReact, onDelete, onModerateRe
         </View>
         {isActivity && (
           <View style={styles.activityBadge}>
-            <Text style={styles.activityBadgeText}>⚡ activity</Text>
+            <Text style={styles.activityBadgeText}>activity</Text>
           </View>
         )}
         {hasMenu && (
@@ -589,7 +591,7 @@ export default function GroupScreen({ route, navigation }) {
         </View>
         {classmates.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyEmoji}>🎓</Text>
+            <Icon name="members" size={iconSize.xl} color={theme.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyText}>You're the first one here!</Text>
             <Text style={styles.emptySubtext}>
               Share the app with your classmates to see them appear.
@@ -621,7 +623,7 @@ export default function GroupScreen({ route, navigation }) {
         onPress={() => setSectionPickerOpen(true)}
         activeOpacity={0.8}
       >
-        <Text style={styles.classActionEmoji}>🏛️</Text>
+        <Icon name="section" size={iconSize.lg} color={theme.primary} style={styles.classActionIcon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.classActionTitle}>{mySection ? mySection.name : 'Join a section'}</Text>
           <Text style={styles.classActionSub}>
@@ -636,7 +638,7 @@ export default function GroupScreen({ route, navigation }) {
         onPress={() => setExamModalOpen(true)}
         activeOpacity={0.8}
       >
-        <Text style={styles.classActionEmoji}>📅</Text>
+        <Icon name="exam" size={iconSize.lg} color={theme.primary} style={styles.classActionIcon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.classActionTitle}>
             {examInfo?.date
@@ -710,7 +712,10 @@ export default function GroupScreen({ route, navigation }) {
                   {buddy.buddyName.split(' ')[0]}
                 </Text>
                 {buddy.sharedStreak > 0 && (
-                  <Text style={styles.buddyStreak}>🔥 {buddy.sharedStreak}</Text>
+                  <View style={styles.buddyStreakRow}>
+                    <Icon name="streak" size={iconSize.sm} color={theme.warning} />
+                    <Text style={styles.buddyStreak}>{buddy.sharedStreak}</Text>
+                  </View>
                 )}
                 <TouchableOpacity
                   style={styles.nudgeBtn}
@@ -740,7 +745,7 @@ export default function GroupScreen({ route, navigation }) {
             })}
             activeOpacity={0.85}
           >
-            <Text style={styles.challengeEmoji}>⚡</Text>
+            <Icon name="dailyChallenge" size={iconSize.xl} color={theme.primary} style={styles.challengeIcon} />
             <View style={{ flex: 1 }}>
               <Text style={styles.challengeTitle}>Daily Challenge</Text>
               <Text style={styles.challengeSub}>10 questions · same for everyone today</Text>
@@ -757,7 +762,7 @@ export default function GroupScreen({ route, navigation }) {
           onPress={() => navigation.navigate('GroupChallenge', { groupId, classId, classCode: code, classTitle: title })}
           activeOpacity={0.85}
         >
-          <Text style={styles.challengeEmoji}>🏆</Text>
+          <Icon name="trophy" size={iconSize.xl} color={theme.primary} style={styles.challengeIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.challengeTitle}>{activeChallenge.title}</Text>
             {challengeProgress ? (
@@ -787,7 +792,7 @@ export default function GroupScreen({ route, navigation }) {
           onPress={() => navigation.navigate('GroupChallenge', { groupId, classId, classCode: code, classTitle: title })}
           activeOpacity={0.85}
         >
-          <Text style={styles.challengeEmoji}>🏆</Text>
+          <Icon name="trophy" size={iconSize.xl} color={theme.primary} style={styles.challengeIcon} />
           <View style={{ flex: 1 }}>
             <Text style={styles.challengeTitle}>Class Challenges</Text>
             <Text style={styles.challengeSub}>Create a collective study goal</Text>
@@ -801,7 +806,7 @@ export default function GroupScreen({ route, navigation }) {
         <Text style={styles.sectionTitle}>Shared Decks</Text>
         {sortedDecks.length === 0 ? (
           <View style={styles.emptyBox}>
-            <Text style={styles.emptyEmoji}>📚</Text>
+            <Icon name="decks" size={iconSize.xl} color={theme.textMuted} style={styles.emptyIcon} />
             <Text style={styles.emptyText}>No shared decks yet</Text>
             <Text style={styles.emptySubtext}>
               Open a deck you created and share it with this group.
@@ -860,8 +865,9 @@ export default function GroupScreen({ route, navigation }) {
         <Text style={styles.title}>{title}</Text>
         <View style={styles.metaRow}>
           <View style={styles.badge}>
+            <Icon name="members" size={iconSize.sm} color={theme.primary} />
             <Text style={styles.badgeText}>
-              👥 {memberCount} {memberCount === 1 ? 'member' : 'members'}
+              {memberCount} {memberCount === 1 ? 'member' : 'members'}
             </Text>
           </View>
           {liveCount > 0 && (
@@ -909,7 +915,7 @@ export default function GroupScreen({ route, navigation }) {
             )}
             ListEmptyComponent={
               <View style={styles.feedEmpty}>
-                <Text style={styles.feedEmptyEmoji}>💬</Text>
+                <Icon name="comment" size={iconSize.xl} color={theme.textMuted} style={styles.feedEmptyIcon} />
                 <Text style={styles.feedEmptyText}>No posts yet</Text>
                 <Text style={styles.feedEmptySubtext}>
                   Be the first to post something for {code}!
@@ -1007,13 +1013,16 @@ const makeStyles = (theme) => StyleSheet.create({
   title: { fontSize: 14, color: theme.textSecondary, marginTop: 2, marginBottom: 8 },
   metaRow: { flexDirection: 'row', gap: 8 },
   badge: {
-    backgroundColor: '#eef2ff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: theme.primaryLight,
     borderRadius: 20,
     paddingVertical: 4,
     paddingHorizontal: 10,
     alignSelf: 'flex-start',
   },
-  badgeText: { fontSize: 12, color: '#4338ca', fontWeight: '600' },
+  badgeText: { fontSize: 12, color: theme.primary, fontWeight: '600' },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1084,12 +1093,12 @@ const makeStyles = (theme) => StyleSheet.create({
 
   // ── empty states ────────────────────────────────────────────────────────
   emptyBox: { alignItems: 'center', paddingVertical: 16 },
-  emptyEmoji: { fontSize: 28, marginBottom: 6 },
+  emptyIcon: { marginBottom: 6 },
   emptyText: { fontSize: 14, fontWeight: '600', color: theme.text, marginBottom: 4 },
   emptySubtext: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 18 },
 
   feedEmpty: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 32 },
-  feedEmptyEmoji: { fontSize: 36, marginBottom: 8 },
+  feedEmptyIcon: { marginBottom: 8 },
   feedEmptyText: { fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 4 },
   feedEmptySubtext: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 18 },
 
@@ -1132,14 +1141,14 @@ const makeStyles = (theme) => StyleSheet.create({
   postAuthor: { fontSize: 14, fontWeight: '700', color: theme.text },
   postTime: { fontSize: 11, color: theme.textSecondary, marginTop: 1 },
   activityBadge: {
-    backgroundColor: '#fef9c3',
+    backgroundColor: theme.warningBg,
     borderRadius: 10,
     paddingVertical: 2,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: '#fde68a',
+    borderColor: theme.warning,
   },
-  activityBadgeText: { fontSize: 10, color: '#854d0e', fontWeight: '600' },
+  activityBadgeText: { fontSize: 10, color: theme.warningText, fontWeight: '600' },
   postMenuBtn: {
     marginLeft: 4,
     paddingVertical: 4,
@@ -1217,7 +1226,7 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1.5,
     borderColor: theme.accent || '#a5b4fc',
   },
-  challengeEmoji: { fontSize: 28, marginRight: 12 },
+  challengeIcon: { marginRight: 12 },
   challengeTitle: { fontSize: 15, fontWeight: '800', color: theme.primary },
   challengeSub: { fontSize: 12, color: theme.primary, marginTop: 2, opacity: 0.75 },
   challengeChevron: { fontSize: 24, color: theme.primary, fontWeight: '700' },
@@ -1233,7 +1242,7 @@ const makeStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.primaryLight || '#e5e7eb',
   },
-  classActionEmoji: { fontSize: 22, marginRight: 12 },
+  classActionIcon: { marginRight: 12 },
   classActionTitle: { fontSize: 15, fontWeight: '700', color: theme.text },
   classActionSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
 
@@ -1294,7 +1303,8 @@ const makeStyles = (theme) => StyleSheet.create({
 
   // ── study buddies ────────────────────────────────────────────────────────
   buddyCard: { alignItems: 'center', width: 72, gap: 3 },
-  buddyStreak: { fontSize: 11, color: '#f97316', fontWeight: '700' },
+  buddyStreakRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  buddyStreak: { fontSize: 11, color: theme.warning, fontWeight: '700' },
   nudgeBtn: {
     backgroundColor: '#f3f4f6',
     borderRadius: 10,

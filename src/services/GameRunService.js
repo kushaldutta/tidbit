@@ -128,69 +128,6 @@ class GameRunService {
       return [];
     }
   }
-
-  /**
-   * Accumulate onto the one-run-per-challenge row (Jeopardy claims, etc.).
-   * Inserts if this is the user's first play of the challenge.
-   */
-  static async addToRun(challengeId, {
-    gameType,
-    classId = null,
-    deltaScore = 0,
-    deltaCorrect = 0,
-    elapsedMs = 0,
-    claim = null,
-  }) {
-    if (!SUPABASE_CONFIGURED || !challengeId) return null;
-    const existing = await this.getMyRunForChallenge(challengeId);
-    if (!existing) {
-      const inserted = await this.recordRun({
-        challengeId,
-        gameType,
-        classId,
-        score: deltaScore,
-        correctCount: deltaCorrect,
-        totalAttempted: 1,
-        elapsedMs,
-        meta: { claims: claim ? [claim] : [] },
-      });
-      if (inserted) {
-        return {
-          id: inserted.id,
-          score: deltaScore,
-          correct_count: deltaCorrect,
-          total_attempted: 1,
-          meta: { claims: claim ? [claim] : [] },
-        };
-      }
-      const raced = await this.getMyRunForChallenge(challengeId);
-      if (!raced) return null;
-      return this._patchRun(raced, { deltaScore, deltaCorrect, elapsedMs, claim });
-    }
-    return this._patchRun(existing, { deltaScore, deltaCorrect, elapsedMs, claim });
-  }
-
-  static async _patchRun(existing, { deltaScore, deltaCorrect, elapsedMs, claim }) {
-    const claims = [...(existing.meta?.claims || [])];
-    if (claim) claims.push(claim);
-    const { data, error } = await supabase
-      .from('game_runs')
-      .update({
-        score: (existing.score || 0) + deltaScore,
-        correct_count: (existing.correct_count || 0) + deltaCorrect,
-        total_attempted: (existing.total_attempted || 0) + 1,
-        elapsed_ms: elapsedMs,
-        meta: { ...(existing.meta || {}), claims },
-      })
-      .eq('id', existing.id)
-      .select('id, score, correct_count, total_attempted, meta')
-      .maybeSingle();
-    if (error) {
-      console.warn('[GameRunService] addToRun failed:', error.message);
-      return null;
-    }
-    return data;
-  }
 }
 
 export { GameRunService };

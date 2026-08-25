@@ -90,7 +90,7 @@ function ModeCard({ mode, onPress, disabled, styles, theme }) {
   );
 }
 
-function DeckRow({ deck, selected, onPress, styles }) {
+function DeckRow({ deck, selected, onPress, styles, theme }) {
   return (
     <TouchableOpacity
       style={[styles.deckRow, selected && styles.deckRowSelected]}
@@ -102,7 +102,7 @@ function DeckRow({ deck, selected, onPress, styles }) {
         <Text style={styles.deckTitle} numberOfLines={1}>{deck.title}</Text>
         <Text style={styles.deckSub}>{deck.card_count ?? 0} cards</Text>
       </View>
-      {selected && <Text style={styles.deckCheck}>✓</Text>}
+      {selected && <Icon name="check" size={iconSize.md} color={theme.primary} />}
     </TouchableOpacity>
   );
 }
@@ -115,7 +115,7 @@ function SectionToggleRow({ label, sublabel, selected, onPress, styles }) {
       activeOpacity={0.75}
     >
       <View style={[styles.sectionCheck, selected && styles.sectionCheckSelected]}>
-        {selected && <Text style={styles.sectionCheckMark}>✓</Text>}
+        {selected && <Icon name="check" size={iconSize.sm} color="#fff" />}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.sectionRowTitle}>{label}</Text>
@@ -332,7 +332,7 @@ export default function LearnModePickerScreen({ route, navigation }) {
             <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />
           ) : deckListData.length === 0 ? (
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyEmoji}>📭</Text>
+              <Icon name="deck" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
               <Text style={styles.emptyText}>No decks available yet.</Text>
               <Text style={styles.emptySubtext}>
                 Enroll in classes on the Categories tab or create your own deck.
@@ -360,6 +360,7 @@ export default function LearnModePickerScreen({ route, navigation }) {
                     selected={selectedDeck?.id === item.deck.id}
                     onPress={() => handleDeckSelect(item.deck)}
                     styles={styles}
+                    theme={theme}
                   />
                 );
               }}
@@ -438,7 +439,7 @@ export default function LearnModePickerScreen({ route, navigation }) {
           )}
 
           <View style={styles.tipsBox}>
-            <Text style={styles.tipsTitle}>💡 Tips</Text>
+            <Text style={styles.tipsTitle}>Tips</Text>
             <Text style={styles.tipText}>• <Text style={{ fontWeight: '700' }}>Quiz</Text> — great first pass, builds recognition</Text>
             <Text style={styles.tipText}>• <Text style={{ fontWeight: '700' }}>Recall</Text> — harder, but better for long-term retention</Text>
             <Text style={styles.tipText}>• <Text style={{ fontWeight: '700' }}>Match</Text> — warm-up or review, good for speed</Text>
@@ -550,11 +551,6 @@ const makeStyles = (theme) => StyleSheet.create({
     borderColor: theme.primary,
     backgroundColor: theme.primary,
   },
-  sectionCheckMark: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '800',
-  },
   sectionRowTitle: {
     fontSize: 15,
     fontWeight: '600',
@@ -595,7 +591,7 @@ const makeStyles = (theme) => StyleSheet.create({
   tipText: { fontSize: 13, color: theme.text, lineHeight: 22 },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 32 },
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyText: { fontSize: 16, color: theme.text, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
   emptySubtext: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', marginBottom: 16, lineHeight: 20 },
   emptyLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },

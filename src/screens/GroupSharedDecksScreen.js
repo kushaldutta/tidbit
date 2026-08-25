@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 import { GroupService } from '../services/GroupService';
 import { AuthService } from '../services/AuthService';
 import { ModerationService } from '../services/ModerationService';
@@ -205,7 +207,7 @@ export default function GroupSharedDecksScreen({ route, navigation }) {
           )}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyEmoji}>📚</Text>
+              <Icon name="decks" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
               <Text style={styles.emptyText}>No shared decks yet</Text>
               <Text style={styles.emptySubtext}>
                 Open a deck you created and share it with this group.
@@ -256,7 +258,7 @@ const makeStyles = (theme) => StyleSheet.create({
   subtitle: { fontSize: 13, color: theme.textSecondary },
   listContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 },
   emptyBox: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 32 },
-  emptyEmoji: { fontSize: 36, marginBottom: 8 },
+  emptyIcon: { marginBottom: 12 },
   emptyText: { fontSize: 15, fontWeight: '600', color: theme.text, marginBottom: 4 },
   emptySubtext: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 18 },
 });

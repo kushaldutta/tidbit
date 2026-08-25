@@ -12,6 +12,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 import { GroupService } from '../services/GroupService';
 import { BlockService } from '../services/BlockService';
 import { BuddyService } from '../services/BuddyService';
@@ -161,7 +163,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
 
   const buddyButtonLabel = (status) => {
     switch (status) {
-      case 'buddies': return '🤝 Buddies';
+      case 'buddies': return 'Buddies';
       case 'request_sent': return 'Requested';
       case 'request_received': return 'Respond ›';
       default: return '+ Buddy';
@@ -198,7 +200,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
                   opponentName: item.display_name || 'Classmate',
                 })}
               >
-                <Text style={styles.duelBtnText}>⚔️ Duel</Text>
+                <Text style={styles.duelBtnText}>Duel</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -261,7 +263,7 @@ export default function GroupClassmatesScreen({ route, navigation }) {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyEmoji}>🎓</Text>
+              <Icon name="members" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
               <Text style={styles.emptyTitle}>No classmates yet</Text>
               <Text style={styles.emptyBody}>Share Tidbit with your class to see others here.</Text>
             </View>
@@ -338,7 +340,7 @@ const makeStyles = (theme) => StyleSheet.create({
   buddyBtnTextActive: { color: '#fff' },
 
   empty: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 24 },
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: theme.text, marginBottom: 6 },
   emptyBody: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 20 },
 });

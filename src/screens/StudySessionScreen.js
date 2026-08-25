@@ -299,7 +299,7 @@ export default function StudySessionScreen({ route, navigation }) {
         {/* Header with progress */}
         <View style={styles.header}>
           <TouchableOpacity onPress={handleClose} style={styles.closeHeaderButton}>
-            <Text style={styles.closeHeaderText}>✕</Text>
+            <Icon name="close" size={iconSize.md} color={theme.textSecondary} />
           </TouchableOpacity>
           
           {sessionStats && (

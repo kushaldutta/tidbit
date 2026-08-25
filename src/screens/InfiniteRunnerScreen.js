@@ -4,6 +4,11 @@
  * Character runs. A definition flies in as an obstacle.
  * Tap the matching term to dodge. Wrong tap or timeout = wipe out.
  * Score = distance. Class leaderboard.
+ *
+ * Deliberately theme-independent: this is a game canvas, not app chrome. The
+ * dark stage and amber score are the art direction and stay fixed across
+ * themes. Everything the player returns to (Home, wallet, leaderboards) is
+ * themed.
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -21,6 +26,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { RunnerService } from '../services/RunnerService';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 import { CardLearningService } from '../services/CardLearningService';
 import { GameRunService } from '../services/GameRunService';
 import { GAME_TYPE } from '../config/gameCatalog';
@@ -253,7 +260,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
     return (
       <SafeAreaView style={styles.center}>
         <TouchableOpacity style={styles.exitAbs} onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕</Text>
+          <Icon name="close" size={iconSize.md} color="#94a3b8" />
         </TouchableOpacity>
         <Text style={styles.bigEmoji}>🏃</Text>
         <Text style={styles.readyTitle}>Infinite Runner</Text>
@@ -302,7 +309,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
             <Text style={styles.backLink}>Done</Text>
           </TouchableOpacity>
           <View style={styles.lbCard}>
-            <Text style={styles.lbTitle}>🏅 {classCode || 'Class'} distance</Text>
+            <Text style={styles.lbTitle}>{classCode || 'Class'} distance</Text>
             {leaderboard.length === 0 ? (
               <Text style={styles.lbEmpty}>You're on the board.</Text>
             ) : (
@@ -330,7 +337,7 @@ export default function InfiniteRunnerScreen({ route, navigation }) {
       <SafeAreaView style={{ flex: 1 }} edges={['top']}>
         <View style={styles.hud}>
           <TouchableOpacity onPress={() => { stopLoops(); navigation.goBack(); }}>
-            <Text style={styles.exitText}>✕</Text>
+            <Icon name="close" size={iconSize.md} color="#94a3b8" />
           </TouchableOpacity>
           <Text style={styles.hudDist}>{Math.floor(distance)}m</Text>
           <Text style={styles.hudHits}>{correct} dodged</Text>

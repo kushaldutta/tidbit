@@ -16,6 +16,8 @@ import {
   Alert,
 } from 'react-native';
 import { GroupService } from '../services/GroupService';
+import { useTheme } from '../context/ThemeContext';
+import { spacing, radius } from '../theme/tokens';
 
 export default function SectionPickerModal({
   visible,
@@ -30,6 +32,8 @@ export default function SectionPickerModal({
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const { theme } = useTheme();
+  const styles = makeStyles(theme);
 
   const load = async () => {
     setLoading(true);
@@ -109,7 +113,7 @@ export default function SectionPickerModal({
           <Text style={styles.sub}>Join your discussion section so you study with the people in the room.</Text>
 
           {loading ? (
-            <ActivityIndicator color="#4f46e5" style={{ marginVertical: 20 }} />
+            <ActivityIndicator color={theme.primary} style={{ marginVertical: spacing.xl }} />
           ) : (
             <ScrollView style={{ maxHeight: 280 }} keyboardShouldPersistTaps="handled">
               {sections.length === 0 && !creating && (
@@ -142,7 +146,7 @@ export default function SectionPickerModal({
               <TextInput
                 style={styles.input}
                 placeholder="Section 103"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={theme.textMuted}
                 value={name}
                 onChangeText={setName}
                 autoFocus
@@ -178,50 +182,71 @@ export default function SectionPickerModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme) => StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.overlay },
   sheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 22,
-    paddingBottom: 32,
+    backgroundColor: theme.card,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: spacing.xxl,
+    paddingBottom: spacing.xxxl,
   },
-  title: { fontSize: 20, fontWeight: '800', color: '#111827' },
-  sub: { fontSize: 13, color: '#6b7280', marginTop: 4, marginBottom: 14, lineHeight: 18 },
-  empty: { fontSize: 14, color: '#6b7280', marginBottom: 12 },
+  title: { fontSize: 20, fontWeight: '700', color: theme.text },
+  sub: {
+    fontSize: 13,
+    color: theme.textSecondary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
+  empty: { fontSize: 14, color: theme.textSecondary, marginBottom: spacing.md },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    marginBottom: 8,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: theme.surfaceAlt,
+    marginBottom: spacing.sm,
   },
-  rowMine: { backgroundColor: '#eef2ff', borderWidth: 1.5, borderColor: '#c7d2fe' },
-  rowTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  rowSub: { fontSize: 12, color: '#6b7280', marginTop: 2 },
-  rowAction: { fontWeight: '800', color: '#4f46e5' },
+  rowMine: {
+    backgroundColor: theme.primaryLight,
+    borderWidth: 1.5,
+    borderColor: theme.primary,
+  },
+  rowTitle: { fontSize: 16, fontWeight: '700', color: theme.text },
+  rowSub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
+  rowAction: { fontWeight: '700', color: theme.primary },
   input: {
     borderWidth: 1.5,
-    borderColor: '#e5e7eb',
-    borderRadius: 12,
-    padding: 12,
+    borderColor: theme.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
     fontSize: 16,
-    marginBottom: 10,
-    color: '#111827',
+    marginBottom: spacing.sm,
+    color: theme.text,
   },
   saveBtn: {
-    backgroundColor: '#4f46e5',
-    borderRadius: 14,
-    paddingVertical: 14,
+    backgroundColor: theme.primary,
+    borderRadius: radius.card,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
   },
-  saveText: { color: '#fff', fontWeight: '800', fontSize: 16 },
-  createBtn: { marginTop: 12, alignItems: 'center', paddingVertical: 10 },
-  createText: { color: '#4f46e5', fontWeight: '700', fontSize: 15 },
-  clear: { textAlign: 'center', color: '#6b7280', fontWeight: '600', marginTop: 12 },
-  done: { textAlign: 'center', color: '#4f46e5', fontWeight: '800', marginTop: 10, fontSize: 16 },
+  saveText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  createBtn: { marginTop: spacing.md, alignItems: 'center', paddingVertical: spacing.sm },
+  createText: { color: theme.primary, fontWeight: '700', fontSize: 15 },
+  clear: {
+    textAlign: 'center',
+    color: theme.textSecondary,
+    fontWeight: '600',
+    marginTop: spacing.md,
+  },
+  done: {
+    textAlign: 'center',
+    color: theme.primary,
+    fontWeight: '700',
+    marginTop: spacing.sm,
+    fontSize: 16,
+  },
 });

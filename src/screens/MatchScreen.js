@@ -30,6 +30,8 @@ import { StudyDeckService } from '../services/StudyDeckService';
 import { GameScoreService } from '../services/GameScoreService';
 import { CardLearningService } from '../services/CardLearningService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 const MAX_PAIRS = 8;
 
@@ -245,7 +247,7 @@ export default function MatchScreen({ route, navigation }) {
   if (allCards.length < 2) {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.emptyEmoji}>🧩</Text>
+        <Icon name="match" size={iconSize.hero} color={theme.textMuted} style={styles.emptyIcon} />
         <Text style={styles.emptyText}>Need at least 2 cards to play Match.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -259,7 +261,10 @@ export default function MatchScreen({ route, navigation }) {
       {/* Top bar */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕ Exit</Text>
+          <View style={styles.exitRow}>
+            <Icon name="close" size={iconSize.sm} color={theme.textSecondary} />
+            <Text style={styles.exitText}>Exit</Text>
+          </View>
         </TouchableOpacity>
         <Text style={styles.titleText}>Match</Text>
         <Text style={styles.timerText}>{formatTime(elapsed)}</Text>
@@ -268,7 +273,9 @@ export default function MatchScreen({ route, navigation }) {
       {/* Stats row */}
       <View style={styles.statsRow}>
         <Text style={styles.stat}>{matchedCount}/{totalPairs} matched</Text>
-        {mistakes > 0 && <Text style={styles.statMistake}>✗ {mistakes} miss{mistakes !== 1 ? 'es' : ''}</Text>}
+        {mistakes > 0 && (
+          <Text style={styles.statMistake}>{mistakes} miss{mistakes !== 1 ? 'es' : ''}</Text>
+        )}
       </View>
 
       {/* Progress bar */}
@@ -278,7 +285,7 @@ export default function MatchScreen({ route, navigation }) {
 
       {done ? (
         <ScrollView contentContainerStyle={styles.doneScroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.doneEmoji}>🎉</Text>
+          <Icon name="trophy" size={iconSize.hero} color={theme.primary} style={styles.doneIcon} />
           <Text style={styles.doneTitle}>All matched!</Text>
           <Text style={styles.doneSub}>
             {formatTime(elapsed)}  ·  {mistakes === 0 ? 'Perfect!' : `${mistakes} miss${mistakes !== 1 ? 'es' : ''}`}
@@ -287,7 +294,7 @@ export default function MatchScreen({ route, navigation }) {
           {personalBest && (
             <View style={styles.pbRow}>
               <Text style={styles.pbText}>
-                🏆 Personal best: {formatTime(personalBest.elapsed_seconds)} · {personalBest.mistakes} miss{personalBest.mistakes !== 1 ? 'es' : ''}
+                Personal best: {formatTime(personalBest.elapsed_seconds)} · {personalBest.mistakes} miss{personalBest.mistakes !== 1 ? 'es' : ''}
               </Text>
             </View>
           )}
@@ -316,7 +323,7 @@ export default function MatchScreen({ route, navigation }) {
 
           {/* Leaderboard */}
           <View style={styles.lbCard}>
-            <Text style={styles.lbTitle}>🏅 Top scores — {deckTitle}</Text>
+            <Text style={styles.lbTitle}>Top scores — {deckTitle}</Text>
             {loadingLb ? (
               <ActivityIndicator color={theme.primary} style={{ marginVertical: 12 }} />
             ) : leaderboard.length === 0 ? (
@@ -324,14 +331,12 @@ export default function MatchScreen({ route, navigation }) {
             ) : (
               leaderboard.map((entry, i) => (
                 <View key={entry.userId} style={[styles.lbRow, entry.isMe && styles.lbRowMe]}>
-                  <Text style={styles.lbRank}>
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
-                  </Text>
+                  <Text style={styles.lbRank}>{i + 1}.</Text>
                   <Text style={[styles.lbName, entry.isMe && styles.lbNameMe]} numberOfLines={1}>
                     {entry.displayName}
                   </Text>
                   <Text style={[styles.lbScore, entry.isMe && styles.lbScoreMe]}>
-                    {formatTime(entry.elapsedSeconds)} · {entry.mistakes}✗
+                    {formatTime(entry.elapsedSeconds)} · {entry.mistakes} miss
                   </Text>
                 </View>
               ))
@@ -382,6 +387,7 @@ const makeStyles = (theme) => StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingVertical: 12,
   },
+  exitRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   exitText: { fontSize: 14, color: theme.textSecondary, fontWeight: '600', width: 60 },
   titleText: { fontSize: 16, fontWeight: '800', color: theme.text },
   timerText: { fontSize: 14, color: theme.textSecondary, fontWeight: '600', width: 60, textAlign: 'right' },
@@ -409,7 +415,7 @@ const makeStyles = (theme) => StyleSheet.create({
   tileText: { fontSize: 13, fontWeight: '600', color: theme.text, lineHeight: 18, textAlign: 'center' },
 
   doneScroll: { padding: 28, paddingBottom: 60, alignItems: 'center' },
-  doneEmoji: { fontSize: 56, marginBottom: 12 },
+  doneIcon: { marginBottom: 12 },
   doneTitle: { fontSize: 28, fontWeight: '800', color: theme.text, marginBottom: 6 },
   doneSub: { fontSize: 15, color: theme.textSecondary, marginBottom: 16 },
   pbRow: {
@@ -441,7 +447,7 @@ const makeStyles = (theme) => StyleSheet.create({
   lbScore: { fontSize: 13, fontWeight: '600', color: theme.textSecondary },
   lbScoreMe: { color: theme.primary },
 
-  emptyEmoji: { fontSize: 40, marginBottom: 12 },
+  emptyIcon: { marginBottom: 12 },
   emptyText: { fontSize: 16, color: theme.textSecondary, marginBottom: 16 },
   backLink: { fontSize: 15, color: theme.primary, fontWeight: '600' },
 });

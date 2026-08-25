@@ -1,3 +1,10 @@
+/**
+ * Boot splash — deliberately theme-independent.
+ *
+ * App.js renders this outside <ThemeProvider> while auth and onboarding
+ * state resolve, so useTheme() here would always return Classic anyway.
+ * Keep it neutral rather than pretending to be theme-aware.
+ */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

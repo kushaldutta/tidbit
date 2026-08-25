@@ -11,6 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthService } from '../../services/AuthService';
 import { useTheme } from '../../context/ThemeContext';
+import Icon from '../../components/Icon';
+import { iconSize } from '../../theme/tokens';
 
 export default function VerifyEmailScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -48,7 +50,7 @@ export default function VerifyEmailScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.emoji}>✉️</Text>
+        <Icon name="mail" size={iconSize.hero} color={theme.primary} style={styles.heroIcon} />
         <Text style={styles.title}>Confirm your email</Text>
         <Text style={styles.subtitle}>
           We sent a confirmation link to{' '}
@@ -104,7 +106,7 @@ const makeStyles = (theme) => StyleSheet.create({
     paddingTop: 48,
     paddingBottom: 48,
   },
-  emoji: { fontSize: 48, marginBottom: 16 },
+  heroIcon: { marginBottom: 16 },
   title: {
     fontSize: 32,
     fontWeight: '700',

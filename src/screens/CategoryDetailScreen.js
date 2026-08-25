@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { CategoryProgressService } from '../services/CategoryProgressService';
 import { StudyPlanService } from '../services/StudyPlanService';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 export default function CategoryDetailScreen({ route, navigation }) {
   const { categoryId } = route.params || {};
@@ -110,13 +112,13 @@ export default function CategoryDetailScreen({ route, navigation }) {
 
       {progress.due > 0 && (
         <View style={styles.dueCard}>
-          <Text style={styles.dueTitle}>📋 {progress.due} tidbits due for review</Text>
+          <Text style={styles.dueTitle}>{progress.due} tidbits due for review</Text>
           <Text style={styles.dueSubtext}>Time to review what you've learned!</Text>
         </View>
       )}
 
       <TouchableOpacity style={styles.studyButton} onPress={handleStudyCategory}>
-        <Text style={styles.studyButtonText}>📚 Study This Category</Text>
+        <Text style={styles.studyButtonText}>Study this category</Text>
       </TouchableOpacity>
 
       <View style={styles.infoCard}>

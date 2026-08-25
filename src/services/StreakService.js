@@ -113,13 +113,14 @@ class StreakService {
     const dates = await this.mergeDates([key]);
     const current = computeStreak(dates);
     this.scheduleCloudSync(dates);
-    if (current >= 7) {
-      try {
-        const { AchievementService } = require('./AchievementService');
+    try {
+      const { AchievementService } = require('./AchievementService');
+      if (current >= 7) {
         AchievementService.unlock(STREAK_ACHIEVEMENT_SLUG).catch(() => {});
-      } catch {
-        /* optional */
       }
+      AchievementService.recordNightOwl(at).catch(() => {});
+    } catch {
+      /* optional */
     }
     return current;
   }

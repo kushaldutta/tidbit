@@ -43,9 +43,6 @@ const ICONS = {
   dailyChallenge: ['flash-outline', 'flash'],
   speedDuel: ['people-outline', 'people'],
   runner: ['walk-outline', 'walk'],
-  jeopardy: ['grid-outline', 'grid'],
-  dungeon: ['shield-outline', 'shield'],
-  wordle: ['text-outline', 'text'],
 
   // ─── Study objects ───────────────────────────────────────────────────────
   deck: ['albums-outline', 'albums'],
@@ -96,6 +93,7 @@ const ICONS = {
   info: ['information-circle-outline', 'information-circle'],
   warning: ['alert-circle-outline', 'alert-circle'],
   search: ['search-outline', 'search'],
+  mail: ['mail-outline', 'mail'],
   lock: ['lock-closed-outline', 'lock-closed'],
 };
 

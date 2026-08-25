@@ -14,6 +14,8 @@ import { ClassService } from '../../services/ClassService';
 import CatalogSegmentedControl from '../../components/CatalogSegmentedControl';
 import { DEFAULT_SCHOOL_ID, getSchool } from '../../config/schools';
 import { useTheme } from '../../context/ThemeContext';
+import Icon from '../../components/Icon';
+import { iconSize } from '../../theme/tokens';
 
 export default function ClassSelectionScreen({ route, navigation }) {
   const { theme } = useTheme();
@@ -143,7 +145,7 @@ export default function ClassSelectionScreen({ route, navigation }) {
           </Text>
         </View>
         <View style={[styles.checkbox, selected && styles.checkboxSelected]}>
-          {selected && <Text style={styles.checkmark}>✓</Text>}
+          {selected && <Icon name="check" size={iconSize.sm} color="#fff" />}
         </View>
       </TouchableOpacity>
     );
@@ -323,7 +325,6 @@ const makeStyles = (theme) => StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxSelected: { backgroundColor: theme.primary, borderColor: theme.primary },
-  checkmark: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   emptyText: {
     textAlign: 'center',

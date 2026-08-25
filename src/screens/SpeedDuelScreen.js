@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 import { RecallService } from '../services/RecallService';
 import { SpeedDuelService } from '../services/SpeedDuelService';
 import { GameRunService } from '../services/GameRunService';
@@ -147,7 +149,7 @@ export default function SpeedDuelScreen({ route, navigation }) {
   if (phase === 'error') {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={styles.bigEmoji}>⚔️</Text>
+        <Icon name="speedDuel" size={iconSize.hero} color={theme.textMuted} style={styles.bigIcon} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -165,10 +167,15 @@ export default function SpeedDuelScreen({ route, navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <TouchableOpacity style={styles.exitBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕</Text>
+          <Icon name="close" size={iconSize.md} color={theme.textSecondary} />
         </TouchableOpacity>
         <View style={styles.readyContent}>
-          <Text style={styles.bigEmoji}>{outcome?.result === 'win' ? '🏆' : '⚔️'}</Text>
+          <Icon
+            name={outcome?.result === 'win' ? 'trophy' : 'speedDuel'}
+            size={iconSize.hero}
+            color={theme.primary}
+            style={styles.bigIcon}
+          />
           <Text style={styles.readyTitle}>{title}</Text>
           {opponentName ? <Text style={styles.readySub}>vs {opponentName}</Text> : null}
           <Text style={styles.statLine}>
@@ -181,7 +188,11 @@ export default function SpeedDuelScreen({ route, navigation }) {
           )}
           {outcome?.coins > 0 && (
             <TouchableOpacity onPress={() => navigation.navigate('CoinWallet')}>
-              <Text style={styles.coinLine}>🪙 +{outcome.coins} Study Coins · see your pile ›</Text>
+              <View style={styles.coinRow}>
+                <Icon name="coins" size={iconSize.md} color={theme.warningText} />
+                <Text style={styles.coinLine}>+{outcome.coins} Study Coins</Text>
+              </View>
+              <Text style={styles.coinLineSub}>See your pile</Text>
             </TouchableOpacity>
           )}
           {phase === 'waiting' && (
@@ -200,7 +211,7 @@ export default function SpeedDuelScreen({ route, navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.topBar}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕</Text>
+          <Icon name="close" size={iconSize.md} color={theme.textSecondary} />
         </TouchableOpacity>
         <Text style={styles.progressText}>{index + 1} / {cards.length}</Text>
         <Text style={styles.timer}>{formatMs(elapsedMs)}</Text>
@@ -249,7 +260,7 @@ const makeStyles = (theme) => StyleSheet.create({
   muted: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', marginTop: 8 },
   errorText: { fontSize: 16, color: theme.text, textAlign: 'center', marginBottom: 12 },
   backLink: { fontSize: 16, fontWeight: '600', color: theme.primary },
-  bigEmoji: { fontSize: 56, textAlign: 'center', marginBottom: 8 },
+  bigIcon: { alignSelf: 'center', marginBottom: 8 },
   exitBtn: { position: 'absolute', top: 12, left: 16, zIndex: 2, padding: 8 },
   exitText: { fontSize: 22, color: theme.textSecondary, fontWeight: '600' },
   topBar: {
@@ -299,7 +310,9 @@ const makeStyles = (theme) => StyleSheet.create({
   readyTitle: { fontSize: 28, fontWeight: '800', color: theme.text, marginBottom: 6, textAlign: 'center' },
   readySub: { fontSize: 16, color: theme.textSecondary, marginBottom: 16 },
   statLine: { fontSize: 16, fontWeight: '600', color: theme.text, marginBottom: 6 },
-  coinLine: { fontSize: 18, fontWeight: '800', color: '#92400e', marginTop: 10 },
+  coinRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  coinLine: { fontSize: 18, fontWeight: '700', color: theme.warningText },
+  coinLineSub: { fontSize: 13, color: theme.textSecondary, textAlign: 'center', marginTop: 2 },
   goBtn: {
     marginTop: 28,
     backgroundColor: theme.primary,

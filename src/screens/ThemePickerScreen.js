@@ -14,6 +14,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTheme, THEMES } from '../context/ThemeContext';
 import { usePremium } from '../components/PremiumGate';
 import { CoinService } from '../services/CoinService';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 import {
   SHOP_ITEM,
   shopItemForTheme,
@@ -148,20 +150,20 @@ export default function ThemePickerScreen({ navigation }) {
             >
               <View style={[styles.swatch, { backgroundColor: t.primary }]} />
               <View style={[styles.swatchSmall, { backgroundColor: t.accent, marginLeft: 8 }]} />
-              <Text style={[styles.themeName, { color: theme.text }]}>
-                {t.emoji}  {t.label}
-              </Text>
+              <Text style={[styles.themeName, { color: theme.text }]}>{t.label}</Text>
               {active ? (
                 <View style={[styles.checkBadge, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.checkText}>✓</Text>
+                  <Icon name="check" size={iconSize.sm} color="#fff" />
                 </View>
               ) : open ? null : coinItem ? (
                 <View style={styles.coinPill}>
-                  <Text style={styles.coinPillText}>🪙 {coinItem.cost}</Text>
+                  <Icon name="coins" size={iconSize.sm} color={theme.warningText} />
+                  <Text style={styles.coinPillText}>{coinItem.cost}</Text>
                 </View>
               ) : (
                 <View style={styles.lockPill}>
-                  <Text style={styles.lockPillText}>🔒 Premium</Text>
+                  <Icon name="lock" size={iconSize.sm} color={theme.textMuted} />
+                  <Text style={styles.lockPillText}>Premium</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -179,7 +181,7 @@ export default function ThemePickerScreen({ navigation }) {
               Mitosis produces two genetically identical daughter cells; meiosis produces four genetically diverse gametes.
             </Text>
             <View style={[styles.previewBtn, { backgroundColor: theme.primary }]}>
-              <Text style={styles.previewBtnText}>Knew it ✓</Text>
+              <Text style={styles.previewBtnText}>Knew it</Text>
             </View>
           </View>
         </View>
@@ -217,8 +219,10 @@ const styles = StyleSheet.create({
   swatchSmall: { width: 16, height: 16, borderRadius: 8, marginRight: 12 },
   themeName: { flex: 1, fontSize: 16, fontWeight: '700' },
   checkBadge: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  checkText: { color: '#fff', fontWeight: '900', fontSize: 14 },
   coinPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#fffbeb',
     borderWidth: 1,
     borderColor: '#fcd34d',
@@ -226,14 +230,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  coinPillText: { fontSize: 13, fontWeight: '800', color: '#92400e' },
+  coinPillText: { fontSize: 13, fontWeight: '700', color: '#92400e' },
   lockPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#f3f4f6',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  lockPillText: { fontSize: 12, fontWeight: '800', color: '#6b7280' },
+  lockPillText: { fontSize: 12, fontWeight: '700', color: '#6b7280' },
 
   sectionLabel: {
     fontSize: 11, fontWeight: '800', textTransform: 'uppercase',

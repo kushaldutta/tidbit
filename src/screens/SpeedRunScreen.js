@@ -29,6 +29,8 @@ import { StudyDeckService } from '../services/StudyDeckService';
 import { RecallService } from '../services/RecallService';
 import { GameScoreService } from '../services/GameScoreService';
 import { CardLearningService } from '../services/CardLearningService';
+import Icon from '../components/Icon';
+import { iconSize } from '../theme/tokens';
 
 const DURATION_OPTIONS = [60, 90];
 
@@ -39,10 +41,9 @@ function formatTime(s) {
 // ─── Leaderboard row ─────────────────────────────────────────
 
 function LbRow({ rank, entry }) {
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
   return (
     <View style={[lbS.row, entry.isMe && lbS.rowMe]}>
-      <Text style={lbS.rank}>{medal}</Text>
+      <Text style={lbS.rank}>{rank}.</Text>
       <Text style={[lbS.name, entry.isMe && lbS.nameMe]} numberOfLines={1}>{entry.displayName}</Text>
       <Text style={[lbS.score, entry.isMe && lbS.scoreMe]}>{entry.correctCount} correct</Text>
     </View>
@@ -219,7 +220,7 @@ export default function SpeedRunScreen({ route, navigation }) {
   if (phase === 'error') {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: theme.background }]}>
-        <Text style={styles.errorEmoji}>⚡</Text>
+        <Icon name="speedRun" size={iconSize.hero} color={theme.textMuted} style={styles.errorIcon} />
         <Text style={styles.errorText}>Need at least 2 cards to Speed Run.</Text>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backLink}>← Back</Text>
@@ -234,10 +235,10 @@ export default function SpeedRunScreen({ route, navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <TouchableOpacity style={styles.exitBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.exitText}>✕</Text>
+          <Icon name="close" size={iconSize.md} color={theme.textSecondary} />
         </TouchableOpacity>
         <View style={styles.readyContent}>
-          <Text style={styles.readyEmoji}>⚡</Text>
+          <Icon name="speedRun" size={iconSize.hero} color={theme.primary} style={styles.readyIcon} />
           <Text style={styles.readyTitle}>Speed Run</Text>
           <Text style={styles.readySub}>{deckTitle}</Text>
           <Text style={styles.readyDesc}>
@@ -259,7 +260,7 @@ export default function SpeedRunScreen({ route, navigation }) {
             ))}
           </View>
           <TouchableOpacity style={styles.goBtn} onPress={() => startRun(duration)} activeOpacity={0.85}>
-            <Text style={styles.goBtnText}>Go! ⚡</Text>
+            <Text style={styles.goBtnText}>Go!</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -274,14 +275,19 @@ export default function SpeedRunScreen({ route, navigation }) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
         <ScrollView contentContainerStyle={styles.resultsScroll}>
-          <Text style={styles.resultsEmoji}>{correct >= 10 ? '🔥' : correct >= 5 ? '⚡' : '📖'}</Text>
+          <Icon
+            name={correct >= 10 ? 'streak' : correct >= 5 ? 'speedRun' : 'study'}
+            size={iconSize.hero}
+            color={theme.primary}
+            style={styles.resultsIcon}
+          />
           <Text style={styles.resultsScore}>{correct}</Text>
           <Text style={styles.resultsLabel}>correct in {duration}s</Text>
           <Text style={styles.resultsAccuracy}>{attempted} attempted · {accuracy}% accuracy</Text>
 
           {isPB && correct > 0 && (
             <View style={styles.pbBanner}>
-              <Text style={styles.pbBannerText}>🏆 New personal best!</Text>
+              <Text style={styles.pbBannerText}>New personal best</Text>
             </View>
           )}
           {!isPB && personalBest && (
@@ -293,14 +299,14 @@ export default function SpeedRunScreen({ route, navigation }) {
           )}
 
           <TouchableOpacity style={styles.tryAgainBtn} onPress={() => startRun(duration)} activeOpacity={0.85}>
-            <Text style={styles.tryAgainText}>Try again ⚡</Text>
+            <Text style={styles.tryAgainText}>Try again</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()} activeOpacity={0.85}>
             <Text style={styles.doneBtnText}>Done</Text>
           </TouchableOpacity>
 
           <View style={styles.lbCard}>
-            <Text style={styles.lbTitle}>🏅 Top scores — {deckTitle} ({duration}s)</Text>
+            <Text style={styles.lbTitle}>Top scores — {deckTitle} ({duration}s)</Text>
             {loadingResults ? (
               <ActivityIndicator color={theme.primary} style={{ margin: 16 }} />
             ) : leaderboard.length === 0 ? (
@@ -314,7 +320,7 @@ export default function SpeedRunScreen({ route, navigation }) {
 
           {attemptLog.length > 0 && (
             <View style={styles.reviewCard}>
-              <Text style={styles.reviewTitle}>📋 Your round</Text>
+              <Text style={styles.reviewTitle}>Your round</Text>
               {attemptLog.map((item, i) => (
                 <View
                   key={i}
@@ -330,9 +336,11 @@ export default function SpeedRunScreen({ route, navigation }) {
                       <Text style={styles.reviewYourAnswer}>You wrote: "{item.userAnswer}"</Text>
                     )}
                   </View>
-                  <Text style={item.wasCorrect ? styles.checkMark : styles.crossMark}>
-                    {item.wasCorrect ? '✓' : '✗'}
-                  </Text>
+                  <Icon
+                    name={item.wasCorrect ? 'check' : 'wrong'}
+                    size={iconSize.md}
+                    color={item.wasCorrect ? theme.success : theme.danger}
+                  />
                 </View>
               ))}
             </View>
@@ -369,7 +377,7 @@ export default function SpeedRunScreen({ route, navigation }) {
         <Text style={styles.timerText}>{timeLeft}s</Text>
         <Text style={styles.deckLabel} numberOfLines={1}>{deckTitle}</Text>
         <View style={styles.scoreBadge}>
-          <Text style={styles.scoreText}>{correct} ✓</Text>
+          <Text style={styles.scoreText}>{correct} correct</Text>
         </View>
       </View>
 
@@ -419,7 +427,7 @@ export default function SpeedRunScreen({ route, navigation }) {
 const makeStyles = (theme) => StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorEmoji: { fontSize: 48, marginBottom: 12 },
+  errorIcon: { marginBottom: 12 },
   errorText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 16 },
   backLink: { fontSize: 16, color: theme.primary, fontWeight: '600' },
   exitBtn: { position: 'absolute', top: 16, left: 16, zIndex: 10, padding: 8 },
@@ -427,7 +435,7 @@ const makeStyles = (theme) => StyleSheet.create({
 
   // Ready
   readyContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  readyEmoji: { fontSize: 64, marginBottom: 12 },
+  readyIcon: { marginBottom: 12 },
   readyTitle: { fontSize: 32, fontWeight: '900', color: theme.text, marginBottom: 4 },
   readySub: { fontSize: 15, color: theme.textSecondary, marginBottom: 16 },
   readyDesc: { fontSize: 14, color: theme.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 28 },
@@ -478,7 +486,7 @@ const makeStyles = (theme) => StyleSheet.create({
 
   // Results
   resultsScroll: { padding: 28, paddingBottom: 60, alignItems: 'center' },
-  resultsEmoji: { fontSize: 64, marginBottom: 12 },
+  resultsIcon: { marginBottom: 12 },
   resultsScore: { fontSize: 64, fontWeight: '900', color: theme.primary },
   resultsLabel: { fontSize: 18, fontWeight: '700', color: theme.text, marginBottom: 4 },
   resultsAccuracy: { fontSize: 14, color: theme.textSecondary, marginBottom: 16 },
@@ -526,6 +534,4 @@ const makeStyles = (theme) => StyleSheet.create({
   termWrong: { color: '#b91c1c' },
   reviewDef: { fontSize: 12, color: theme.textSecondary, lineHeight: 16 },
   reviewYourAnswer: { fontSize: 12, color: '#9ca3af', marginTop: 3, fontStyle: 'italic' },
-  checkMark: { fontSize: 18, fontWeight: '700', color: '#22c55e', marginLeft: 8, alignSelf: 'center' },
-  crossMark: { fontSize: 18, fontWeight: '700', color: '#ef4444', marginLeft: 8, alignSelf: 'center' },
 });

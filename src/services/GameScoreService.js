@@ -7,8 +7,11 @@
  */
 import { supabase, SUPABASE_CONFIGURED } from '../config/supabase';
 import { AuthService } from './AuthService';
+import { AchievementService } from './AchievementService';
 
 const TOP_N = 10;
+/** Speed Demon threshold — see src/config/achievementCatalog.js. */
+const SPEED_DEMON_CORRECT = 15;
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -130,6 +133,9 @@ class GameScoreService {
         correct_count: correctCount,
         total_attempted: totalAttempted,
       });
+      if (correctCount >= SPEED_DEMON_CORRECT) {
+        AchievementService.unlock('speed_demon').catch(() => {});
+      }
     } catch (err) {
       console.warn('[GameScoreService] saveSpeedRunScore failed:', err.message);
     }

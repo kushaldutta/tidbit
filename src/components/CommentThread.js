@@ -127,7 +127,7 @@ export default function CommentThread({ postId, commentCount = 0, isModerator = 
         activeOpacity={0.7}
       >
         <Text style={styles.toggleLabel}>
-          {expanded ? '▲ Hide comments' : `💬 ${label}`}
+          {expanded ? 'Hide comments' : label}
         </Text>
       </TouchableOpacity>
 

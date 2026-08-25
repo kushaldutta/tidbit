@@ -897,7 +897,7 @@ export default function SettingsScreen({ navigation }) {
 
       {false && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔧 Spaced Repetition Debug</Text>
+          <Text style={styles.sectionTitle}>Spaced Repetition Debug</Text>
         <View style={styles.debugStats}>
           <View style={styles.debugStatRow}>
             <Text style={styles.debugStatLabel}>Total Tidbits with State:</Text>
