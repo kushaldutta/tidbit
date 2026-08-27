@@ -39,6 +39,8 @@ const CLASS_TO_CATEGORY = {
   'uc-berkeley:chem1b:fa26':      'chem1b',
   'uc-berkeley:eecs16a:fa26':     'eecs16a',
   'uc-berkeley:eecs16b:fa26':     'eecs16b',
+  'uc-berkeley:eps7:fa26':        'eps7',
+  'uc-berkeley:math185:fa26':     'math185',
   ...AP_CLASS_TO_CATEGORY,
 };
 
@@ -131,6 +133,7 @@ const FALLBACK_CLASSES = {
     { id: 'uc-berkeley:psych1:fa26',   code: 'PSYCH 1',    title: 'General Psychology',                                subject: 'Psychology' },
     { id: 'uc-berkeley:hist7a:fa26',   code: 'HISTORY 7A', title: 'Introduction to the History of the United States: Settlement to Civil War', subject: 'History' },
     { id: 'uc-berkeley:phil25a:fa26',  code: 'PHILOS 25A', title: 'Ancient Philosophy',                                subject: 'Philosophy' },
+    { id: 'uc-berkeley:eps7:fa26',     code: 'EPS 7',      title: 'Introduction to Climate Change',                    subject: 'Earth & Planetary Science' },
   ]),
   'high-school-ap': [
     { id: 'hs-ap:ap_calc_ab:ap26',  code: 'AP Calc AB',      title: 'AP Calculus AB',                        subject: 'Mathematics' },
