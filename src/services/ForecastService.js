@@ -277,7 +277,9 @@ class ForecastService {
     const attempts = deps.attempts || (await this.loadRecentAttempts());
     const examDates = deps.examDates || (await InsightsService.getExamDates());
 
-    const allCards = await QueueService.loadCardsForCategory(categoryId);
+    // Load the full deck so the exam-scope filter below works against every card,
+    // not just the subset the user has enabled for notifications/study.
+    const allCards = await QueueService.loadCardsForCategory(categoryId, { bypassStudyScope: true });
     const name = ContentService.formatCategoryName(categoryId);
     const examInfo = examDates[categoryId];
 

@@ -81,9 +81,14 @@ class QueueService {
     this._reviewQueueCache = null;
   }
 
-  static async loadCardsForCategory(categoryId) {
+  static async loadCardsForCategory(categoryId, { bypassStudyScope = false } = {}) {
     const deckId = await ContentService.getPresetDeckIdForSlug(categoryId);
     if (deckId) {
+      if (bypassStudyScope) {
+        // Load every card in the deck — used by ForecastService so the exam-scope
+        // filter operates on the full card set, not just the notification scope.
+        return StudyDeckService.loadStudyCards(deckId, null);
+      }
       const studyScope = await StudyDeckService.resolveStudyScope(deckId);
       return StudyDeckService.loadStudyCards(deckId, studyScope);
     }
