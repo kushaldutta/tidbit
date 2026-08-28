@@ -29,10 +29,26 @@ import { getSchool } from '../config/schools';
 import { CoinService } from '../services/CoinService';
 import { BuddyService } from '../services/BuddyService';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 import { openLegalUrl, PRIVACY_URL, TERMS_URL } from '../constants/legalUrls';
 import Icon from '../components/Icon';
 import NavRow from '../components/NavRow';
 import { spacing, radius, iconSize } from '../theme/tokens';
+
+/**
+ * Version shown in About. Read from app.json rather than typed — the string it
+ * replaces said "Tidbit 2.3.1" while the app shipped 3.0.0, because a literal
+ * has no reason to change when the release does.
+ */
+const versionLabel = (() => {
+  const version = Constants.expoConfig?.version;
+  if (!version) return 'Tidbit';
+  const build =
+    Platform.OS === 'ios'
+      ? Constants.expoConfig?.ios?.buildNumber
+      : Constants.expoConfig?.android?.versionCode?.toString();
+  return build ? `Tidbit ${version} (${build})` : `Tidbit ${version}`;
+})();
 
 const INTERVAL_OPTIONS = [
   { label: '1 hour', value: 60 },
@@ -1019,12 +1035,24 @@ export default function SettingsScreen({ navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
         <Text style={styles.aboutText}>
-          Study with your class — course-native flashcards, daily challenges, and
-          classmates in the same lecture.
+          Study with your class: spaced repetition that learns your weak spots,
+          daily challenges your whole section plays, and decks shared by people
+          in your lecture.
         </Text>
-        <Text style={styles.aboutVersion}>Tidbit 2.3.1</Text>
+        {/* Read from app.json, never typed: the old hardcoded string was three
+            releases stale. Build number included because it is the first thing
+            worth knowing when someone taps Contact support below. */}
+        <Text style={styles.aboutVersion}>{versionLabel}</Text>
         <TouchableOpacity
-          onPress={() => Linking.openURL('mailto:kushald@berkeley.edu?subject=Tidbit App Support')}
+          onPress={() =>
+            Linking.openURL(
+              // Version in the subject so a support mail arrives already saying
+              // which build it came from.
+              `mailto:kushald@berkeley.edu?subject=${encodeURIComponent(
+                `${versionLabel} — Support`,
+              )}`,
+            )
+          }
           activeOpacity={0.7}
         >
           <Text style={styles.aboutLink}>Contact support</Text>

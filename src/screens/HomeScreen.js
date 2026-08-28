@@ -140,7 +140,7 @@ export default function HomeScreen({ navigation }) {
       await ClassService.ensureCategoriesSyncedToEnrollments();
       const progress = await CategoryProgressService.getEnrollmentCategoriesProgress();
       const sorted = CategoryProgressService.sortForHome(progress);
-      setCategoryProgress(sorted.slice(0, 3));
+      setCategoryProgress(sorted.slice(0, 4));
     } catch (error) {
       console.error('Error loading category progress:', error);
       setCategoryProgress([]);
@@ -368,7 +368,7 @@ export default function HomeScreen({ navigation }) {
       {challengeClasses.length > 0 && (
         <View style={styles.challengeSection}>
           <Text style={styles.sectionTitle}>Daily Challenge</Text>
-          {challengeClasses.slice(0, 3).map((cls) => {
+          {challengeClasses.map((cls) => {
             const categorySlug = ClassService.getCategoryForClass(cls.id);
             if (!categorySlug) return null;
             return (
