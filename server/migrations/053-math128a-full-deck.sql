@@ -10,6 +10,12 @@
 -- ─────────────────────────────────────────────────────────────
 -- 0. Wipe existing hand-entered cards and sections so we start clean
 -- ─────────────────────────────────────────────────────────────
+DELETE FROM public.saved_tidbits
+WHERE tidbit_id IN (SELECT id FROM public.tidbits WHERE category_id = 'math128a');
+
+DELETE FROM public.tidbits
+WHERE category_id = 'math128a';
+
 DELETE FROM public.cards
 WHERE deck_id = (SELECT id FROM public.decks WHERE slug = 'math128a');
 

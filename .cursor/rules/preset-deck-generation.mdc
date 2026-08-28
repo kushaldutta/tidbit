@@ -1,0 +1,30 @@
+---
+description: When generating a Berkeley preset class deck, wipe leftover tidbits for that class
+alwaysApply: true
+---
+
+# Preset deck generation
+
+When the user asks to generate/rebuild a class deck:
+
+1. Write a wipe-and-rebuild SQL migration (~10 sections × ~15 cards).
+2. Always delete **old `tidbits` stubs** for that class as part of the wipe, not only `cards` / `deck_sections`:
+
+```sql
+DELETE FROM public.saved_tidbits
+WHERE tidbit_id IN (SELECT id FROM public.tidbits WHERE category_id = '<slug>');
+
+DELETE FROM public.tidbits
+WHERE category_id = '<slug>';
+
+DELETE FROM public.cards
+WHERE deck_id = (SELECT id FROM public.decks WHERE slug = '<slug>');
+
+DELETE FROM public.deck_sections
+WHERE deck_id = (SELECT id FROM public.decks WHERE slug = '<slug>');
+```
+
+The study UI reads `cards`. `tidbits` is leftover from the old one-fact-per-row seed (`/api/tidbits` still reads it). Leaving those rows makes the Table Editor look like the deck was never rebuilt.
+
+3. Apply the SQL to the live Tidbit Supabase project when MCP is available (including the tidbits delete).
+4. Never use three consecutive apostrophes (`'''`) in card text; escape as `''`.

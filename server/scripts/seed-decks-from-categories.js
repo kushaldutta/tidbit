@@ -26,7 +26,7 @@ const CATEGORY_EMOJI = {
   'math-54': '🧮', history: '🏛️', science: '🔬',
   'berkeley-fun-facts': '🐻', miscellaneous: '💡',
   'cs-61a': '💻', 'cs61b': '💻', 'cs61c': '⚙️', 'cs70': '🎲',
-  'cs161': '🔐', 'cs188': '🤖', 'data100': '📊',
+  'cs161': '🔐', 'cs162': '🖥️', 'cs170': '🧩', 'cs186': '🗄️', 'cs188': '🤖', 'cs189': '🧠', 'data100': '📊',
   econ100a: '📈', econ100b: '📈', 'physics137a': '⚛️',
   'math128a': '🧮', 'math51': '🧮', 'math52': '🧮', 'math53': '🧮', 'math55': '🧮',
   'nuc150': '☢️', 'nuc155': '☢️', 'agrs28': '📜', 'mcb102': '🔬',

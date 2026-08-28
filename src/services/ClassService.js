@@ -19,6 +19,10 @@ const CLASS_TO_CATEGORY = {
   'uc-berkeley:cs70:fa26':     'cs70',
   'uc-berkeley:cs188:fa26':    'cs188',
   'uc-berkeley:cs161:fa26':    'cs161',
+  'uc-berkeley:cs162:fa26':    'cs162',
+  'uc-berkeley:cs170:fa26':    'cs170',
+  'uc-berkeley:cs186:fa26':    'cs186',
+  'uc-berkeley:cs189:fa26':    'cs189',
   'uc-berkeley:data8:fa26':    'data-8',
   'uc-berkeley:data100:fa26':  'data100',
   'uc-berkeley:econ1:fa26':    'econ-1',
@@ -37,10 +41,12 @@ const CLASS_TO_CATEGORY = {
   'uc-berkeley:bio1b:fa26':       'bio1b',
   'uc-berkeley:chem1a:fa26':      'chem1a',
   'uc-berkeley:chem1b:fa26':      'chem1b',
+  'uc-berkeley:chem3a:fa26':      'chem3a',
   'uc-berkeley:eecs16a:fa26':     'eecs16a',
   'uc-berkeley:eecs16b:fa26':     'eecs16b',
   'uc-berkeley:eps7:fa26':        'eps7',
   'uc-berkeley:math185:fa26':     'math185',
+  'uc-berkeley:ugba101a:fa26':    'ugba101a',
   ...AP_CLASS_TO_CATEGORY,
 };
 

@@ -10,6 +10,12 @@
 -- ─────────────────────────────────────────────────────────────
 -- 0. Wipe any existing hand-entered content
 -- ─────────────────────────────────────────────────────────────
+DELETE FROM public.saved_tidbits
+WHERE tidbit_id IN (SELECT id FROM public.tidbits WHERE category_id = 'stat134');
+
+DELETE FROM public.tidbits
+WHERE category_id = 'stat134';
+
 DELETE FROM public.cards
 WHERE deck_id = (SELECT id FROM public.decks WHERE slug = 'stat134');
 
