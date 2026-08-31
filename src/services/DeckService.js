@@ -25,6 +25,21 @@ class DeckService {
     this._cardsCache.delete(deckId);
   }
 
+  /** class_id → slug for system preset decks (warmed by listPresetDecks). */
+  static _presetSlugByClassId = new Map();
+
+  static rememberPresets(presets) {
+    const next = new Map();
+    for (const p of presets || []) {
+      if (p.class_id && p.slug) next.set(p.class_id, p.slug);
+    }
+    this._presetSlugByClassId = next;
+  }
+
+  static cachedSlugForClass(classId) {
+    return classId ? this._presetSlugByClassId.get(classId) || null : null;
+  }
+
   static async listMyDecks() {
     if (!SUPABASE_CONFIGURED) return [];
     const userId = AuthService.getUserId();
@@ -53,6 +68,7 @@ class DeckService {
       console.error('[DECK] listPresetDecks:', error);
       return [];
     }
+    this.rememberPresets(data || []);
     return data || [];
   }
 

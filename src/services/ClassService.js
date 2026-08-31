@@ -25,6 +25,7 @@ const CLASS_TO_CATEGORY = {
   'uc-berkeley:cs189:fa26':    'cs189',
   'uc-berkeley:data8:fa26':    'data-8',
   'uc-berkeley:data100:fa26':  'data100',
+  'uc-berkeley:data140:fa26':  'data140',
   'uc-berkeley:econ1:fa26':    'econ-1',
   'uc-berkeley:econ100a:fa26': 'econ100a',
   'uc-berkeley:econ100b:fa26': 'econ100b',
@@ -225,9 +226,9 @@ class ClassService {
 
   /** Whether preset tidbit content is live for this class (enrollment works regardless). */
   static hasTidbitContent(classId) {
-    if (!CLASS_TO_CATEGORY[classId]) return false;
+    if (!classId) return false;
     if (AP_CLASS_TO_CATEGORY[classId]) return apCourseHasLiveContent(classId);
-    return true;
+    return Boolean(this.getCategoryForClass(classId));
   }
 
   /** Get class IDs the current user has already joined. */
@@ -307,6 +308,14 @@ class ClassService {
       if (key) return CLASS_TO_CATEGORY[key];
     }
 
+    try {
+      const { DeckService } = require('./DeckService');
+      const fromPreset = DeckService.cachedSlugForClass(classId);
+      if (fromPreset) return fromPreset;
+    } catch (e) {
+      // DeckService may be unavailable during module init.
+    }
+
     return null;
   }
 
@@ -362,6 +371,13 @@ class ClassService {
   static async ensureCategoriesSyncedToEnrollments() {
     const classIds = await this.getMyClassIds();
     if (classIds.length === 0) return false;
+
+    try {
+      const { DeckService } = require('./DeckService');
+      await DeckService.listPresetDecks();
+    } catch (e) {
+      // Category sync still works from CLASS_TO_CATEGORY if presets fail to load.
+    }
 
     const expected = this.categoryIdsForClasses(classIds);
     const disabledSet = new Set(await StorageService.getNotificationDisabledCategories());

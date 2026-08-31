@@ -19,6 +19,7 @@ import { GAME_CATALOG, GAME_TYPE } from '../config/gameCatalog';
 import { SpeedDuelService } from '../services/SpeedDuelService';
 import { GroupService } from '../services/GroupService';
 import { ClassService } from '../services/ClassService';
+import { DeckService } from '../services/DeckService';
 import CoinBalanceChip from '../components/CoinBalanceChip';
 import BuddyRequestsCard from '../components/BuddyRequestsCard';
 import Icon from '../components/Icon';
@@ -40,6 +41,7 @@ export default function GamesScreen({ navigation }) {
       const [pending, myGroups] = await Promise.all([
         SpeedDuelService.getInbox(),
         GroupService.getMyGroups(),
+        DeckService.listPresetDecks(),
       ]);
       setInbox(pending);
       const unique = [];

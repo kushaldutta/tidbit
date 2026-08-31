@@ -277,6 +277,7 @@ export default function GroupScreen({ route, navigation }) {
         GroupChallengeService.getActiveChallengeForGroup(groupId),
         GroupService.getMySection(classId),
         BuddyService.getPendingRequests(),
+        DeckService.listPresetDecks(),
       ]);
       setClassmates(BlockService.filterClassmates(cm, blockedIds));
       setDecks(BlockService.filterDecks(dk, blockedIds));
