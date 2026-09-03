@@ -31,6 +31,7 @@ const CATEGORY_EMOJI = {
   'math128a': '🧮', 'math51': '🧮', 'math52': '🧮', 'math53': '🧮', 'math55': '🧮',
   'nuc150': '☢️', 'nuc155': '☢️', 'agrs28': '📜', 'mcb102': '🔬',
   'phys7a': '⚛️', 'phys7b': '⚛️', 'stat134': '📊',
+  'eecs16a': '⚡', 'eecs16b': '⚡', 'eecs127': '📐', 'eecs149': '🔌',
 };
 
 async function main() {
