@@ -5,10 +5,8 @@ INSERT INTO public.classes (id, school_id, code, title, term, subject) VALUES
   -- Mathematics
   ('uc-berkeley:math104:fa26',  'uc-berkeley', 'MATH 104',   'Introduction to Analysis',                          'fa26', 'Mathematics'),
   ('uc-berkeley:math105:fa26',  'uc-berkeley', 'MATH 105',   'Second Course in Analysis',                         'fa26', 'Mathematics'),
-  ('uc-berkeley:math110:fa26',  'uc-berkeley', 'MATH 110',   'Honors Abstract Linear Algebra',                    'fa26', 'Mathematics'),
-  ('uc-berkeley:math113:fa26',  'uc-berkeley', 'MATH 113',   'Introduction to Abstract Algebra',                  'fa26', 'Mathematics'),
-  ('uc-berkeley:math118:fa26',  'uc-berkeley', 'MATH 118',   'Honors Introduction to Analysis',                   'fa26', 'Mathematics'),
-  ('uc-berkeley:math126:fa26',  'uc-berkeley', 'MATH 126',   'Mathematical Logic',                                'fa26', 'Mathematics'),
+  ('uc-berkeley:math110:fa26',  'uc-berkeley', 'MATH 110',   'Abstract Linear Algebra',                           'fa26', 'Mathematics'),
+  ('uc-berkeley:math113:fa26',  'uc-berkeley', 'MATH 113',   'Abstract Algebra',                                  'fa26', 'Mathematics'),
   ('uc-berkeley:math185:fa26',  'uc-berkeley', 'MATH 185',   'Introduction to Complex Analysis',                  'fa26', 'Mathematics'),
   -- Computer Science
   ('uc-berkeley:cs162:fa26',    'uc-berkeley', 'CS 162',     'Operating Systems and System Programming',          'fa26', 'Computer Science'),
@@ -46,8 +44,6 @@ WHERE  c.id IN (
   'uc-berkeley:math105:fa26',
   'uc-berkeley:math110:fa26',
   'uc-berkeley:math113:fa26',
-  'uc-berkeley:math118:fa26',
-  'uc-berkeley:math126:fa26',
   'uc-berkeley:math185:fa26',
   'uc-berkeley:cs162:fa26',
   'uc-berkeley:cs170:fa26',
